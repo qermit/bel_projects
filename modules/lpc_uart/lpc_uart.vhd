@@ -135,6 +135,12 @@ architecture lpc_uart_arch of lpc_uart is
 	end component;
 	
 	constant uart_base_addr:	unsigned(15 downto 0) := x"03F8";
+  constant base_hw_12v:	    unsigned(15 downto 0) := x"0064";
+  constant base_bank_sel:   unsigned(15 downto 0) := x"004e";
+  constant vendor_id:       unsigned(15 downto 0) := x"004f";
+  
+  constant vendor_high_byte:  std_logic_vector(7 downto 0) := x"5c";
+  constant vendor_low_byte:  std_logic_vector(7 downto 0) := x"a3";
    
 	signal io_addr:			std_logic_vector(15 downto 0);
 	signal io_to_slave:		std_logic_vector(7 downto 0);
@@ -145,6 +151,7 @@ architecture lpc_uart_arch of lpc_uart is
 	signal s_baudout:	std_logic;
 	signal s_uart_addr:	std_logic_vector(2 downto 0);
 	signal s_uart_cs:	std_logic;
+  signal s_uart_out: std_logic_vector(7 downto 0);
 	signal s_addr_hit:	std_logic;
 	signal s_rd_en:		std_logic;
 	signal s_wr_en:		std_logic;
@@ -160,6 +167,15 @@ architecture lpc_uart_arch of lpc_uart is
 	signal serirq_oe: std_logic;
 	signal irq_vector: std_logic_vector(31 downto 0);
 	signal uart_int: std_logic;
+  
+  signal s_hw_12v_wr: std_logic;
+  signal s_hw_12v_rd: std_logic;
+  signal hw_12v_reg: std_logic_vector(7 downto 0);
+  signal s_bsel_wr: std_logic;
+  signal s_bsel_rd: std_logic;
+  signal bank_sel_reg: std_logic_vector(7 downto 0) := x"80";
+  signal s_vendorid_rd: std_logic;
+
    
 begin
 
@@ -181,12 +197,9 @@ begin
 		dma_tc_o => open,
 		wbm_err_i => '0',
 		
-		
-		
-		
 		io_bus_dat_o => io_to_slave,
 		io_bus_dat_i => io_from_slave,
-		io_bus_addr	=> io_addr,
+    io_bus_addr	=> io_addr,
 		io_bus_we => io_bus_we,
 		io_ack => '1',
 		io_data_valid => io_data_valid
@@ -213,7 +226,7 @@ begin
 		rd => s_rd_en,
 		a => s_uart_addr,
 		din => io_to_slave,
-		dout => io_from_slave,
+		dout => s_uart_out,
 		ddis => open,
 		int => uart_int,
 		out1n => open,
@@ -234,7 +247,7 @@ begin
 			clk_i => lpc_clk,
 			nrst_i => lpc_reset_n,
 			irq_i => irq_vector,
-         serirq_o => serirq_o,
+      serirq_o => serirq_o,
 			serirq_i =>  serirq_i,
 			serirq_oe => serirq_oe
 		);
@@ -262,8 +275,7 @@ begin
 	end process;
 	
 	serirq_i <= lpc_serirq;
-	
-	
+
 	
 	
 	uart_addr_deco:	process (lpc_clk, io_addr)
@@ -296,5 +308,70 @@ begin
 			
 		end if;
 	end process;
+  
+  winbond_deco:	process (io_addr, io_bus_we)
+	begin
+    s_hw_12v_wr <= '0';
+    s_hw_12v_rd <= '0';
+    s_bsel_wr <= '0';
+    s_bsel_rd <= '0';
+    s_vendorid_rd <= '0';
+    
+		case unsigned(io_addr) is
+      when base_bank_sel => 
+        if io_bus_we then
+          s_bsel_wr <= '1';
+        else
+          s_bsel_rd <= '1';
+        end if;
+      when vendor_id =>
+        if io_bus_we = '0' then
+          s_vendorid_rd <= '1';
+        end if;
+      when base_hw_12v => 
+        if io_bus_we then
+          s_hw_12v_wr <= '1';
+        else
+          s_hw_12v_rd <= '1';
+        end if;
+      when others =>
+        s_hw_12v_wr <= '0';
+        s_hw_12v_rd <= '0';
+        s_bsel_wr <= '0';
+        s_bsel_rd <= '0';
+        s_vendorid_rd <= '0';
+				
+		end case;
+	end process winbond_deco;
+  
+  hw_reg: process (lpc_clk, io_to_slave)
+  begin
+    if rising_edge(lpc_clk) then
+      if s_hw_12v_wr = '1' and io_data_valid = '1' then
+        hw_12v_reg <= io_to_slave;
+      end if;
+      if s_bsel_wr = '1' and io_data_valid = '1' then
+        bank_sel_reg <= io_to_slave;
+      end if;
+    end if;
+  end process;
+  
+  read_mux: process(hw_12v_reg, s_hw_12v_rd, s_uart_cs, s_bsel_rd)
+  begin
+    if s_hw_12v_rd = '1' then
+      io_from_slave <= hw_12v_reg;
+    elsif s_uart_cs = '1' then
+      io_from_slave <= s_uart_out;
+    elsif s_bsel_rd = '1' then
+      io_from_slave <= bank_sel_reg;
+    elsif s_vendorid_rd = '1' then
+      if bank_sel_reg(7) then
+        io_from_slave <= vendor_high_byte;
+      else
+        io_from_slave <= vendor_low_byte;
+      end if;
+    end if;
+  end process;
+  
 				
 end architecture;

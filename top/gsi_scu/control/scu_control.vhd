@@ -15,6 +15,7 @@ use work.wr_altera_pkg.all;
 use work.etherbone_pkg.all;
 use work.scu_bus_pkg.all;
 use work.oled_display_pkg.all;
+use work.lpc_uart_pkg.all;
 
 entity scu_control is
   port(
@@ -541,7 +542,7 @@ begin
        master_i      => cbar_slave_o(1),
        
        slave_clk_i   => clk_ref,
-       slave_rstn_i  => rstn_ref,
+       slave_rstn_i  => '1',
        slave_i       => pcie_slave_i,
        slave_o       => pcie_slave_o);
   
@@ -692,8 +693,10 @@ begin
       slave_i    => cbar_master_o(6),
       slave_o    => cbar_master_i(6),
       desc_o     => open,
-      uart_rxd_i => uart_rxd_i(1),
-      uart_txd_o => uart_txd_o(1));
+--      uart_rxd_i => uart_rxd_i(1),
+--      uart_txd_o => uart_txd_o(1),
+      uart_rxd_i => '1',
+      uart_txd_o => open);
       
   -------------------------------------
   -- OLED display
@@ -710,6 +713,29 @@ begin
       SCK_SPI_o  => hpla_ch(2),	
       SD_SPI_o   => hpla_ch(10),
       SH_VR_o    => hpla_ch(0));
+      
+  -------------------------------------
+  -- LPC UART
+  -------------------------------------
+  lpc_slave: lpc_uart
+    port map(
+      lpc_clk         => LPC_FPGA_CLK,
+      lpc_serirq      => LPC_SERIRQ,
+      lpc_ad          => LPC_AD,
+      lpc_frame_n     => nLPC_FRAME,
+      lpc_reset_n     => nPCI_RESET,
+      
+      serial_rxd      => uart_rxd_i(1),
+      serial_txd      => uart_txd_o(1),
+      serial_dtr      => open,
+      serial_dcd      => '0',
+      serial_dsr      => '0',
+      serial_ri       => '0',
+      serial_cts      => '0',
+      serial_rts      => open,
+      seven_seg_L     => open,
+      seven_seg_H     => open);
+      
     
   -- open drain buffer for one wire
   owr(0) <= OneWire_CB;
