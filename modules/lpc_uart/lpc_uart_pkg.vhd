@@ -12,6 +12,7 @@ package lpc_uart_pkg is
 		lpc_frame_n:		in std_logic;
 		lpc_reset_n:		in std_logic;
 
+    uart_clk:     in std_logic;
 		serial_rxd:		in std_logic;
 		serial_txd:		out std_logic;
 		serial_dtr:		out std_logic;

@@ -10,6 +10,7 @@ entity lpc_uart is
 		lpc_frame_n:	in std_logic;
 		lpc_reset_n:	in std_logic;
 
+    uart_clk:     in std_logic;
 		serial_rxd:		in std_logic;
 		serial_txd:		out std_logic;
 		serial_dtr:		out std_logic;
@@ -127,20 +128,26 @@ architecture lpc_uart_arch of lpc_uart is
 	port (
 			clk_i : in std_logic;
 			nrst_i : in std_logic;
-         irq_i : in std_logic_vector(31 downto 0);
-         serirq_o : out std_logic;
+      irq_i : in std_logic_vector(31 downto 0);
+      serirq_o : out std_logic;
 			serirq_i : in std_logic;
 			serirq_oe : out std_logic
 	);
 	end component;
 	
 	constant uart_base_addr:	unsigned(15 downto 0) := x"03F8";
-  constant base_hw_12v:	    unsigned(15 downto 0) := x"0064";
+  constant kbc_status:	    unsigned(15 downto 0) := x"0064";
+  constant kbc_data:	      unsigned(15 downto 0) := x"0060";
   constant base_bank_sel:   unsigned(15 downto 0) := x"004e";
   constant vendor_id:       unsigned(15 downto 0) := x"004f";
   
   constant vendor_high_byte:  std_logic_vector(7 downto 0) := x"5c";
   constant vendor_low_byte:  std_logic_vector(7 downto 0) := x"a3";
+  
+  constant EFER:            unsigned(15 downto 0) := x"002e";
+  constant EFIR:            unsigned(15 downto 0) := EFER;
+  constant EFDR:            unsigned(15 downto 0) := EFIR + 1;
+  
    
 	signal io_addr:			std_logic_vector(15 downto 0);
 	signal io_to_slave:		std_logic_vector(7 downto 0);
@@ -167,14 +174,25 @@ architecture lpc_uart_arch of lpc_uart is
 	signal serirq_oe: std_logic;
 	signal irq_vector: std_logic_vector(31 downto 0);
 	signal uart_int: std_logic;
-  
-  signal s_hw_12v_wr: std_logic;
-  signal s_hw_12v_rd: std_logic;
-  signal hw_12v_reg: std_logic_vector(7 downto 0);
+
   signal s_bsel_wr: std_logic;
   signal s_bsel_rd: std_logic;
   signal bank_sel_reg: std_logic_vector(7 downto 0) := x"80";
   signal s_vendorid_rd: std_logic;
+  
+  type ef_type is ( ef_idle, ef_first, ef_sec);
+			
+	signal ef_state:		ef_type;					-- Current state
+  signal ef_active: std_logic;
+  
+  signal efir_reg: std_logic_vector(7 downto 0);
+  signal ld_reg:  std_logic_vector(7 downto 0);
+  
+  signal kbc_status_reg: std_logic_vector(7 downto 0);
+  signal kbc_input_reg: std_logic_vector(7 downto 0);
+  signal kbc_output_reg: std_logic_vector(7 downto 0);
+  signal kbc_irq: std_logic;
+  
 
    
 begin
@@ -183,8 +201,7 @@ begin
 	s_wr_en <= io_bus_we and io_data_valid;
 	s_rd_en <= not io_bus_we and io_data_valid;
 	
-	
-	irq_vector <= x"FFFFFF" & "111" & not uart_int & "1111";	-- IRQ4 is IRQ frame 4 on CA945
+	irq_vector <= x"FFFFFF" & "111" & not uart_int & "11" & not kbc_irq & "1";	-- IRQ4 is IRQ frame 4 on CA945
 	
 	decoder: lpc_peripheral port map (
 		clk_i => lpc_clk,
@@ -309,57 +326,127 @@ begin
 		end if;
 	end process;
   
-  winbond_deco:	process (io_addr, io_bus_we)
-	begin
-    s_hw_12v_wr <= '0';
-    s_hw_12v_rd <= '0';
-    s_bsel_wr <= '0';
-    s_bsel_rd <= '0';
-    s_vendorid_rd <= '0';
-    
-		case unsigned(io_addr) is
-      when base_bank_sel => 
-        if io_bus_we then
-          s_bsel_wr <= '1';
-        else
-          s_bsel_rd <= '1';
-        end if;
-      when vendor_id =>
-        if io_bus_we = '0' then
-          s_vendorid_rd <= '1';
-        end if;
-      when base_hw_12v => 
-        if io_bus_we then
-          s_hw_12v_wr <= '1';
-        else
-          s_hw_12v_rd <= '1';
-        end if;
-      when others =>
-        s_hw_12v_wr <= '0';
-        s_hw_12v_rd <= '0';
-        s_bsel_wr <= '0';
-        s_bsel_rd <= '0';
-        s_vendorid_rd <= '0';
-				
-		end case;
-	end process winbond_deco;
-  
-  hw_reg: process (lpc_clk, io_to_slave)
+  extended_function: process (lpc_clk, lpc_reset_n)
   begin
-    if rising_edge(lpc_clk) then
-      if s_hw_12v_wr = '1' and io_data_valid = '1' then
-        hw_12v_reg <= io_to_slave;
+    if lpc_reset_n = '0' then
+      ef_state <= ef_idle;
+      ef_active <= '0';
+    elsif rising_edge(lpc_clk) then
+      ef_active <= '0';
+      
+      case ef_state is
+        when ef_idle =>
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"87" then
+            ef_state <= ef_first;
+          end if;
+        when ef_first =>
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"87" then
+            ef_state <= ef_sec;
+          end if;
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"AA" then
+            ef_state <= ef_idle;
+          end if;
+        when ef_sec =>
+          ef_active <= '1';
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"AA" then
+            ef_state <= ef_idle;
+          end if;
+      
+      end case;
+    end if;
+  end process;
+  
+ 
+  extended_access: process (lpc_clk, lpc_reset_n)
+  begin
+    if lpc_reset_n = '0' then
+      efir_reg <= x"00";
+    elsif rising_edge(lpc_clk) then
+      -- save config register address in EFIR
+      if ef_active = '1' and (io_addr = std_logic_vector(EFIR)) and io_bus_we = '1' then
+        efir_reg <= io_to_slave;
       end if;
-      if s_bsel_wr = '1' and io_data_valid = '1' then
-        bank_sel_reg <= io_to_slave;
+      -- save logical device number
+      if ef_active = '1' and (io_addr = std_logic_vector(EFDR)) and efir_reg = x"07" and io_bus_we = '1' then
+        ld_reg <= io_to_slave;
       end if;
     end if;
   end process;
   
-  read_mux: process(hw_12v_reg, s_hw_12v_rd, s_uart_cs, s_bsel_rd)
+--  winbond_deco:	process (io_addr, io_bus_we)
+--	begin
+--    s_hw_12v_wr <= '0';
+--    s_hw_12v_rd <= '0';
+--    s_bsel_wr <= '0';
+--    s_bsel_rd <= '0';
+--    s_vendorid_rd <= '0';
+--    
+--		case unsigned(io_addr) is
+--      when base_bank_sel => 
+--        if io_bus_we then
+--          s_bsel_wr <= '1';
+--        else
+--          s_bsel_rd <= '1';
+--        end if;
+--      when vendor_id =>
+--        if io_bus_we = '0' then
+--          s_vendorid_rd <= '1';
+--        end if;
+--      when base_hw_12v => 
+--        if io_bus_we then
+--          s_hw_12v_wr <= '1';
+--        else
+--          s_hw_12v_rd <= '1';
+--        end if;
+--      when others =>
+--        s_hw_12v_wr <= '0';
+--        s_hw_12v_rd <= '0';
+--        s_bsel_wr <= '0';
+--        s_bsel_rd <= '0';
+--        s_vendorid_rd <= '0';
+--				
+--		end case;
+--	end process winbond_deco;
+  
+--  hw_reg: process (lpc_clk, io_to_slave)
+--  begin
+--    if rising_edge(lpc_clk) then
+--      if s_hw_12v_wr = '1' and io_data_valid = '1' then
+--        hw_12v_reg <= io_to_slave;
+--      end if;
+--      if s_bsel_wr = '1' and io_data_valid = '1' then
+--        bank_sel_reg <= io_to_slave;
+--      end if;
+--    end if;
+--  end process;
+
+  kb_control: process (lpc_clk, lpc_reset_n)
   begin
-    if s_hw_12v_rd = '1' then
-      io_from_slave <= hw_12v_reg;
+    if lpc_reset_n = '0' then
+      kbc_status_reg <= x"64";
+      kbc_input_reg <= x"00";
+      kbc_output_reg <= x"00";
+      kbc_irq <= '0';
+    elsif rising_edge(lpc_clk) then
+      if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '1' and io_to_slave = x"aa" and io_data_valid = '1' then
+        kbc_input_reg <= x"55"; -- answer to selftest
+        kbc_status_reg <= x"55"; -- set IBF bit
+        kbc_irq <= '1';
+      end if;
+      if (io_addr = std_logic_vector(kbc_data)) and io_bus_we = '0' and io_data_valid = '1' then
+        kbc_status_reg <= x"64";
+        kbc_irq <= '0';
+      end if;
+    end if;
+  
+  end process;
+  
+  read_mux: process(s_uart_cs, s_bsel_rd, io_bus_we, ef_active)
+  begin
+    if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '0' then
+      io_from_slave <= kbc_status_reg;
+    elsif (io_addr = std_logic_vector(kbc_data)) and io_bus_we = '0' then
+      io_from_slave <= kbc_input_reg;
     elsif s_uart_cs = '1' then
       io_from_slave <= s_uart_out;
     elsif s_bsel_rd = '1' then
@@ -370,7 +457,102 @@ begin
       else
         io_from_slave <= vendor_low_byte;
       end if;
+    elsif ef_active = '1' and (io_addr = std_logic_vector(EFDR)) and io_bus_we = '0' then
+      if efir_reg = x"20" then
+        io_from_slave <= x"52";
+      end if;
+      
+      if efir_reg = x"22" then
+        io_from_slave <= x"ff";
+      end if;
+      if efir_reg = x"28" then
+        io_from_slave <= x"00";
+      end if;
+      if efir_reg = x"2b" then
+        io_from_slave <= x"00";
+      end if;
+      if ld_reg = x"02" then
+        if efir_reg = x"30" then
+          io_from_slave <= x"01"; -- UART A active
+        end if;
+        if efir_reg = x"60" then
+          io_from_slave <= x"03"; -- UART base 0x3f8
+        end if;
+        if efir_reg = x"61" then
+          io_from_slave <= x"f8"; -- UART base 0x3f8
+        end if;
+        if efir_reg = x"70" then
+          io_from_slave <= x"04"; -- UART IRQ 4
+        end if;
+        if efir_reg = x"F0" then
+          io_from_slave <= x"00"; -- clk source
+        end if;
+      end if;
+      if ld_reg = x"03" then
+        if efir_reg = x"30" then
+          io_from_slave <= x"00"; -- UART B inactive
+        end if;
+        if efir_reg = x"60" then
+          io_from_slave <= x"00"; -- UART base 0x3f8
+        end if;
+        if efir_reg = x"61" then
+          io_from_slave <= x"00"; -- UART base 0x3f8
+        end if;
+        if efir_reg = x"70" then
+          io_from_slave <= x"00"; -- UART IRQ 4
+        end if;
+        if efir_reg = x"F0" then
+          io_from_slave <= x"00"; -- clk source
+        end if;
+      end if;
+      if ld_reg = x"01" then
+        if efir_reg = x"30" then
+          io_from_slave <= x"00"; -- parallel port inactive
+        end if;
+        if efir_reg = x"60" then
+          io_from_slave <= x"03"; -- base 0x378
+        end if;
+        if efir_reg = x"61" then
+          io_from_slave <= x"78"; -- base 0x378
+        end if;
+        if efir_reg = x"70" then
+          io_from_slave <= x"00"; -- IRQ
+        end if;
+        if efir_reg = x"74" then
+          io_from_slave <= x"04"; -- no DMA active
+        end if;
+        if efir_reg = x"F0" then
+          io_from_slave <= x"3f"; -- interface mode ECP and EPP 1.7 mode
+        end if;
+      end if;
+      if ld_reg = x"05" then
+        if efir_reg = x"30" then
+          io_from_slave <= x"00"; -- kbc inactive
+        end if;
+        if efir_reg = x"60" then
+          io_from_slave <= x"00"; -- base 0x0060
+        end if;
+        if efir_reg = x"61" then
+          io_from_slave <= x"60"; -- base 0x0060
+        end if;
+        if efir_reg = x"62" then
+          io_from_slave <= x"00"; -- 
+        end if;
+        if efir_reg = x"63" then
+          io_from_slave <= x"64"; -- 
+        end if;
+        if efir_reg = x"70" then
+          io_from_slave <= x"01"; -- 
+        end if;
+        if efir_reg = x"72" then
+          io_from_slave <= x"0c"; -- 
+        end if;
+        if efir_reg = x"F0" then
+          io_from_slave <= x"80"; -- 
+        end if;
+      end if;
     end if;
+    
   end process;
   
 				
