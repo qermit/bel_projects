@@ -433,6 +433,11 @@ begin
         kbc_status_reg <= x"55"; -- set IBF bit
         kbc_irq <= '1';
       end if;
+      if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '1' and io_to_slave = x"20" and io_data_valid = '1' then
+        kbc_input_reg <= x"65";
+        kbc_status_reg <= x"66";
+        kbc_irq <= '1';
+      end if;
       if (io_addr = std_logic_vector(kbc_data)) and io_bus_we = '0' and io_data_valid = '1' then
         kbc_status_reg <= x"64";
         kbc_irq <= '0';
