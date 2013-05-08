@@ -31,22 +31,6 @@ end lpc_uart;
 
 architecture lpc_uart_arch of lpc_uart is
 
-
-	component lpc_decoder is
-		Port (
-		      lclk:         in std_logic;                      -- LPC: 33MHz clock (rising edge)
-		      lframe_n:   in std_logic;                        -- LPC: frame, active low
-		      lreset_n:   in std_logic;                        -- LPC: reset, active low
-		      lad:         in std_logic_vector(3 downto 0);    -- LPC: multiplexed bus
-		      
-		      paddr:		out std_logic_vector(15 downto 0);	-- port addr
-		      pdata_in: 	out std_logic_vector(7 downto 0);	-- data to the slave
-		      pdata_out:	in std_logic_vector(7 downto 0);	-- data from the slave
-		      paddr_valid:	out std_logic;
-		      pdata_valid:	out std_logic
-		);
-	end component;
-
 	component lpc_peripheral is
 	port (
 		
@@ -81,7 +65,7 @@ architecture lpc_uart_arch of lpc_uart is
 		addr_hit:	out std_logic;
 		data_valid:	in std_logic;
 		      
-		seven_seg_L:	out std_logic_vector(7 downto 0);    -- SSeg Data output
+		seven_seg_L:	out std_logic_vector(7 downto 0);   -- SSeg Data output
 		seven_seg_H:	out std_logic_vector(7 downto 0)    -- SSeg Data output  
 	
 	);
@@ -114,6 +98,23 @@ architecture lpc_uart_arch of lpc_uart is
 		SOUT        : out std_logic                             -- Transmitter output
 	    );
 	end component;
+  
+  component i8042_kbc is
+    port (
+      clk       : in std_logic;
+      nrst      : in std_logic;
+      cs        : in std_logic;
+      rd        : in std_logic;
+      wr        : in std_logic;
+      data      : in std_logic;                     -- command /data register select
+      stat_cmd  : in std_logic;
+      int       : out std_logic;                    -- irq from kbc
+      out_buffer  : out std_logic_vector(7 downto 0);  -- data out port to host
+      status_buffer : out std_logic_vector(7 downto 0);
+      in_buffer   : in std_logic_vector(7 downto 0)  -- data port from host
+    );
+   end component;
+      
 	
 	component uart_pll IS
 	PORT
@@ -188,10 +189,12 @@ architecture lpc_uart_arch of lpc_uart is
   signal efir_reg: std_logic_vector(7 downto 0);
   signal ld_reg:  std_logic_vector(7 downto 0);
   
-  signal kbc_status_reg: std_logic_vector(7 downto 0);
-  signal kbc_input_reg: std_logic_vector(7 downto 0);
-  signal kbc_output_reg: std_logic_vector(7 downto 0);
-  signal kbc_irq: std_logic;
+  signal kbc_irq:         std_logic;
+  signal s_kbc_cs:        std_logic;
+  signal kbc_data_out:    std_logic_vector(7 downto 0);
+  signal kbc_status_out:  std_logic_vector(7 downto 0);
+  signal s_kbc_status:    std_logic;
+  signal s_kbc_data:      std_logic;
   
 
    
@@ -269,8 +272,21 @@ begin
 			serirq_oe => serirq_oe
 		);
 	
+  i8042: i8042_kbc port map (
+    clk => lpc_clk,
+    nrst => lpc_reset_n,
+    cs => s_kbc_cs,
+    data => s_kbc_data,
+    stat_cmd => s_kbc_status,
+    rd => not io_bus_we,
+    wr => io_bus_we,
+    int => kbc_irq,
+    status_buffer => kbc_status_out,
+    out_buffer => kbc_data_out,
+    in_buffer => io_to_slave
+    );
 	
-	tri_lad: process (lad_oe)
+	tri_lad: process (lad_oe, s_lad_o)
 	begin
 		if lad_oe = '1' then
 			lpc_ad <= s_lad_o;
@@ -282,7 +298,7 @@ begin
 	s_lad_i <= lpc_ad;
 	
 	
-	tri_serirq: process (serirq_oe)
+	tri_serirq: process (serirq_oe, serirq_o)
 	begin
 		if serirq_oe = '1' then
 			lpc_serirq <= serirq_o;
@@ -295,29 +311,47 @@ begin
 
 	
 	
-	uart_addr_deco:	process (lpc_clk, io_addr)
+	addr_deco:	process (lpc_clk, io_addr)
 	begin
 		if rising_edge(lpc_clk) then
-			
+        s_uart_addr <= "000";
+        s_uart_cs <= '0';
+        s_kbc_cs <= '0';
+        s_kbc_data <= '0';
+        s_kbc_status <= '0';
+      
 				case unsigned(io_addr) is
 				
-				when (uart_base_addr + 0) => 	s_uart_addr <= "000";
-								s_uart_cs <= '1';
-									
-				when (uart_base_addr + 1) => 	s_uart_addr <= "001";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 2) => 	s_uart_addr <= "010";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 3) => 	s_uart_addr <= "011";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 4) => 	s_uart_addr <= "100";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 5) => 	s_uart_addr <= "101";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 6) => 	s_uart_addr <= "110";
-								s_uart_cs <= '1';
-				when (uart_base_addr + 7) => 	s_uart_addr <= "111";
-								s_uart_cs <= '1';
+				when (uart_base_addr + 0) =>
+          s_uart_addr <= "000";
+					s_uart_cs <= '1';				
+				when (uart_base_addr + 1) =>
+          s_uart_addr <= "001";
+					s_uart_cs <= '1';
+				when (uart_base_addr + 2) =>
+          s_uart_addr <= "010";
+					s_uart_cs <= '1';
+				when (uart_base_addr + 3) =>
+          s_uart_addr <= "011";
+					s_uart_cs <= '1';
+				when (uart_base_addr + 4) =>
+          s_uart_addr <= "100";
+          s_uart_cs <= '1';
+				when (uart_base_addr + 5) =>
+          s_uart_addr <= "101";
+					s_uart_cs <= '1';
+				when (uart_base_addr + 6) =>
+          s_uart_addr <= "110";
+					s_uart_cs <= '1';
+				when (uart_base_addr + 7) =>
+          s_uart_addr <= "111";
+					s_uart_cs <= '1';
+        when (kbc_data) =>
+          s_kbc_cs <= '1';
+          s_kbc_data <= '1';
+        when (kbc_status) =>
+          s_kbc_cs <= '1';
+          s_kbc_status <= '1';
 				when others => s_uart_addr <= "000";
 						s_uart_cs <= '0';
 				
@@ -372,86 +406,16 @@ begin
       end if;
     end if;
   end process;
+ 
   
---  winbond_deco:	process (io_addr, io_bus_we)
---	begin
---    s_hw_12v_wr <= '0';
---    s_hw_12v_rd <= '0';
---    s_bsel_wr <= '0';
---    s_bsel_rd <= '0';
---    s_vendorid_rd <= '0';
---    
---		case unsigned(io_addr) is
---      when base_bank_sel => 
---        if io_bus_we then
---          s_bsel_wr <= '1';
---        else
---          s_bsel_rd <= '1';
---        end if;
---      when vendor_id =>
---        if io_bus_we = '0' then
---          s_vendorid_rd <= '1';
---        end if;
---      when base_hw_12v => 
---        if io_bus_we then
---          s_hw_12v_wr <= '1';
---        else
---          s_hw_12v_rd <= '1';
---        end if;
---      when others =>
---        s_hw_12v_wr <= '0';
---        s_hw_12v_rd <= '0';
---        s_bsel_wr <= '0';
---        s_bsel_rd <= '0';
---        s_vendorid_rd <= '0';
---				
---		end case;
---	end process winbond_deco;
-  
---  hw_reg: process (lpc_clk, io_to_slave)
---  begin
---    if rising_edge(lpc_clk) then
---      if s_hw_12v_wr = '1' and io_data_valid = '1' then
---        hw_12v_reg <= io_to_slave;
---      end if;
---      if s_bsel_wr = '1' and io_data_valid = '1' then
---        bank_sel_reg <= io_to_slave;
---      end if;
---    end if;
---  end process;
-
-  kb_control: process (lpc_clk, lpc_reset_n)
+  read_mux: process(s_uart_cs, s_bsel_rd, io_bus_we, ef_active, efir_reg, ld_reg, io_addr,
+                    s_vendorid_rd, s_kbc_data, s_kbc_status, kbc_status_out, kbc_data_out,
+                    s_uart_out)
   begin
-    if lpc_reset_n = '0' then
-      kbc_status_reg <= x"64";
-      kbc_input_reg <= x"00";
-      kbc_output_reg <= x"00";
-      kbc_irq <= '0';
-    elsif rising_edge(lpc_clk) then
-      if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '1' and io_to_slave = x"aa" and io_data_valid = '1' then
-        kbc_input_reg <= x"55"; -- answer to selftest
-        kbc_status_reg <= x"55"; -- set IBF bit
-        kbc_irq <= '1';
-      end if;
-      if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '1' and io_to_slave = x"20" and io_data_valid = '1' then
-        kbc_input_reg <= x"65";
-        kbc_status_reg <= x"66";
-        kbc_irq <= '1';
-      end if;
-      if (io_addr = std_logic_vector(kbc_data)) and io_bus_we = '0' and io_data_valid = '1' then
-        kbc_status_reg <= x"64";
-        kbc_irq <= '0';
-      end if;
-    end if;
-  
-  end process;
-  
-  read_mux: process(s_uart_cs, s_bsel_rd, io_bus_we, ef_active)
-  begin
-    if (io_addr = std_logic_vector(kbc_status)) and io_bus_we = '0' then
-      io_from_slave <= kbc_status_reg;
-    elsif (io_addr = std_logic_vector(kbc_data)) and io_bus_we = '0' then
-      io_from_slave <= kbc_input_reg;
+    if s_kbc_status = '1' then
+      io_from_slave <= kbc_status_out;
+    elsif s_kbc_data = '1' then
+      io_from_slave <= kbc_data_out;
     elsif s_uart_cs = '1' then
       io_from_slave <= s_uart_out;
     elsif s_bsel_rd = '1' then
@@ -556,6 +520,8 @@ begin
           io_from_slave <= x"80"; -- 
         end if;
       end if;
+    else
+      io_from_slave <= x"00";
     end if;
     
   end process;
