@@ -151,6 +151,7 @@ entity scu_control is
     nTHRMTRIP         : in std_logic;
     nEXCD0_PERST      : in std_logic;
     WDT               : in std_logic;
+    A20GATE           : out std_logic;
     
     -----------------------------------------------------------------------
     -- Parallel Flash
@@ -311,6 +312,9 @@ architecture rtl of scu_control is
   signal s_lemo_led : std_logic_vector(2 downto 1);
   
   signal uart_clk:  std_logic;
+  signal kbc_out_port: std_logic_vector(7 downto 0);
+  signal kbc_in_port: std_logic_vector(7 downto 0);
+  
 begin
 
   Inst_flash_loader_v01 : flash_loader
@@ -633,6 +637,7 @@ begin
   A_nReset    <= rstn_sys;
   A_Spare     <= (others => 'Z');
   A_OneWire   <= 'Z';
+  A20GATE     <= kbc_out_port(1);
      
   gpio_slave_i <= cbar_master_o(5);
   cbar_master_i(5) <= gpio_slave_o;
@@ -727,6 +732,9 @@ begin
       lpc_ad          => LPC_AD,
       lpc_frame_n     => nLPC_FRAME,
       lpc_reset_n     => nPCI_RESET,
+      
+      kbc_out_port    => kbc_out_port,
+      kbc_in_port     => x"00",
       
       uart_clk        => uart_clk,
       serial_rxd      => uart_rxd_i(1),

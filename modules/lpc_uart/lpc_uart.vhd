@@ -9,6 +9,9 @@ entity lpc_uart is
 		lpc_ad:			inout std_logic_vector(3 downto 0);
 		lpc_frame_n:	in std_logic;
 		lpc_reset_n:	in std_logic;
+    
+    kbc_out_port:   out std_logic_vector(7 downto 0);
+    kbc_in_port:   in std_logic_vector(7 downto 0);
 
     uart_clk:     in std_logic;
 		serial_rxd:		in std_logic;
@@ -111,7 +114,9 @@ architecture lpc_uart_arch of lpc_uart is
       int       : out std_logic;                    -- irq from kbc
       out_buffer  : out std_logic_vector(7 downto 0);  -- data out port to host
       status_buffer : out std_logic_vector(7 downto 0);
-      in_buffer   : in std_logic_vector(7 downto 0)  -- data port from host
+      in_buffer   : in std_logic_vector(7 downto 0);  -- data port from host
+      out_port      : out std_logic_vector(7 downto 0);
+      in_port      : in std_logic_vector(7 downto 0)
     );
    end component;
       
@@ -283,7 +288,9 @@ begin
     int => kbc_irq,
     status_buffer => kbc_status_out,
     out_buffer => kbc_data_out,
-    in_buffer => io_to_slave
+    in_buffer => io_to_slave,
+    out_port => kbc_out_port,
+    in_port => kbc_in_port
     );
 	
 	tri_lad: process (lad_oe, s_lad_o)
