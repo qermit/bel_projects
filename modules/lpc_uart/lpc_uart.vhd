@@ -13,7 +13,6 @@ entity lpc_uart is
     kbc_out_port:   out std_logic_vector(7 downto 0);
     kbc_in_port:   in std_logic_vector(7 downto 0);
 
-    uart_clk:     in std_logic;
 		serial_rxd:		in std_logic;
 		serial_txd:		out std_logic;
 		serial_dtr:		out std_logic;

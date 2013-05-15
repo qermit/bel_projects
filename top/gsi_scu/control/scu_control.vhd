@@ -311,7 +311,6 @@ architecture rtl of scu_control is
   signal s_uled_dat : std_logic_vector(2 downto 1);
   signal s_lemo_led : std_logic_vector(2 downto 1);
   
-  signal uart_clk:  std_logic;
   signal kbc_out_port: std_logic_vector(7 downto 0);
   signal kbc_in_port: std_logic_vector(7 downto 0);
   
@@ -338,7 +337,6 @@ begin
     c2     => clk_sys,          --  62.5MHz
     c3     => clk_scubus,       --  20  MHz
     c4     => open,             -- 100  MHz
-    c5     => uart_clk,         -- 1.843 Mhz
     locked => sys_locked);
   
   sys_reset : gc_reset
@@ -736,7 +734,6 @@ begin
       kbc_out_port    => kbc_out_port,
       kbc_in_port     => x"00",
       
-      uart_clk        => uart_clk,
       serial_rxd      => uart_rxd_i(1),
       serial_txd      => uart_txd_o(1),
       serial_dtr      => open,

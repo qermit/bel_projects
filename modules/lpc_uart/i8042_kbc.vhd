@@ -9,11 +9,11 @@ entity i8042_kbc is
     rd            : in std_logic;
     wr            : in std_logic;
     data          : in std_logic;                       -- command /data register select
-    stat_cmd        : in std_logic;
+    stat_cmd      : in std_logic;
     int           : out std_logic;                      -- irq from kbc
     out_buffer    : out std_logic_vector(7 downto 0);   -- data out port to host
     status_buffer : out std_logic_vector(7 downto 0);   -- status reg
-    in_buffer     : in std_logic_vector(7 downto 0);     -- data port from host
+    in_buffer     : in std_logic_vector(7 downto 0);    -- data port from host
     out_port      : out std_logic_vector(7 downto 0);
     in_port      : in std_logic_vector(7 downto 0)
   );
