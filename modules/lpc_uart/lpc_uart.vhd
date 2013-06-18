@@ -58,48 +58,50 @@ architecture lpc_uart_arch of lpc_uart is
 		);
 	end component;
    
-	component postcode is
-		port (
-		lclk:		in std_logic;
-		
-		paddr:		in std_logic_vector(15 downto 0);
-		pdata:		in std_logic_vector(7 downto 0);
-		addr_hit:	out std_logic;
-		data_valid:	in std_logic;
-		      
-		seven_seg_L:	out std_logic_vector(7 downto 0);   -- SSeg Data output
-		seven_seg_H:	out std_logic_vector(7 downto 0)    -- SSeg Data output  
-	
-	);
-	end component;
-	
-	component uart_16750 is
-	    port (
-		CLK         : in std_logic;                             -- Clock 24Mhz
-		RST         : in std_logic;                             -- Reset
-		BAUDCE      : in std_logic;                             -- Baudrate generator clock enable
-		CS          : in std_logic;                             -- Chip select
-		WR          : in std_logic;                             -- Write to UART
-		RD          : in std_logic;                             -- Read from UART
-		A           : in std_logic_vector(2 downto 0);          -- Register select
-		DIN         : in std_logic_vector(7 downto 0);          -- Data bus input
-		DOUT        : out std_logic_vector(7 downto 0);         -- Data bus output
-		DDIS        : out std_logic;                            -- Driver disable
-		INT         : out std_logic;                            -- Interrupt output
-		OUT1N       : out std_logic;                            -- Output 1
-		OUT2N       : out std_logic;                            -- Output 2
-		RCLK        : in std_logic;                             -- Receiver clock (16x baudrate)
-		BAUDOUTN    : out std_logic;                            -- Baudrate generator output (16x baudrate)
-		RTSN        : out std_logic;                            -- RTS output
-		DTRN        : out std_logic;                            -- DTR output
-		CTSN        : in std_logic;                             -- CTS input
-		DSRN        : in std_logic;                             -- DSR input
-		DCDN        : in std_logic;                             -- DCD input
-		RIN         : in std_logic;                             -- RI input
-		SIN         : in std_logic;                             -- Receiver input
-		SOUT        : out std_logic                             -- Transmitter output
-	    );
-	end component;
+  component postcode is
+    port (
+    lclk:   in std_logic;
+    pdata_valid:	in std_logic;
+		paddr_valid:	in std_logic;
+    
+    paddr:    in std_logic_vector(15 downto 0);
+    pdata:    in std_logic_vector(7 downto 0);
+    addr_hit: out std_logic;
+    data_valid: in std_logic;
+          
+    seven_seg_L:  out std_logic_vector(7 downto 0);   -- SSeg Data output
+    seven_seg_H:  out std_logic_vector(7 downto 0)    -- SSeg Data output  
+  
+  );
+  end component;
+  
+  component uart_16750 is
+      port (
+    CLK         : in std_logic;                             -- Clock 24Mhz
+    RST         : in std_logic;                             -- Reset
+    BAUDCE      : in std_logic;                             -- Baudrate generator clock enable
+    CS          : in std_logic;                             -- Chip select
+    WR          : in std_logic;                             -- Write to UART
+    RD          : in std_logic;                             -- Read from UART
+    A           : in std_logic_vector(2 downto 0);          -- Register select
+    DIN         : in std_logic_vector(7 downto 0);          -- Data bus input
+    DOUT        : out std_logic_vector(7 downto 0);         -- Data bus output
+    DDIS        : out std_logic;                            -- Driver disable
+    INT         : out std_logic;                            -- Interrupt output
+    OUT1N       : out std_logic;                            -- Output 1
+    OUT2N       : out std_logic;                            -- Output 2
+    RCLK        : in std_logic;                             -- Receiver clock (16x baudrate)
+    BAUDOUTN    : out std_logic;                            -- Baudrate generator output (16x baudrate)
+    RTSN        : out std_logic;                            -- RTS output
+    DTRN        : out std_logic;                            -- DTR output
+    CTSN        : in std_logic;                             -- CTS input
+    DSRN        : in std_logic;                             -- DSR input
+    DCDN        : in std_logic;                             -- DCD input
+    RIN         : in std_logic;                             -- RI input
+    SIN         : in std_logic;                             -- Receiver input
+    SOUT        : out std_logic                             -- Transmitter output
+      );
+  end component;
   
   component i8042_kbc is
     port (
@@ -204,73 +206,75 @@ architecture lpc_uart_arch of lpc_uart is
    
 begin
 
-	rst <= not lpc_reset_n;
-	s_wr_en <= io_bus_we and io_data_valid;
-	s_rd_en <= not io_bus_we and io_data_valid;
-	
-	irq_vector <= x"FFFFFF" & "111" & not uart_int & "11" & not kbc_irq & "1";	-- IRQ4 is IRQ frame 4 on CA945
-	
-	decoder: lpc_peripheral port map (
-		clk_i => lpc_clk,
-		lframe_i => lpc_frame_n,
-		nrst_i => lpc_reset_n,
-		lad_oe => lad_oe,
-		lad_i => s_lad_i,
-		lad_o => s_lad_o,
-		dma_chan_o => open,
-		dma_tc_o => open,
-		wbm_err_i => '0',
-		
-		io_bus_dat_o => io_to_slave,
-		io_bus_dat_i => io_from_slave,
-    io_bus_addr	=> io_addr,
-		io_bus_we => io_bus_we,
-		io_ack => '1',
-		io_data_valid => io_data_valid
-		);
-		
-	pcode: postcode port map (
-	
-		lclk => lpc_clk,
-		data_valid => io_data_valid,
-		paddr => io_addr,
-		pdata => io_to_slave,
-		addr_hit => s_addr_hit,
-		      
-		seven_seg_L => seven_seg_L,
-		seven_seg_H => seven_seg_H
-	);
-	
-	uart: uart_16750 port map (
-		clk => lpc_clk,
-		rst => rst,
-		baudce => '1',
-		cs => s_uart_cs,
-		wr => s_wr_en,
-		rd => s_rd_en,
-		a => s_uart_addr,
-		din => io_to_slave,
-		dout => s_uart_out,
-		ddis => open,
-		int => uart_int,
-		out1n => open,
-		out2n => open,
-		rclk => s_baudout,
-		baudoutn => s_baudout,
-		rtsn => serial_rts,
-		dtrn => serial_dtr,
-		ctsn => serial_cts,
-		dsrn => serial_dsr,
-		dcdn => serial_dcd,
-		rin => serial_ri,
-		sin => serial_rxd,
-		sout => serial_txd
-	);
-	
-	serirq: serirq_slave port map (
-			clk_i => lpc_clk,
-			nrst_i => lpc_reset_n,
-			irq_i => irq_vector,
+  rst <= not lpc_reset_n;
+  s_wr_en <= io_bus_we and io_data_valid;
+  s_rd_en <= not io_bus_we and io_data_valid;
+  
+  irq_vector <= x"FFFFFF" & "111" & not uart_int & "11" & not kbc_irq & "1";  -- IRQ4 is IRQ frame 4 on CA945
+  
+  decoder: lpc_peripheral port map (
+    clk_i => lpc_clk,
+    lframe_i => lpc_frame_n,
+    nrst_i => lpc_reset_n,
+    lad_oe => lad_oe,
+    lad_i => s_lad_i,
+    lad_o => s_lad_o,
+    dma_chan_o => open,
+    dma_tc_o => open,
+    wbm_err_i => '0',
+    
+    io_bus_dat_o => io_to_slave,
+    io_bus_dat_i => io_from_slave,
+    io_bus_addr => io_addr,
+    io_bus_we => io_bus_we,
+    io_ack => '1',
+    io_data_valid => io_data_valid
+    );
+    
+  pcode: postcode port map (
+  
+    lclk => lpc_clk,
+    data_valid => io_data_valid,
+    paddr => io_addr,
+    pdata => io_to_slave,
+    addr_hit => s_addr_hit,
+    pdata_valid => '0',
+		paddr_valid => '0',
+          
+    seven_seg_L => seven_seg_L,
+    seven_seg_H => seven_seg_H
+  );
+  
+  uart: uart_16750 port map (
+    clk => lpc_clk,
+    rst => rst,
+    baudce => '1',
+    cs => s_uart_cs,
+    wr => s_wr_en,
+    rd => s_rd_en,
+    a => s_uart_addr,
+    din => io_to_slave,
+    dout => s_uart_out,
+    ddis => open,
+    int => uart_int,
+    out1n => open,
+    out2n => open,
+    rclk => s_baudout,
+    baudoutn => s_baudout,
+    rtsn => serial_rts,
+    dtrn => serial_dtr,
+    ctsn => serial_cts,
+    dsrn => serial_dsr,
+    dcdn => serial_dcd,
+    rin => serial_ri,
+    sin => serial_rxd,
+    sout => serial_txd
+  );
+  
+  serirq: serirq_slave port map (
+      clk_i => lpc_clk,
+      nrst_i => lpc_reset_n,
+      irq_i => irq_vector,
       serirq_o => serirq_o,
 			serirq_i =>  serirq_i,
 			serirq_oe => serirq_oe
@@ -376,19 +380,19 @@ begin
       
       case ef_state is
         when ef_idle =>
-          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"87" then
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_data_valid = '1' and io_to_slave = x"87" then
             ef_state <= ef_first;
           end if;
         when ef_first =>
-          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"87" then
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_data_valid = '1' and io_to_slave = x"87" then
             ef_state <= ef_sec;
           end if;
-          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"AA" then
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_data_valid = '1' and io_to_slave = x"AA" then
             ef_state <= ef_idle;
           end if;
         when ef_sec =>
           ef_active <= '1';
-          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_to_slave = x"AA" then
+          if (io_addr = std_logic_vector(EFER)) and io_bus_we = '1' and io_data_valid = '1' and io_to_slave = x"AA" then
             ef_state <= ef_idle;
           end if;
       
