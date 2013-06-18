@@ -314,7 +314,7 @@ architecture rtl of exploder_top is
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
   
   -- Top crossbar layout
-  constant c_slaves  : natural := 6;
+  constant c_slaves  : natural := 7;
   constant c_masters : natural := 3;
   constant c_layout : t_sdb_record_array(c_slaves-1 downto 0) :=
    (0 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00000000"),
@@ -322,8 +322,9 @@ architecture rtl of exploder_top is
     2 => f_sdb_embed_device(c_eca_sdb,                    x"00100800"),
     3 => f_sdb_embed_device(c_eca_evt_sdb,                x"00100C00"),
     4 => f_sdb_embed_device(c_wb_serial_lcd_sdb,          x"00100D00"),
-    5 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"01000000"));
-  constant c_sdb_address : t_wishbone_address := x"00300000";
+	 5 => f_sdb_embed_device(c_ebm_sdb,          			 x"00200000"),
+    6 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"01000000"));
+  constant c_sdb_address : t_wishbone_address := x"00400000";
 
   signal cbar_slave_i  : t_wishbone_slave_in_array (c_masters-1 downto 0);
   signal cbar_slave_o  : t_wishbone_slave_out_array(c_masters-1 downto 0);
@@ -384,6 +385,9 @@ architecture rtl of exploder_top is
   signal wrc_master_i  : t_wishbone_master_in;
   signal wrc_master_o  : t_wishbone_master_out;
 
+  signal ebm_src_out    : t_wrf_source_out;
+  signal ebm_src_in     : t_wrf_source_in;
+  
   signal mb_src_out    : t_wrf_source_out;
   signal mb_src_in     : t_wrf_source_in;
   signal mb_snk_out    : t_wrf_sink_out;
@@ -494,8 +498,8 @@ begin
     port map(
       clk_i     => clk_sys,
       rstn_i    => rstn_sys,
-      slave_i   => cbar_master_o(5),
-      slave_o   => cbar_master_i(5),
+      slave_i   => cbar_master_o(6),
+      slave_o   => cbar_master_i(6),
       clk_out_i => clk_flash,
       clk_in_i  => clk_flash); -- no need to phase shift at 50MHz
   
@@ -569,6 +573,9 @@ begin
       wrf_snk_o => mb_src_in,
       wrf_snk_i => mb_src_out,
 
+		aux_snk_o => ebm_src_in,
+		aux_snk_i => ebm_src_out,
+		
       aux_master_o => wrc_master_o,
       aux_master_i => wrc_master_i,
  
@@ -652,6 +659,18 @@ begin
       master_o    => cbar_slave_i(1),
       master_i    => cbar_slave_o(1));
   
+  U_ebm : eb_master_top 
+   GENERIC MAP(g_adr_bits_hi => 11,
+               g_mtu => 32)
+   PORT MAP (
+	  clk_i           => clk_sys,
+     rst_n_i         => rstn_sys,
+	  slave_i  			=> cbar_master_o(5),
+	  slave_o         => cbar_master_i(5),
+     src_o           => ebm_src_out,
+     src_i           => ebm_src_in
+			);    
+  
   ref2sys : xwb_clock_crossing
     port map(
       slave_clk_i   => clk_ref,
@@ -681,6 +700,8 @@ begin
       wb_slave_i               => cbar_master_o(1),
       wb_slave_o               => cbar_master_i(1));
 
+		
+		
   ECA0 : wr_eca
     generic map(
       g_eca_name       => f_name("Exploder2C + DB2"),

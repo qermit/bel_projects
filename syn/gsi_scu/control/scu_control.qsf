@@ -3,7 +3,7 @@ set_global_assignment -name DEVICE EP2AGX125EF29C5
 set_global_assignment -name TOP_LEVEL_ENTITY scu_control
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 11.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "11:00:25 FEBRUARY 13, 2012"
-set_global_assignment -name LAST_QUARTUS_VERSION "12.1 SP1"
+set_global_assignment -name LAST_QUARTUS_VERSION "11.1 SP1"
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name DEVICE_FILTER_PACKAGE FBGA
@@ -17,10 +17,10 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name ALLOW_POWER_UP_DONT_CARE OFF
 set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
 set_global_assignment -name USE_CONFIGURATION_DEVICE ON
-set_global_assignment -rise -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO"
-set_global_assignment -fall -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO"
-set_global_assignment -rise -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING"
-set_global_assignment -fall -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING"
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_40MHZ
 set_global_assignment -name ENABLE_SIGNALTAP OFF
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "2.5 V"
