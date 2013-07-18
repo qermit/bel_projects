@@ -660,7 +660,7 @@ begin
       master_i    => cbar_slave_o(1));
   
   U_ebm : eb_master_top 
-   GENERIC MAP(g_adr_bits_hi => 11,
+   GENERIC MAP(g_adr_bits_hi => 13,
                g_mtu => 32)
    PORT MAP (
 	  clk_i           => clk_sys,

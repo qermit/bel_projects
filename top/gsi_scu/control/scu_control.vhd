@@ -212,18 +212,19 @@ architecture rtl of scu_control is
     name          => "GSI_GPIO_32        ")));
 
   -- Top crossbar layout
-  constant c_slaves  : natural := 9;
+  constant c_slaves  : natural := 10;
   constant c_masters : natural := 2;
   constant c_layout : t_sdb_record_array(c_slaves-1 downto 0) :=
    (0 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00000000"),
     1 => f_sdb_embed_device(c_xwr_wb_timestamp_latch_sdb, x"00100000"),
     2 => f_sdb_embed_device(c_eca_sdb,                    x"00100800"),
     3 => f_sdb_embed_device(c_eca_evt_sdb,                x"00100C00"),
-    4 => f_sdb_embed_device(c_scu_bus_master,             x"00400000"),
-    5 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00800000"),
-    6 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
-    7 => f_sdb_embed_device(c_oled_display,               x"00900000"),
-    8 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"01000000"));
+	 4 => f_sdb_embed_device(c_pcie_ctrl_sdb,              x"00100D00"),
+    5 => f_sdb_embed_device(c_scu_bus_master,             x"00400000"),
+    6 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00800000"),
+    7 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
+    8 => f_sdb_embed_device(c_oled_display,               x"00900000"),
+    9 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"01000000"));
   constant c_sdb_address : t_wishbone_address := x"00300000";
 
   signal cbar_slave_i  : t_wishbone_slave_in_array (c_masters-1 downto 0);
@@ -377,8 +378,8 @@ begin
     port map(
       clk_i     => clk_sys,
       rstn_i    => rstn_sys,
-      slave_i   => cbar_master_o(8),
-      slave_o   => cbar_master_i(8),
+      slave_i   => cbar_master_o(9),
+      slave_o   => cbar_master_i(9),
       clk_out_i => clk_flash,
       clk_in_i  => clk_flash); -- no need to phase shift at 50MHz
   
@@ -573,7 +574,10 @@ begin
        slave_clk_i   => clk_ref,
        slave_rstn_i  => rstn_ref,
        slave_i       => pcie_slave_i,
-       slave_o       => pcie_slave_o);
+       slave_o       => pcie_slave_o,
+		 
+		 irq_slave_i   => cbar_master_o(4),
+		 irq_slave_o   => cbar_master_i(4));
   
   TLU : wb_timestamp_latch
     generic map (
@@ -641,8 +645,8 @@ begin
    port map(
      clk     =>  clk_sys,
      nrst    => rstn_sys,
-     slave_i => cbar_master_o(4),
-     slave_o => cbar_master_i(4),
+     slave_i => cbar_master_o(5),
+     slave_o => cbar_master_i(5),
      
      SCUB_Data          => A_D,
      nSCUB_DS           => A_nDS,
@@ -662,8 +666,8 @@ begin
   A_OneWire   <= 'Z';
   A20GATE     <= kbc_out_port(1);
      
-  gpio_slave_i <= cbar_master_o(5);
-  cbar_master_i(5) <= gpio_slave_o;
+  gpio_slave_i <= cbar_master_o(6);
+  cbar_master_i(6) <= gpio_slave_o;
   
   -- There is a tool called 'wbgen2' which can autogenerate a Wishbone
   -- interface and C header file, but this is a simple example.
@@ -724,8 +728,8 @@ begin
     port map(
       clk_sys_i  => clk_sys,
       rst_n_i    => rstn_sys,
-      slave_i    => cbar_master_o(6),
-      slave_o    => cbar_master_i(6),
+      slave_i    => cbar_master_o(7),
+      slave_o    => cbar_master_i(7),
       desc_o     => open,
       uart_rxd_i => '1',
       uart_txd_o => open);
@@ -737,8 +741,8 @@ begin
     port map(	
       clk_i      => clk_sys,
       nRst_i     => rstn_sys,
-      slave_i    => cbar_master_o(7),
-      slave_o    => cbar_master_i(7),
+      slave_i    => cbar_master_o(8),
+      slave_o    => cbar_master_i(8),
       RST_DISP_o => hpla_ch(8),
       DC_SPI_o   => hpla_ch(6),
       SS_SPI_o   => hpla_ch(4),
