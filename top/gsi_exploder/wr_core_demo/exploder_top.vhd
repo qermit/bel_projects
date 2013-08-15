@@ -573,9 +573,6 @@ begin
       wrf_snk_o => mb_src_in,
       wrf_snk_i => mb_src_out,
 
-		aux_snk_o => ebm_src_in,
-		aux_snk_i => ebm_src_out,
-		
       aux_master_o => wrc_master_o,
       aux_master_i => wrc_master_i,
  
@@ -644,9 +641,12 @@ begin
       pulse_i    => pps,
       extended_o => ext_pps);
   
-  U_ebone : eb_ethernet_slave
+    U_ebonew : eb_master_slave_wrapper
     generic map(
-      g_sdb_address => x"00000000" & c_sdb_address)
+      g_with_master   		=> true,
+      g_ebs_sdb_address 	=> x"00000000" & c_sdb_address,
+      g_ebm_adr_bits_hi   => 13,
+      g_ebm_size          => 32)
     port map(
       clk_i       => clk_sys,
       nRst_i      => rstn_sys,
@@ -654,22 +654,15 @@ begin
       snk_o       => mb_snk_out,
       src_o       => mb_src_out,
       src_i       => mb_src_in,
-      cfg_slave_o => wrc_master_i,
-      cfg_slave_i => wrc_master_o,
-      master_o    => cbar_slave_i(1),
-      master_i    => cbar_slave_o(1));
-  
-  U_ebm : eb_master_top 
-   GENERIC MAP(g_adr_bits_hi => 13,
-               g_mtu => 32)
-   PORT MAP (
-	  clk_i           => clk_sys,
-     rst_n_i         => rstn_sys,
-	  slave_i  			=> cbar_master_o(5),
-	  slave_o         => cbar_master_i(5),
-     src_o           => ebm_src_out,
-     src_i           => ebm_src_in
-			);    
+	 
+      ebs_cfg_slave_o => wrc_master_i,
+      ebs_cfg_slave_i => wrc_master_o,
+      ebs_wb_master_o => cbar_slave_i(1),
+      ebs_wb_master_i => cbar_slave_o(1),
+      
+      ebm_wb_slave_i  => cbar_master_o(5),
+	    ebm_wb_slave_o  => cbar_master_i(5)
+    );
   
   ref2sys : xwb_clock_crossing
     port map(
