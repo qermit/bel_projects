@@ -16,6 +16,7 @@ use work.scu_bus_pkg.all;
 use work.altera_flash_pkg.all;
 use work.oled_display_pkg.all;
 use work.lpc_uart_pkg.all;
+use work.wb_irq_pkg.all;
 
 entity scu_control is
   port(
@@ -211,7 +212,7 @@ architecture rtl of scu_control is
     date          => x"20120305",
     name          => "GSI_GPIO_32        ")));
 
-	
+	constant c_dpram_size : natural := 131072/4;
 
 
   ----------------------------------------------------------------------------------
@@ -219,7 +220,7 @@ architecture rtl of scu_control is
   ----------------------------------------------------------------------------------
   constant c_irq_slaves   : natural := 4;
   constant c_irq_masters  : natural := 1;
-  constant c_irq_layout   : t_sdb_record_array(c_per_slaves-1 downto 0) :=
+  constant c_irq_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(c_irq_ep_sdb, 					      x"00000000"),
     1 => f_sdb_embed_device(c_irq_ep_sdb,                 x"00000100"),
     2 => f_sdb_embed_device(c_irq_ep_sdb,                 x"00000200"),
@@ -237,26 +238,26 @@ architecture rtl of scu_control is
   ----------------------------------------------------------------------------------
   -- GSI Periphery Crossbar --------------------------------------------------------
   ----------------------------------------------------------------------------------
-  constant c_per_slaves   : natural := 10;
-  constant c_per_masters  : natural := 2;
+  constant c_per_slaves   : natural := 9;
+  constant c_per_masters  : natural := 1;
   constant c_per_layout   : t_sdb_record_array(c_per_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(c_xwr_wb_timestamp_latch_sdb, x"00000000"),
     1 => f_sdb_embed_device(c_eca_sdb,                    x"00000800"),
     2 => f_sdb_embed_device(c_eca_evt_sdb,                x"00000C00"),
-	  3 => f_sdb_embed_device(c_irq_ctrl_sdb,               x"00000D00"),
-    4 => f_sdb_embed_device(c_scu_bus_master,             x"00300000"),
-    5 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00700000"),
-    6 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00700100"),
-    7 => f_sdb_embed_device(c_oled_display,               x"00800000"),
-    8 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"00900000"));
-  constant c_per_sdb_address : t_wishbone_address := x"00200000";
+	 3 => f_sdb_embed_device(c_irq_ctrl_sdb,               x"00000D00"),
+	 4 => f_sdb_embed_device(c_scu_bus_master,             x"00400000"),
+    5 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00800000"),
+    6 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
+    7 => f_sdb_embed_device(c_oled_display,               x"00900000"),
+    8 => f_sdb_embed_device(c_wb_spi_flash_sdb,           x"01000000"));
+  constant c_per_sdb_address : t_wishbone_address := x"00001000";
   constant c_per_bridge_sdb  : t_sdb_bridge       :=
     f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);
 	
-  signal irq_cbar_slave_i  : t_wishbone_slave_in_array (c_irq_masters-1 downto 0);
-  signal irq_cbar_slave_o  : t_wishbone_slave_out_array(c_irq_masters-1 downto 0);
-  signal irq_cbar_master_i : t_wishbone_master_in_array(c_irq_slaves-1 downto 0);
-  signal irq_cbar_master_o : t_wishbone_master_out_array(c_irq_slaves-1 downto 0);	
+  signal per_cbar_slave_i  : t_wishbone_slave_in_array (c_per_masters-1 downto 0);
+  signal per_cbar_slave_o  : t_wishbone_slave_out_array(c_per_masters-1 downto 0);
+  signal per_cbar_master_i : t_wishbone_master_in_array(c_per_slaves-1 downto 0);
+  signal per_cbar_master_o : t_wishbone_master_out_array(c_per_slaves-1 downto 0);	
   
   -- END OF GSI Periphery Crossbar
   ----------------------------------------------------------------------------------		 
@@ -267,11 +268,11 @@ architecture rtl of scu_control is
   constant c_top_slaves : natural := 3;
   constant c_top_masters : natural := 4;
   constant c_top_layout : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (0 => f_sdb_embed_device(f_xwb_dpram(g_dpram_size),    x"00000000"),
+   (0 => f_sdb_embed_device(f_xwb_dpram(c_dpram_size),    x"00000000"),
     1 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00080000"),
-    2 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"01000000")
+    2 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"02000000")
    );
-  constant c_top_sdb_address : t_wishbone_address := x"02000000";	 
+  constant c_top_sdb_address : t_wishbone_address := x"000F0000";	 
 	 
   signal top_cbar_slave_i  : t_wishbone_slave_in_array (c_top_masters-1 downto 0);
   signal top_cbar_slave_o  : t_wishbone_slave_out_array(c_top_masters-1 downto 0);
@@ -487,6 +488,12 @@ begin
      master_i      => top_cbar_master_i,
      master_o      => top_cbar_master_o);
   
+  ------------------------------------------------
+  -- Connect periphery crossbar to top crossbar
+  per_cbar_slave_i(0)  <= top_cbar_master_o(2);
+  top_cbar_master_i(2) <= per_cbar_slave_o(0);
+  ------------------------------------------------
+  
   PER_CON : xwb_sdb_crossbar
    generic map(
      g_num_masters => c_per_masters,
@@ -514,21 +521,21 @@ begin
   ----------------------------------------------------------------------------------
     DPRAM : xwb_dpram
     generic map(
-      g_size                  => g_dpram_size,
-      g_init_file             => f_choose_lm32_firmware_file,
-      g_must_have_init_file   => f_check_if_lm32_firmware_necessary,
+      g_size                  => c_dpram_size,
+      g_init_file             => "",
+      g_must_have_init_file   => false,
       g_slave1_interface_mode => PIPELINED,
       g_slave2_interface_mode => PIPELINED,
       g_slave1_granularity    => BYTE,
       g_slave2_granularity    => WORD)  
     port map(
-      clk_sys_i => clk_sys_i,
-      rst_n_i   => rst_n_i,
+      clk_sys_i => clk_sys,
+      rst_n_i   => rstn_sys,
 
       slave1_i => top_cbar_master_o(0),
       slave1_o => top_cbar_master_i(0),
-      slave2_i => dpram_wbb_i,
-      slave2_o => dpram_wbb_o
+      slave2_i => cc_dummy_slave_in,
+      slave2_o => open
       );
 
     
@@ -536,19 +543,19 @@ begin
    LM32_CORE : wb_irq_lm32
     generic map(g_profile => "medium_icache_debug")
     port map(
-      clk_sys_i => clk_sys_i,
-      rst_n_i   => rst_wrc_n,
+      clk_sys_i => clk_sys,
+      rst_n_i   => rstn_sys,
 
       dwb_o => top_cbar_slave_i(2),
       dwb_i => top_cbar_slave_o(2),
       iwb_o => top_cbar_slave_i(3),
       iwb_i => top_cbar_slave_o(3),
       
-      irq_slave_o   => irq_master_i(c_irq_slaves-1-1 downto 0), 
-      irq_slave_i   => irq_master_o(c_irq_slaves-1-1 downto 0),
+      irq_slave_o   => irq_cbar_master_i(c_irq_slaves-1-1 downto 0), 
+      irq_slave_i   => irq_cbar_master_o(c_irq_slaves-1-1 downto 0),
            
-      ctrl_slave_o  => per_master_i(3),
-      ctrl_slave_i  => per_master_o(3)
+      ctrl_slave_o  => per_cbar_master_i(3),
+      ctrl_slave_i  => per_cbar_master_o(3)
       );	
 
   -- END OF Top LM32 CPU & RAM 
@@ -569,8 +576,8 @@ begin
     port map(
       clk_i     => clk_sys,
       rstn_i    => rstn_sys,
-      slave_i   => top_cbar_master_o(8),
-      slave_o   => top_cbar_master_i(8),
+      slave_i   => per_cbar_master_o(8),
+      slave_o   => per_cbar_master_i(8),
       clk_out_i => clk_flash,
       clk_in_i  => clk_flash); -- no need to phase shift at 50MHz
       
@@ -598,7 +605,7 @@ U_DAC_ARB : spec_serial_dac_arb
   
    U_ebone : eb_ethernet_slave
      generic map(
-       g_sdb_address => x"00000000" & c_sdb_address)
+       g_sdb_address => x"00000000" & c_top_sdb_address)
      port map(
        clk_i       => clk_sys,
        nRst_i      => rstn_sys,
@@ -610,20 +617,11 @@ U_DAC_ARB : spec_serial_dac_arb
        cfg_slave_i => wrc_master_o,
        master_o    => top_cbar_slave_i(0),
        master_i    => top_cbar_slave_o(0));
-  
-    constant c_irq_slaves   : natural := 4;
-  constant c_irq_masters  : natural := 2;
-  constant c_irq_layout   : t_sdb_record_array(c_per_slaves-1 downto 0) :=
-   (0 => f_sdb_embed_device(c_irq_ep_sdb, 					      x"00000000"),
-    1 => f_sdb_embed_device(c_irq_ep_sdb,                 x"00000100"),
-    2 => f_sdb_embed_device(c_irq_ep_sdb,                 x"00000200"),
-	  3 => f_sdb_embed_device(c_irq_hostbridge_ep_sdb,      x"00000300"));
-  constant c_irq_sdb_address : t_wishbone_address := x"00002000";
 
   
   PCIe : pcie_wb
     generic map(
-       sdb_addr => c_sdb_address)
+       sdb_addr => c_top_sdb_address)
     port map(
        clk125_i      => clk_pcie,
        cal_clk50_i   => clk_reconf,
@@ -640,8 +638,8 @@ U_DAC_ARB : spec_serial_dac_arb
        
        slave_clk_i   => clk_ref,
        slave_rstn_i  => rstn_ref,
-       slave_i       => irq_master_o(3),
-       slave_o       => irq_master_i(3));
+       slave_i       => irq_cbar_master_o(3),
+       slave_o       => irq_cbar_master_i(3));
   
   TLU : wb_timestamp_latch
     generic map (
@@ -696,8 +694,8 @@ U_DAC_ARB : spec_serial_dac_arb
       clk_i     => clk_ref,
       rst_n_i   => rstn_ref,
       channel_i => channels(1),
-      master_o  => irq_slave_i(0),
-      master_i  => irq_slave_o(0));
+      master_o  => irq_cbar_slave_i(0),
+      master_i  => irq_cbar_slave_o(0));
   
   scub_master : wb_scu_bus 
     generic map(
@@ -730,8 +728,8 @@ U_DAC_ARB : spec_serial_dac_arb
   A_OneWire   <= 'Z';
   A20GATE     <= kbc_out_port(1);
      
-  gpio_slave_i <= top_cbar_master_o(5);
-  top_cbar_master_i(5) <= gpio_slave_o;
+  gpio_slave_i <= per_cbar_master_o(5);
+  per_cbar_master_i(5) <= gpio_slave_o;
   
   -- There is a tool called 'wbgen2' which can autogenerate a Wishbone
   -- interface and C header file, but this is a simple example.
