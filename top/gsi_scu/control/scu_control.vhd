@@ -282,7 +282,8 @@ architecture rtl of scu_control is
   -- END OF Top crossbar
   ----------------------------------------------------------------------------------		
 
-
+  signal eca_2_wb_i : t_wishbone_master_in;
+  signal eca_2_wb_o : t_wishbone_master_out;
   
   signal pcie_slave_i : t_wishbone_slave_in;
   signal pcie_slave_o : t_wishbone_slave_out;
@@ -694,8 +695,23 @@ U_DAC_ARB : spec_serial_dac_arb
       clk_i     => clk_ref,
       rst_n_i   => rstn_ref,
       channel_i => channels(1),
-      master_o  => irq_cbar_slave_i(0),
-      master_i  => irq_cbar_slave_o(0));
+      master_o  => eca_2_wb_o,
+      master_i  => eca_2_wb_i);
+		
+	 eca_2_irq : xwb_clock_crossing 
+	 generic map(
+				g_size => 256)
+	 port map(
+    slave_clk_i    => clk_ref,
+    slave_rst_n_i  => rstn_ref,
+    slave_i        => eca_2_wb_o,
+    slave_o        => eca_2_wb_i,
+    master_clk_i   => clk_sys, 
+    master_rst_n_i => rstn_sys,
+    master_i       => irq_cbar_slave_o(0),
+    master_o       => irq_cbar_slave_i(0));	
+		
+		
   
   scub_master : wb_scu_bus 
     generic map(
