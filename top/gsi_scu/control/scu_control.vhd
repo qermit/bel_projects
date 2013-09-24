@@ -681,7 +681,7 @@ U_DAC_ARB : spec_serial_dac_arb
   
   TLU : wb_timestamp_latch
     generic map (
-      g_num_triggers => 2,
+      g_num_triggers => 5,
       g_fifo_depth   => 10)
     port map (
       ref_clk_i       => clk_ref,
@@ -690,6 +690,9 @@ U_DAC_ARB : spec_serial_dac_arb
       sys_rstn_i      => rstn_sys,
       triggers_i(0)   => lemo_io(1),
       triggers_i(1)   => lemo_io(2),
+		triggers_i(2)	 => eca_gpio(0),
+		triggers_i(3)	 => eca_gpio(1),
+		triggers_i(4)	 => eca_gpio(2),
       tm_time_valid_i => tm_valid,
       tm_tai_i        => tm_tai,
       tm_cycles_i     => tm_cycles,
