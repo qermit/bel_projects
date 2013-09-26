@@ -376,8 +376,8 @@ architecture rtl of scu_control is
   signal r_lemo_dir : std_logic_vector(1 downto 0);
   signal r_gpio_mux : std_logic_vector(7 downto 0);
   signal r_gpio_val : std_logic_vector(3 downto 0);
-  signal r_resets   : std_logic_vector(2 downto 0) := (others => '0');
-  
+  signal r_resets   : std_logic_vector(3 downto 0) := (others => '0');
+    
   signal s_lemo_dat : std_logic_vector(2 downto 1);
   signal s_uled_dat : std_logic_vector(2 downto 1);
   signal s_lemo_led : std_logic_vector(2 downto 1);
@@ -385,6 +385,8 @@ architecture rtl of scu_control is
   
   signal kbc_out_port : std_logic_vector(7 downto 0);
   signal kbc_in_port  : std_logic_vector(7 downto 0);
+  
+  signal rst_usr_lm32_n : std_logic;
 begin
 
   ----------------------------------------------------------------------------------
@@ -572,7 +574,7 @@ begin
     generic map(g_profile => "medium_icache_debug")
     port map(
       clk_sys_i => clk_sys,
-      rst_n_i   => rstn_sys,
+      rst_n_i   => rst_usr_lm32_n,
 
       dwb_o => top_cbar_slave_i(2),
       dwb_i => top_cbar_slave_o(2),
@@ -1138,6 +1140,9 @@ U_DAC_ARB : spec_serial_dac_arb
   nPWRBTN       <= not r_resets(1);
   A_nCONFIG     <= not r_resets(2);
 
+  --Internal Resets
+  rst_usr_lm32_n <= not r_resets(3) and rstn_sys;
+  
   -- END OF System IOs
   ----------------------------------------------------------------------------------
   
