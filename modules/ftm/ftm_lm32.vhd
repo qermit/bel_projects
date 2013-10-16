@@ -8,7 +8,7 @@ entity ftm_lm32 is
 generic(g_size          : natural := 16384;                 -- size of the dpram
         g_bridge_sdb    : t_sdb_bridge;                     -- record for the superior bridge
         g_profile       : string := "medium_icache_debug";  -- lm32 profile
-        g_init_file     : string := "";                     -- memory init file - binary for lm32
+        g_init_file     : string := "msidemo.bin";          -- memory init file - binary for lm32
         g_addr_ext_bits : natural := 1;                     -- address extension bits (starting from MSB)
         g_msi_queues    : natural := 3);                    -- number of msi queues connected to the lm32
 port(
@@ -58,10 +58,10 @@ architecture rtl of ftm_lm32 is
    constant c_lm32_sdb_address    : t_wishbone_address := x"7FFFFF00";
  
    --signals
-   signal lm32_idwb_master_in    : t_wishbone_master_in_array(1 downto 0);
-   signal lm32_idwb_master_out   : t_wishbone_master_out_array(1 downto 0);
-   signal lm32_cb_master_in      : t_wishbone_master_in_array(2 downto 0);
-   signal lm32_cb_master_out     : t_wishbone_master_out_array(2 downto 0);
+   signal lm32_idwb_master_in    : t_wishbone_master_in_array(c_lm32_masters-1 downto 0);
+   signal lm32_idwb_master_out   : t_wishbone_master_out_array(c_lm32_masters-1 downto 0);
+   signal lm32_cb_master_in      : t_wishbone_master_in_array(c_lm32_slaves-1 downto 0);
+   signal lm32_cb_master_out     : t_wishbone_master_out_array(c_lm32_slaves-1 downto 0);
    signal s_irq : std_logic_vector(31 downto 0);
    signal r_addr_ext             : std_logic_vector(g_addr_ext_bits-1 downto 0);
 
@@ -78,8 +78,8 @@ begin
       g_layout      => c_lm32_layout,
       g_sdb_addr    => c_lm32_sdb_address)
    port map(
-      clk_sys_i     => clk_sys,
-      rst_n_i       => rstn_sys,
+      clk_sys_i     => clk_sys_i,
+      rst_n_i       => rst_n_i,
       -- Master connections (INTERCON is a slave)
       slave_i       => lm32_idwb_master_out,
       slave_o       => lm32_idwb_master_in,
@@ -94,7 +94,7 @@ begin
    generic map(g_profile => g_profile)
    port map(
       clk_sys_i   => clk_sys_i,
-      rst_n_i     => rst_wrc_n,
+      rst_n_i     => rst_n_i,
       irq_i       => s_irq,
       dwb_o       => lm32_idwb_master_out(0),
       dwb_i       => lm32_idwb_master_in(0),
@@ -114,8 +114,8 @@ begin
       g_slave1_granularity    => BYTE,
       g_slave2_granularity    => WORD)  
    port map(
-      clk_sys_i   => clk_sys,
-      rst_n_i     => rstn_sys,
+      clk_sys_i   => clk_sys_i,
+      rst_n_i     => rst_n_i,
       slave1_i    => lm32_cb_master_out(0),
       slave1_o    => lm32_cb_master_in(0),
       slave2_i    => ram_slave_i,
@@ -135,8 +135,8 @@ begin
       irq_slave_i   => irq_slaves_i,
       irq_o         => s_irq(g_msi_queues-1 downto 0),
            
-      ctrl_slave_o  => lm32_cb_master_out(1),
-      ctrl_slave_i  => lm32_cb_master_in(1));
+      ctrl_slave_o  => lm32_cb_master_in(1),
+      ctrl_slave_i  => lm32_cb_master_out(1));
 
    s_irq(31 downto g_msi_queues) <= (others => '0');
 
@@ -144,9 +144,9 @@ begin
 -- Slave 2 - External LM32 Master interface 
 --------------------------------------------------------------------------------
    -- physical address extension (yes, it's dirty, but the best way for now)   
-   addr_ext : process(clk_sys)
+   addr_ext : process(clk_sys_i)
    begin
-    if rising_edge(clk_sys) then
+    if rising_edge(clk_sys_i) then
       -- This is an easy solution for a device that never stalls:
       lm32_cb_master_in(2).ack <= lm32_cb_master_out(2).cyc and lm32_cb_master_out(2).stb;
       lm32_cb_master_in(2).dat <= (others => '0');
@@ -157,7 +157,7 @@ begin
         -- Detect a write to the register byte
         if lm32_cb_master_out(2).cyc = '1' and lm32_cb_master_out(2).stb = '1' and
            lm32_cb_master_out(2).we = '1' and lm32_cb_master_out(2).sel(0) = '1' then
-          if(to_integer(unsigned(lm32_cb_master_out(2).adr(2 downto 2))) is
+          case(to_integer(unsigned(lm32_cb_master_out(2).adr(2 downto 2)))) is
             when 0 => r_addr_ext <= lm32_cb_master_out(2).dat(31 downto 31-g_addr_ext_bits);
             when others => null;
           end case;
@@ -165,7 +165,7 @@ begin
         
         case to_integer(unsigned(lm32_cb_master_out(2).adr(4 downto 2))) is
           when 0 => lm32_cb_master_in(2).dat(31 downto 32-g_addr_ext_bits) <= r_addr_ext ;
-          when 1 => lm32_cb_master_in(2).dat <= std_logic_vetcor(to_unsigned(2**32 - 2**(32-g_addr_ext_bits)));
+          when 1 => lm32_cb_master_in(2).dat <= (others => '0');--std_logic_vector(to_unsigned(2**32 - 2**(32-g_addr_ext_bits), 32));
           when others => null;
         end case;
       end if;
@@ -181,7 +181,7 @@ begin
    lm32_master_o.adr(31-g_addr_ext_bits downto 0)  <= lm32_cb_master_out(3).adr(31-g_addr_ext_bits downto 0);
    lm32_master_o.adr(31 downto 32-g_addr_ext_bits) <= r_addr_ext;
    
-   lm32_cb_master_out(3)   <= lm32_master_i;
+   lm32_cb_master_in(3)   <= lm32_master_i;
 
 end rtl;
   
