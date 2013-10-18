@@ -15,14 +15,14 @@ port(
 clk_sys_i      : in  std_logic;
 rst_n_i        : in  std_logic;
 
-irq_slave_o    : out t_wishbone_slave_out; 
-irq_slave_i    : in  t_wishbone_slave_in;
+ext_irq_slave_o    : out t_wishbone_slave_out; 
+ext_irq_slave_i    : in  t_wishbone_slave_in;
          
-lm32_master_o   : out t_wishbone_master_out; 
-lm32_master_i   : in  t_wishbone_master_in;  
+ext_lm32_master_o   : out t_wishbone_master_out; 
+ext_ext_ext_lm32_master_i : in  t_wishbone_master_in;  
 
-ram_slave_o    : out t_wishbone_slave_out;                            
-ram_slave_i    : in  t_wishbone_slave_in
+ext_ram_slave_o    : out t_wishbone_slave_out;                            
+ext_ram_slave_i    : in  t_wishbone_slave_in
 
 );
 end ftm_lm32_cluster;
@@ -31,138 +31,210 @@ architecture rtl of ftm_lm32_cluster is
 
 constant null_sdbs : t_sdb_record_array(0 downto 1) := (others=>(others => '0'));
 
-function f_create_cluster(multi : t_sdb_device; instances : natural; singles : t_sdb_record_array)
+function f_string_fix_len
+   ( s : string;
+   ret_len : natural := 10;
+   fill_char_c : character := '0' )
+   return string is
+      variable ret_v : string (1 to ret_len_c);
+      constant pad_len_c : integer := ret_len_c - arg_str'length ;
+      variable pad_v : string (1 to abs(pad_len_c));
+   begin
+      if pad_len_c < 1 then
+      ret_v := arg_str(ret_v'range);
+      else
+      pad_v := (others => fill_char_c);
+      ret_v := pad_v & arg_str;
+      end if;
+   return ret_v;
+end f_string_fix_len;
+
+function f_sdb_create_array(g_enum_dev_id    : boolean := false;
+                            g_dev_id_offs    : natural := 0;
+                            g_enum_dev_name  : boolean := false;
+                            g_dev_name_offs  : natural := 0;       
+                            device           : t_sdb_device; 
+                            instances        : natural := 1)
     return t_sdb_record_array
 is
-   variable result   : t_sdb_record_array(singles'length+instances-1 downto 0);  
-   variable i : natural;
+   variable result   : t_sdb_record_array(instances-1 downto 0);  
+   variable i,j, pos : natural;
+   variable dev      : t_sdb_device;
+   variable serial_no : string(1 to 3); 
    begin
       for i in 0 to instances-1 loop
-         result(i) := f_sdb_embed_device(multi, x"00000000");
+         dev := device;         
+         if(g_enum_dev_id) then         
+            dev.sdb_component.product.device_id :=  
+            std_logic_vector( unsigned(dev.sdb_component.product.device_id) 
+                              + to_unsigned(i+g_dev_id_offs, dev.sdb_component.product.device_id'length));        
+         end if;
+         if(g_enum_dev_name) then         
+         -- find end of name
+            for j in dev.sdb_component.product.name'length downto 1 loop
+               if(dev.sdb_component.product.name(j) /= ' ') then
+                   report "Found non space " & dev.sdb_component.product.name(j) & "@" & integer'image(j)
+                  severity note;                   
+                  pos := j;                  
+                  exit;
+               end if;
+            end loop;
+         -- convert i+g_dev_name_offs to string
+            serial_no := f_string_fix_len(integer'image(i+g_dev_name_offs), serial_no'length);
+         -- check if space is sufficient
+            assert (serial_no'length <= dev.sdb_component.product.name'length - pos)
+            report "Not enough space in namestring of sdb_device " & dev.sdb_component.product.name & " to add serial number " & serial_no & 
+                  ". Space available " & integer'image(dev.sdb_component.product.name'length-pos) & ", required " & integer'image(serial_no'length+1)    
+            severity Failure;            
+         -- insert
+            dev.sdb_component.product.name(pos+1) := '_'; 
+            for j in 1 to serial_no'length loop
+               dev.sdb_component.product.name(pos+1+j) := serial_no(j);
+            end loop;
+               
+         end if;
+         result(i) := f_sdb_embed_device(dev, (others=>'1'));
       end loop;
-      for i in 0 to singles'left loop
-         result(i+instances) := singles(i);
+   return result;
+  end;
+
+function f_sdb_join_arrays(a : t_sdb_record_array; b : t_sdb_record_array)
+    return t_sdb_record_array
+is
+   variable result   : t_sdb_record_array(a'length+b'length-1 downto 0);  
+   variable i : natural;
+   begin
+      for i in 0 to a'left loop
+         result(i) := a(i);
+      end loop;
+      for i in 0 to b'left loop
+         result(i+a'length) := b(i);
       end loop;
    return result;
   end;
 
 
-
-function f_get_aligned_offset(offs : std_logic_vector; this_rng : std_logic_vector; prev_rng : std_logic_vector)
-    return std_logic_vector
+function f_sdb_extract_base_addr(sdb_record : t_sdb_record)
+   return std_logic_vector
   is
-   variable result   : std_logic_vector(63 downto 0);  
-   variable start, env, env_prev, env_this, aux : natural;
+  begin
+   return sdb_record(447 downto 384);
+  end;
+
+function f_sdb_extract_end_addr(sdb_record : t_sdb_record)
+   return std_logic_vector
+  is
+  begin
+   return sdb_record(383 downto 320);
+  end;
+
+
+function f_align_addr_offset(offs : unsigned; this_rng : unsigned; prev_rng : unsigned)
+    return unsigned
+  is
+   variable this_pow, prev_pow   : natural;  
+   variable start, env, result : unsigned(63 downto 0) := (others => '0');
    
   begin
       
-   start := to_integer(unsigned(offs));   
-   --calculate address envelopes for previous and this component and choose the larger one
-   env_prev := (2**f_hot_to_bin(prev_rng));   
-   env_this := (2**f_hot_to_bin(this_rng));
-   if(env_this >= env_prev) then
-      env := env_this;
+   start(offs'left downto 0) := offs;   
+   --calculate address envelopes (next power of 2) for previous and this component and choose the larger one
+   this_pow := f_hot_to_bin(std_logic_vector(this_rng)); 
+   prev_pow := f_hot_to_bin(std_logic_vector(prev_rng));    
+   -- no max(). thank you very much, std_numeric :-/   
+   if(this_pow >= prev_pow) then
+      env(this_pow) := '1';
    else
-      env := env_prev;
+      env(prev_pow) := '1';
    end if;
-
    --round up to the next multiple of the envelope...
-   if(unsigned(prev_rng) /= 0) then   
-      aux := start + env - (start mod env);
+   if(prev_rng /= 0) then   
+      result := start + env - (start mod env);
    else
-      aux := 0;   --...except for offset 0, result is also 0. 
+      result := start;   --...except for first element, result is start. 
    end if;
-   result := std_logic_vector(to_unsigned(aux, result'length));
-   
-   --report "o " & f_bits2string(offs) & " rt " & f_bits2string(this_rng) & " rp " & f_bits2string(prev_rng) & " res " & f_bits2string(result)
-   --severity Note;   
-
    return result;
   end;
 
 
-constant dummy_product : t_sdb_product := (  vendor_id => (others=>'0'),
-                                             device_id => (others=>'0'),
-                                             version => (others=>'0'),
-                                             date => (others=>'0'),   
-                                             name => (others=>'0'));
-  
-constant dummy_comp : t_sdb_component := (   addr_first  => (others=>'0'),
-                                             addr_last   => (others=>'0'),
-                                             product     => dummy_product);
-
-
-
--- regenerates aligned addresses for an sdb_record_array + a dummy component for the sdb rom 
-function f_create_meta_layout(sdb_array : t_sdb_record_array)
+ -- generates aligned address map for an sdb_record_array, accepts optional start offset 
+function f_sdb_automap_array(sdb_array : t_sdb_record_array; start_offset : t_wishbone_address := (others => '0'))
     return t_sdb_record_array
   is
-   variable prev_rng,tmp_rng    : std_logic_vector(63 downto 0) := (others => '0');   
-   variable prev_offs   : std_logic_vector(63 downto 0) := (others => '0');   
-   variable this_offs   : std_logic_vector(63 downto 0) := (others => '0');   
+   variable this_rng    : unsigned(63 downto 0) := (others => '0');   
+   variable prev_rng    : unsigned(63 downto 0) := (others => '0');   
+   variable prev_offs   : unsigned(63 downto 0) := (others => '0');   
+   variable this_offs   : unsigned(63 downto 0) := (others => '0');   
    variable device      : t_sdb_device;
    variable bridge      : t_sdb_bridge;  
    variable sdb_type    : std_logic_vector(7 downto 0);
    variable i           : natural;
-   variable result      : t_sdb_record_array(sdb_array'length downto 0); -- last 
-   variable rom_comp    : t_sdb_component := dummy_comp;
-   variable rom_bytes   : natural := (2**f_ceil_log2(sdb_array'length + 1)) * (c_sdb_device_length / 8);
+   variable result      : t_sdb_record_array(sdb_array'length-1 downto 0); -- last 
+
   begin
-  
+   
+   prev_offs(start_offset'left downto 0) := unsigned(start_offset);
    --traverse the array   
    for i in 0 to sdb_array'length-1 loop
-      -- find the fitting extraction function by evaling the type byte      
+      -- find the fitting extraction function by evaling the type byte. 
+      -- could also use the component, but it's safer to use Wes' embed and extract functions.      
       sdb_type := sdb_array(i)(7 downto 0);
       case sdb_type is
          --device         
          when x"01"  => device      := f_sdb_extract_device(sdb_array(i));
-                        this_offs   := f_get_aligned_offset(prev_offs, device.sdb_component.addr_last, prev_rng);
-                        result(i)   := f_sdb_embed_device(device, this_offs(31 downto 0));
-                        tmp_rng    := device.sdb_component.addr_last;
+                        this_rng    := unsigned(device.sdb_component.addr_last) - unsigned(device.sdb_component.addr_first);                      
+                        this_offs   := f_get_aligned_offset(prev_offs, this_rng, prev_rng);
+                        result(i)   := f_sdb_embed_device(device, std_logic_vector(this_offs(31 downto 0)));
          --bridge
          when x"02"  => bridge      := f_sdb_extract_bridge(sdb_array(i));
-                        this_offs   := f_get_aligned_offset(prev_offs, bridge.sdb_component.addr_last, prev_rng);
-                        result(i)   := f_sdb_embed_bridge(bridge, this_offs(31 downto 0));
-                        tmp_rng    := bridge.sdb_component.addr_last;
+                        this_rng    := unsigned(bridge.sdb_component.addr_last) - unsigned(bridge.sdb_component.addr_first);
+                        this_offs   := f_get_aligned_offset(prev_offs, this_rng, prev_rng);
+                        result(i)   := f_sdb_embed_bridge(bridge, std_logic_vector(this_offs(31 downto 0)) );
          --other
          when others => result(i) := sdb_array(i);   
       end case;
-        
-      report "### " & integer'image(i) & "/" & integer'image(sdb_array'length-1) & " to " & f_bits2string(this_offs) & " po " & f_bits2string(prev_offs) & " rt " & f_bits2string(tmp_rng)
-         severity Note;
-      if(unsigned(this_offs) - (unsigned(prev_offs) + unsigned(prev_rng)) >= rom_bytes-1) and (unsigned(rom_comp.addr_last) = 0) then
-                   
-         rom_comp.addr_last := f_get_aligned_offset(prev_offs, std_logic_vector(to_unsigned(rom_bytes-1, 64)), prev_rng);
-         --report "jetzt " & f_bits2string(rom_comp.addr_last) severity Note;      
-      end if;
-      prev_rng  := tmp_rng;
-      prev_offs := this_offs;
+      -- doesnt hurt because this_* doesnt change if its not a device or bridge
+      prev_rng    := this_rng;
+      prev_offs   := this_offs;
    end loop;
-   if(unsigned(rom_comp.addr_last) = 0) then
-         report "ist immer noch null" severity Note; 
-         rom_comp.addr_last := f_get_aligned_offset(prev_offs, std_logic_vector(to_unsigned(rom_bytes-1, 64)), prev_rng);   
-   end if;
-   result(result'left) := (others => '0');   
-   result(result'left)(447 downto 8) := f_sdb_embed_component(rom_comp, (others => '0'));
+
    return result;
   end;
 
-  -- returns layout sdb_record_array from crossbar meta layout
-  function f_get_layout(sdb_array : t_sdb_record_array)
-    return t_sdb_record_array
-  is
-  begin
-   return sdb_array(sdb_array'left-1 downto 0);
-  end;
 
-  -- returns sdb rom address from crossbar meta layout
-  function f_get_sdb_address(sdb_array : t_sdb_record_array)
+  -- find place for sdb rom on crossbar and return address
+  function f_sdb_create_rom_addr(sdb_array : t_sdb_record_array)
     return t_wishbone_address
   is
-   variable comp      : t_sdb_component;  
+   constant rom_bytes            : natural := (2**f_ceil_log2(sdb_array'length + 1)) * (c_sdb_device_length / 8);
+   variable result               : t_wishbone_address  := (others => '0');
+   variable this_base, this_end  : unsigned(63 downto 0)          := (others => '0');    
+   variable prev_base, prev_end  : unsigned(63 downto 0)          := (others => '0');
+   variable rom_base             : unsigned(63 downto 0)          := (others => '0');
+   variable sdb_type             : std_logic_vector(7 downto 0);     
    begin
-      comp := f_sdb_extract_component(sdb_array(sdb_array'left)(447 downto 8));
-      return comp.addr_last(t_wishbone_address'left downto 0);
+   --traverse the array   
+   for i in 0 to sdb_array'length-1 loop     
+      sdb_type := sdb_array(i)(7 downto 0);
+      if(sdb_type = x"01" or sdb_type = x"02") then
+         -- get         
+         this_base := unsigned(f_sdb_extract_base_addr(sdb_array(i)));
+         this_end  := unsigned(f_sdb_extract_end_addr(sdb_array(i)));
+         if(unsigned(result) = 0) then
+            rom_base := f_get_aligned_offset(prev_base, to_unsigned(rom_bytes-1, 64), (prev_end-prev_base));
+            if(rom_base + to_unsigned(rom_bytes, 64) <= this_base) then
+               result := std_logic_vector(rom_base(t_wishbone_address'left downto 0));
+            end if;   
+         end if;
+         prev_base := this_base;
+         prev_end  := this_end;      
+      end if;
+   end loop;   
+   -- if there was no gap to fit the sdb rom, place it at the end   
+   if(unsigned(result) = 0) then
+         result := std_logic_vector(f_get_aligned_offset(this_base, to_unsigned(rom_bytes-1, 64), this_end-this_base)(t_wishbone_address'left downto 0));   
+   end if;      
+   return result;
   end;   
 
 
@@ -179,14 +251,14 @@ function f_create_meta_layout(sdb_array : t_sdb_record_array)
    rst_n_i        : in  std_logic;  -- reset, active low 
 
    -- wb master interface of the lm32
-   lm32_master_o  : out t_wishbone_master_out; 
-   lm32_master_i  : in  t_wishbone_master_in;  
+   ext_lm32_master_o  : out t_wishbone_master_out; 
+   ext_ext_ext_lm32_master_i: in  t_wishbone_master_in;  
    -- wb msi interfaces
    irq_slaves_o   : out t_wishbone_slave_out_array(g_msi_queues-1 downto 0);  
    irq_slaves_i   : in  t_wishbone_slave_in_array(g_msi_queues-1 downto 0);
    -- port B of the LM32s DPRAM 
-   ram_slave_o    : out t_wishbone_slave_out;                           
-   ram_slave_i    : in  t_wishbone_slave_in
+   ext_ram_slave_o    : out t_wishbone_slave_out;                           
+   ext_ram_slave_i    : in  t_wishbone_slave_in
 
    );
    end component;
@@ -216,10 +288,15 @@ function f_create_meta_layout(sdb_array : t_sdb_record_array)
    
    constant c_lm32_slaves   : natural := g_cores+c_local_periphery'length; -- an irq queue per lm32 + eca + ext interface out
    constant c_lm32_masters  : natural := g_cores; -- lm32's
-   constant c_lm32_meta     : t_sdb_record_array(c_lm32_slaves downto 0) :=
-   f_create_meta_layout(f_create_cluster(c_irq_ep_sdb, g_cores, c_local_periphery)); 
-   constant c_lm32_layout        : t_sdb_record_array(c_lm32_slaves-1 downto 0) := f_get_layout(c_lm32_meta);
-   constant c_lm32_sdb_address   : t_wishbone_address := f_get_sdb_address(c_lm32_meta);
+   constant c_lm32_layout   : t_sdb_record_array(c_lm32_slaves-1 downto 0) := 
+   f_sdb_automap_array(f_sdb_join_arrays(f_sdb_create_array(  device            => c_irq_ep_sdb, 
+                                                               instances         => g_cores,
+                                                               g_enum_dev_id     => true,
+                                                               g_dev_id_offs     => 0,
+                                                               g_enum_dev_name   => true,
+                                                               g_dev_name_offs   => 0), c_local_periphery),  x"00000000");
+   
+   constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm32_layout);
  	
    signal lm32_cbar_masterport_in   : t_wishbone_master_in_array  (c_lm32_slaves-1 downto 0);
    signal lm32_cbar_masterport_out  : t_wishbone_master_out_array (c_lm32_slaves-1 downto 0);
@@ -233,25 +310,60 @@ function f_create_meta_layout(sdb_array : t_sdb_record_array)
    constant c_ext_msi      : natural := g_msi_per_core -1;  -- lm32 irq sources are not masters of irq crossbar to reduce fan out
    constant c_irq_slaves   : natural := g_cores*c_ext_msi;  -- all but one irq queue per lm32 are connected here
    constant c_irq_masters  : natural := 2;                  -- eca action queues, interlocks
-   constant c_irq_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) :=
-   f_align_records(f_create_cluster(c_irq_ep_sdb, c_ext_msi));
-   constant c_lm32_sdb_address : t_wishbone_address := x"FFFFF00";
-
-   null_sdbs
+   
+   ------------------------------------------------------------------------------
+   -- there is no 'reverse' generic. this is awkward: since the master if(s) of
+   -- the IRQ crossbar are slaves to the outside  world , all this might need 
+   -- to be done in the top file as well so a possible higher level IRQ crossbar
+   -- can insert us as a bridge.   
+   constant c_irq_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) := 
+   f_sdb_automap_array(f_sdb_create_array(device            => c_irq_ep_sdb, 
+                                          instances         => c_irq_slaves,
+                                          g_enum_dev_id     => true,
+                                          g_dev_id_offs     => g_cores,
+                                          g_enum_dev_name   => true,
+                                          g_dev_name_offs   => g_cores),  x"00000000");
+   
+   constant c_irq_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_irq_layout);
 
    signal irq_cbar_masterport_in    : t_wishbone_master_in_array  (c_irq_slaves-1 downto 0);
    signal irq_cbar_masterport_out   : t_wishbone_master_out_array (c_irq_slaves-1 downto 0);
 	signal irq_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_irq_masters-1 downto 0);
    signal irq_cbar_slaveport_out    : t_wishbone_slave_out_array  (c_irq_masters-1 downto 0);
 
-  
+   --**************************************************************************--
+   -- RAM CROSSBAR
+   ------------------------------------------------------------------------------
+   constant c_ram_slaves   : natural := g_cores;  
+   constant c_ram_masters  : natural := 1;       
+   
+   ------------------------------------------------------------------------------
+   -- there is no 'reverse' generic. this is awkward: since the master of the  
+   -- RAM crossbar is a slave to the outside  world (top crossbar), all this 
+   -- needs to be done in the top file as well so the top crossbar can insert us
+   -- as a bridge.          
+   constant c_ram_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) := 
+   f_sdb_automap_array(f_sdb_create_array(device            => f_xwb_dpram(g_ram_per_core), 
+                                          instances         => g_cores,
+                                          g_enum_dev_id     => true,
+                                          g_dev_id_offs     => g_cores,
+                                          g_enum_dev_name   => true,
+                                          g_dev_name_offs   => g_cores),  x"00000000");
+   
+   constant c_ram_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_ram_layout);
+   ------------------------------------------------------------------------------
+
+   signal ram_cbar_masterport_in    : t_wishbone_master_in_array  (c_ram_slaves-1 downto 0);
+   signal ram_cbar_masterport_out   : t_wishbone_master_out_array (c_ram_slaves-1 downto 0);
+	signal ram_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_ram_masters-1 downto 0);
+   signal ram_cbar_slaveport_out    : t_wishbone_slave_out_array  (c_ram_masters-1 downto 0);
 
  
  ----------------------------------------------------------------------------------
   
    G1: for I in 0 to g_cores-1 generate
     
-      --instantiate an ftm-lm32 (LM32 core with its own DPRAM and 4-n msi queues)
+      --instantiate an ftm-lm32 (LM32 core with its own DPRAM and 4..n msi queues)
       LM32 : ftm_lm32
       generic map(g_size         => g_ram_per_core,
                   g_bridge_sdb   => c_lm32_bridge_sdb,
@@ -260,8 +372,8 @@ function f_create_meta_layout(sdb_array : t_sdb_record_array)
                   g_msi_queues   => g_msi_per_core);
       port map(clk_sys_i         => clk_sys_i,
                rst_n_i           => r_rst_n(I),
-               lm32_master_o     => lm32_cbar_slaveport_in  (I),
-               lm32_master_i     => lm32_cbar_slaveport_out (I), 
+               ext_lm32_master_o     => lm32_cbar_slaveport_in  (I),
+               ext_ext_ext_lm32_master_i   => lm32_cbar_slaveport_out (I), 
                --highest prio irq from eca               
                irq_slaves_o(0)   => irq_cbar_masterport_in  (I*c_ext_msi+0),
                irq_slaves_i(0)   => irq_cbar_masterport_out (I*c_ext_msi+0),
@@ -275,63 +387,73 @@ function f_create_meta_layout(sdb_array : t_sdb_record_array)
                irq_slaves_o(g_msi_per_core-1-1 downto 3) => irq_cbar_masterport_in  ((I+1)*c_ext_msi-1 downto I*c_ext_msi+2),
                irq_slaves_i(g_msi_per_core-1-1 downto 3) => irq_cbar_masterport_out ((I+1)*c_ext_msi-1 downto I*c_ext_msi+2),
                --RAM & FTM periphery crossbar 
-               ram_slave_o       => ram_cbar_masterport_in(I),                      
-               ram_slave_i       => ram_cbar_masterport_out(I));
+               ext_ram_slave_o       => ram_cbar_masterport_in(I),                      
+               ext_ram_slave_i       => ram_cbar_masterport_out(I));
       
       end generate;  
   
    LM32_CON : xwb_sdb_crossbar
    generic map(
-     g_num_masters => c_per_masters,
-     g_num_slaves  => c_per_slaves,
+     g_num_masters => c_lm32_masters,
+     g_num_slaves  => c_lm32_slaves,
      g_registered  => true,
      g_wraparound  => true,
-     g_layout      => c_per_layout,
-     g_sdb_addr    => c_per_sdb_address)
+     g_layout      => c_lm32_layout,
+     g_sdb_addr    => c_lm32_sdb_address)
    port map(
      clk_sys_i     => clk_sys,
      rst_n_i       => rstn_sys,
      -- Master connections (INTERCON is a slave)
-     slave_i       => per_cbar_slave_i,
-     slave_o       => per_cbar_slave_o,
+     slave_i       => lm32_cbar_slaveport_i,
+     slave_o       => lm32_cbar_slaveport_o,
      -- Slave connections (INTERCON is a master)
-     master_i      => per_cbar_master_i,
-     master_o      => per_cbar_master_o);
+     master_i      => lm32_cbar_masterport_in,
+     master_o      => lm32_cbar_masterport_out);
+
+   -- last slave on the lm32 crossbar is the connection to the periphery crossbar
+   ext_lm32_master_o                         => lm32_cbar_masterport_out(c_lm32_slaves-1);
+   lm32_cbar_masterport_in(c_lm32_slaves-1)  => ext_lm32_master_i;  
 
    IRQ_CON : xwb_sdb_crossbar
    generic map(
-     g_num_masters => c_per_masters,
-     g_num_slaves  => c_per_slaves,
+     g_num_masters => c_irq_masters,
+     g_num_slaves  => c_irq_slaves,
      g_registered  => true,
      g_wraparound  => true,
-     g_layout      => c_per_layout,
-     g_sdb_addr    => c_per_sdb_address)
+     g_layout      => c_irq_layout,
+     g_sdb_addr    => c_irq_sdb_address)
    port map(
      clk_sys_i     => clk_sys,
      rst_n_i       => rstn_sys,
      -- Master connections (INTERCON is a slave)
-     slave_i       => per_cbar_slave_i,
-     slave_o       => per_cbar_slave_o,
+     slave_i       => irq_cbar_slaveport_in,
+     slave_o       => irq_cbar_slaveport_out,
      -- Slave connections (INTERCON is a master)
-     master_i      => per_cbar_master_i,
-     master_o      => per_cbar_master_o);
+     master_i      => irq_cbar_masterport_in,
+     master_o      => irq_cbar_masterport_out);
+
+   ext_irq_slave_o            => irq_cbar_masterport_out(0);
+   irq_cbar_slaveport_in(0)   => ext_irq_slave_i;
 
    RAM_CON : xwb_sdb_crossbar
    generic map(
-     g_num_masters => c_per_masters,
-     g_num_slaves  => c_per_slaves,
+     g_num_masters => c_ram_masters,
+     g_num_slaves  => c_ram_slaves,
      g_registered  => true,
      g_wraparound  => true,
-     g_layout      => c_per_layout,
-     g_sdb_addr    => c_per_sdb_address)
+     g_layout      => c_ram_layout,
+     g_sdb_addr    => c_ram_sdb_address)
    port map(
      clk_sys_i     => clk_sys,
      rst_n_i       => rstn_sys,
-     -- Master connections (INTERCON is a slave)
-     slave_i       => per_cbar_slave_i,
-     slave_o       => per_cbar_slave_o,
+        -- Master connections (INTERCON is a slave)
+     slave_i       => ram_cbar_slaveport_in,
+     slave_o       => ram_cbar_slaveport_out,
      -- Slave connections (INTERCON is a master)
-     master_i      => per_cbar_master_i,
-     master_o      => per_cbar_master_o);
+     master_i      => ram_cbar_masterport_in,
+     master_o      => ram_cbar_masterport_out);
+
+     ext_ram_slave_o          <= ram_cbar_slaveport_in(0);                           
+     ram_cbar_slaveport_in(0) <= ext_ram_slave_i; 
  
   
