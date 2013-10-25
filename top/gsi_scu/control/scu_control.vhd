@@ -216,19 +216,36 @@ architecture rtl of scu_control is
     name          => "GSI_GPIO_32        ")));
 
 	constant c_dpram_size : natural := 131072/4;
+	constant c_cores 		 : natural := 2;
+	constant c_msi_per_core : natural := 4;	
 
 
   ----------------------------------------------------------------------------------
   -- MSI IRQ Crossbar --------------------------------------------------------------
   ----------------------------------------------------------------------------------
-  constant c_irq_slaves   : natural := 4;
-  constant c_irq_masters  : natural := 1;
+  constant c_lm32c_irq_layout   : t_sdb_record_array(c_cores*(c_msi_per_core-1)-1 downto 0) := 
+   f_sdb_automap_array(f_sdb_create_array(device            => c_irq_ep_sdb, 
+                                          instances         => c_cores*(c_msi_per_core-1),
+                                          g_enum_dev_id     => true,
+                                          g_dev_id_offs     => 0,
+                                          g_enum_dev_name   => true,
+                                          g_dev_name_offs   => 0),  x"00000000");
+   
+   constant c_lm32c_irq_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_lm32c_irq_layout);
+    constant c_lm32c_irq_bridge_sdb  : t_sdb_bridge       :=
+    f_xwb_bridge_layout_sdb(true, c_lm32c_irq_layout, c_lm32c_irq_sdb_address);	
+	 
+  constant c_irq_slaves   : natural := 2;
+  constant c_irq_masters  : natural := 2;
   constant c_irq_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) :=
-   (0 => f_sdb_embed_device(c_irq_ep_sdb, 	      x"00000000"),
-    1 => f_sdb_embed_device(c_irq_ep_sdb,             x"00000100"),
-    2 => f_sdb_embed_device(c_irq_ep_sdb,             x"00000200"),
-    3 => f_sdb_embed_device(c_irq_hostbridge_ep_sdb,  x"00001000"));
+   (0 => f_sdb_embed_device(c_irq_hostbridge_ep_sdb,  x"00000000"),
+	 1 => f_sdb_embed_bridge(c_lm32c_irq_bridge_sdb, x"00010000")
+	 );
+	 
+ 
   constant c_irq_sdb_address : t_wishbone_address := x"00002000";
+  constant c_irq_bridge_sdb  : t_sdb_bridge       :=
+    f_xwb_bridge_layout_sdb(true, c_irq_layout, c_irq_sdb_address);	 
 
   signal irq_cbar_slave_i  : t_wishbone_slave_in_array (c_irq_masters-1 downto 0);
   signal irq_cbar_slave_o  : t_wishbone_slave_out_array(c_irq_masters-1 downto 0);
@@ -269,13 +286,29 @@ architecture rtl of scu_control is
   ----------------------------------------------------------------------------------
   -- Top crossbar ------------------------------------------------------------------
   ----------------------------------------------------------------------------------  
-  constant c_top_slaves : natural := 4;
-  constant c_top_masters : natural := 4;
+
+   constant c_ram_layout   : t_sdb_record_array(c_cores-1 downto 0) := 
+   f_sdb_automap_array(f_sdb_create_array(device            => f_xwb_dpram(c_dpram_size), 
+                                          instances         => c_cores,
+                                          g_enum_dev_id     => false,
+                                         g_dev_id_offs     => 0,
+                                          g_enum_dev_name   => false,
+                                          g_dev_name_offs   => 0),  x"00000000");
+   
+   constant c_ram_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_ram_layout);
+	
+
+   constant c_ram_bridge_sdb  : t_sdb_bridge       :=
+    f_xwb_bridge_layout_sdb(true, c_ram_layout, c_ram_sdb_address);	
+
+  constant c_top_slaves : natural := 5;	 
+  constant c_top_masters : natural := 3; -- ebs, pcie, ftm_lm32
   constant c_top_layout : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (0 => f_sdb_embed_device(f_xwb_dpram(c_dpram_size),    x"00000000"),
+   (0 => f_sdb_embed_bridge(c_ram_bridge_sdb,    			 x"00000000"),
     1 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00080000"),
 	 2 => f_sdb_embed_device(c_ebm_sdb,          			 x"01000000"),
-    3 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"02000000")
+    3 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"02000000"),
+    4 => f_sdb_embed_bridge(c_irq_bridge_sdb,             x"04000000")    
    );
   constant c_top_sdb_address : t_wishbone_address := x"000F0000";	 
   
@@ -407,6 +440,32 @@ architecture rtl of scu_control is
   signal kbc_in_port  : std_logic_vector(7 downto 0);
   
   signal rst_usr_lm32_n : std_logic;
+  
+  component ftm_lm32_cluster is
+   generic(g_cores         : natural := 3;
+           g_ram_per_core  : natural := 32768/4;
+           g_msi_per_core  : natural := 4;
+           g_profile       : string  := "medium_icache_debug";
+           g_init_file     : string  := "msidemo.bin";   
+           g_bridge_sdb    : t_sdb_bridge                      -- periphery crossbar         
+      );
+   port(
+      clk_sys_i      : in  std_logic;
+      rst_n_i        : in  std_logic;
+      rst_lm32_n_i   : in  std_logic;
+
+      ext_irq_slave_o    : out t_wishbone_slave_out; 
+      ext_irq_slave_i    : in  t_wishbone_slave_in;
+               
+      ext_lm32_master_o   : out t_wishbone_master_out; 
+      ext_lm32_master_i 	: in  t_wishbone_master_in;  
+
+      ext_ram_slave_o    : out t_wishbone_slave_out;                            
+      ext_ram_slave_i    : in  t_wishbone_slave_in
+
+   );
+   end component;
+  
 begin
 
   ----------------------------------------------------------------------------------
@@ -587,6 +646,12 @@ begin
   top_cbar_master_i(3) <= per_cbar_slave_o(0);
   ------------------------------------------------
   
+   ------------------------------------------------
+  -- Connect irq crossbar to top crossbar
+  irq_cbar_slave_i(1)  <= top_cbar_master_o(4);
+  top_cbar_master_i(4) <= irq_cbar_slave_o(1);
+  ------------------------------------------------
+
   PER_CON : xwb_sdb_crossbar
    generic map(
      g_num_masters => c_per_masters,
@@ -610,48 +675,29 @@ begin
   
   
   ----------------------------------------------------------------------------------
-  -- Top LM32 CPU & RAM ------------------------------------------------------------
+  -- Top LM32 CPUs & RAMs ------------------------------------------------------------
   ----------------------------------------------------------------------------------
-    DPRAM : xwb_dpram
-    generic map(
-      g_size                  => c_dpram_size,
-      g_init_file             => "",
-      g_must_have_init_file   => false,
-      g_slave1_interface_mode => PIPELINED,
-      g_slave2_interface_mode => PIPELINED,
-      g_slave1_granularity    => BYTE,
-      g_slave2_granularity    => WORD)  
-    port map(
-      clk_sys_i => clk_sys,
-      rst_n_i   => rstn_sys,
+	DUT : ftm_lm32_cluster
+    generic map(  g_cores        => c_cores,
+                  g_ram_per_core => c_dpram_size,
+                  g_msi_per_core => c_msi_per_core,
+                  g_profile      => "medium_icache_debug",
+                  g_init_file    => "",  
+                  g_bridge_sdb   => c_per_bridge_sdb)
+      port map(clk_sys_i         => clk_sys,
+               rst_n_i           => rstn_sys,
+               rst_lm32_n_i      => rst_usr_lm32_n,
+               --LM32               
+               ext_lm32_master_o => top_cbar_slave_i(2),
+               ext_lm32_master_i => top_cbar_slave_o(2), 
+               -- MSI
+               ext_irq_slave_o   => irq_cbar_master_i(1),
+               ext_irq_slave_i   => irq_cbar_master_o(1),       
+               --2nd RAM port               
+               ext_ram_slave_o   => top_cbar_master_i(0),                      
+               ext_ram_slave_i   => top_cbar_master_o(0));
+  
 
-      slave1_i => top_cbar_master_o(0),
-      slave1_o => top_cbar_master_i(0),
-      slave2_i => cc_dummy_slave_in,
-      slave2_o => open
-      );
-
-    
-
-   LM32_CORE : wb_irq_lm32
-    generic map(g_profile => "medium_icache_debug")
-    port map(
-      clk_sys_i => clk_sys,
-      rst_n_i   => rst_usr_lm32_n,
-
-      dwb_o => top_cbar_slave_i(2),
-      dwb_i => top_cbar_slave_o(2),
-      iwb_o => top_cbar_slave_i(3),
-      iwb_i => top_cbar_slave_o(3),
-      
-      irq_slave_o   => irq_cbar_master_i(c_irq_slaves-1-1 downto 0), 
-      irq_slave_i   => irq_cbar_master_o(c_irq_slaves-1-1 downto 0),
-           
-      ctrl_slave_o  => per_cbar_master_i(3),
-      ctrl_slave_i  => per_cbar_master_o(3)
-      );	
-
-  -- END OF Top LM32 CPU & RAM 
   ----------------------------------------------------------------------------------
   
 
@@ -749,8 +795,8 @@ U_DAC_ARB : spec_serial_dac_arb
        
        slave_clk_i   => clk_ref,
        slave_rstn_i  => rstn_ref,
-       slave_i       => irq_cbar_master_o(3),
-       slave_o       => irq_cbar_master_i(3));
+       slave_i       => irq_cbar_master_o(0),
+       slave_o       => irq_cbar_master_i(0));
   
   TLU : wb_timestamp_latch
     generic map (
@@ -1212,7 +1258,7 @@ U_DAC_ARB : spec_serial_dac_arb
   A_nCONFIG     <= not r_resets(2);
 
   --Internal Resets
-  rst_usr_lm32_n <= not r_resets(3) and rstn_sys;
+  rst_usr_lm32_n <= not r_resets(3);
   
   -- END OF System IOs
   ----------------------------------------------------------------------------------
