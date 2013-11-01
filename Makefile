@@ -1,12 +1,24 @@
-all::	etherbone tools driver toolchain firmware
+# PREFIX  controls where programs and libraries get installed
+# STAGING can be used to store 'install' output into a staging folder
+# Note: during compile (all), PREFIX must be set to the final installation path
+# Example usage:
+#   make PREFIX=/usr all
+#   make STAGING=/tmp/package PREFIX=/usr install
+#   ... will compile the programs to expect installation into /usr, but
+#       will actually install them into /tmp/package/usr for zipping.
+STAGING ?=
+PREFIX  ?= /usr/local
+PWD     := $(shell pwd)
 
-clean::	etherbone-clean tools-clean driver-clean toolchain-clean firmware-clean scu-clean exploder-clean pexarria5-clean
+all::	etherbone tools eca toolchain firmware driver
+
+clean::	etherbone-clean tools-clean eca-clean driver-clean toolchain-clean firmware-clean scu-clean exploder-clean pexarria5-clean
 
 distclean::	clean
 	git clean -xfd .
 	for i in etherbone-core fpga-config-space general-cores wr-cores wrpc-sw; do cd ip_cores/$$i; git clean -xfd .; cd ../..; done
 
-install::	etherbone-install tools-install driver-install
+install::	etherbone-install tools-install eca-install driver-install
 
 etherbone::
 	$(MAKE) -C ip_cores/etherbone-core/api all
@@ -17,14 +29,23 @@ etherbone-clean::
 etherbone-install::
 	$(MAKE) -C ip_cores/etherbone-core/api install
 
-tools::
-	$(MAKE) -C tools all
+tools::		etherbone
+	$(MAKE) -C tools EB=$(PWD)/ip_cores/etherbone-core/api all
 
 tools-clean::
-	$(MAKE) -C tools clean
+	$(MAKE) -C tools EB=$(PWD)/ip_cores/etherbone-core/api clean
 
 tools-install::
-	$(MAKE) -C tools install
+	$(MAKE) -C tools EB=$(PWD)/ip_cores/etherbone-core/api install
+
+eca::		etherbone
+	$(MAKE) -C ip_cores/wr-cores/modules/wr_eca EB=$(PWD)/ip_cores/etherbone-core/api all
+
+eca-clean::
+	$(MAKE) -C ip_cores/wr-cores/modules/wr_eca EB=$(PWD)/ip_cores/etherbone-core/api clean
+
+eca-install::
+	$(MAKE) -C ip_cores/wr-cores/modules/wr_eca EB=$(PWD)/ip_cores/etherbone-core/api install
 
 driver::
 	$(MAKE) -C ip_cores/fpga-config-space/pcie-wb all
