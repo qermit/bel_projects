@@ -19,7 +19,7 @@ use work.build_id_pkg.all;
 use work.oled_display_pkg.all;
 use work.lpc_uart_pkg.all;
 use work.wb_irq_pkg.all;
-
+--fuck u
 entity scu_control is
   port(
     clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
@@ -215,8 +215,8 @@ architecture rtl of scu_control is
     date          => x"20120305",
     name          => "GSI_GPIO_32        ")));
 
-	constant c_dpram_size : natural := 131072/4;
-	constant c_cores 		 : natural := 2;
+	constant c_dpram_size : natural := 65536/4;
+	constant c_cores 		 : natural := 7;
 	constant c_msi_per_core : natural := 4;	
 
 
@@ -258,19 +258,18 @@ architecture rtl of scu_control is
   ----------------------------------------------------------------------------------
   -- GSI Periphery Crossbar --------------------------------------------------------
   ----------------------------------------------------------------------------------
-  constant c_per_slaves   : natural := 10;
+  constant c_per_slaves   : natural := 9;
   constant c_per_masters  : natural := 1;
   constant c_per_layout   : t_sdb_record_array(c_per_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(c_xwr_wb_timestamp_latch_sdb, x"00000000"),
     1 => f_sdb_embed_device(c_eca_sdb,                    x"00000800"),
     2 => f_sdb_embed_device(c_eca_evt_sdb,                x"00000C00"),
-    3 => f_sdb_embed_device(c_irq_ctrl_sdb,               x"00000D00"),
-    4 => f_sdb_embed_device(c_scu_bus_master,             x"00400000"),
-    5 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00800000"),
-    6 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
-    7 => f_sdb_embed_device(c_oled_display,               x"00900000"),
-    8 => f_sdb_embed_device(f_wb_spi_flash_sdb(24),       x"01000000"),
-    9 => f_sdb_embed_device(c_build_id_sdb,               x"00800400"));
+    3 => f_sdb_embed_device(c_scu_bus_master,             x"00400000"),
+    4 => f_sdb_embed_device(c_xwb_gpio32_sdb,             x"00800000"),
+    5 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
+    6 => f_sdb_embed_device(c_oled_display,               x"00900000"),
+    7 => f_sdb_embed_device(f_wb_spi_flash_sdb(24),       x"01000000"),
+    8 => f_sdb_embed_device(c_build_id_sdb,               x"00800400"));
   constant c_per_sdb_address : t_wishbone_address := x"00001000";
   constant c_per_bridge_sdb  : t_sdb_bridge       :=
     f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);
@@ -292,7 +291,7 @@ architecture rtl of scu_control is
                                           instances         => c_cores,
                                           g_enum_dev_id     => false,
                                          g_dev_id_offs     => 0,
-                                          g_enum_dev_name   => false,
+                                          g_enum_dev_name   => true,
                                           g_dev_name_offs   => 0),  x"00000000");
    
    constant c_ram_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_ram_layout);
@@ -709,8 +708,8 @@ begin
     port map(
       clk_i   => clk_sys,
       rst_n_i => rstn_sys,
-      slave_i => per_cbar_master_o(9),
-      slave_o => per_cbar_master_i(9));
+      slave_i => per_cbar_master_o(8),
+      slave_o => per_cbar_master_i(8));
   
   flash : flash_top
     generic map(
@@ -724,8 +723,8 @@ begin
     port map(
       clk_i     => clk_sys,
       rstn_i    => rstn_sys,
-      slave_i   => per_cbar_master_o(8),
-      slave_o   => per_cbar_master_i(8),
+      slave_i   => per_cbar_master_o(7),
+      slave_o   => per_cbar_master_i(7),
       clk_ext_i => clk_flash,
       clk_out_i => clk_flash,
       clk_in_i  => clk_flash); -- no need to phase shift at 50MHz
@@ -882,8 +881,8 @@ U_DAC_ARB : spec_serial_dac_arb
    port map(
      clk     =>  clk_sys,
      nrst    => rstn_sys,
-     slave_i => per_cbar_master_o(4),
-     slave_o => per_cbar_master_i(4),
+     slave_i => per_cbar_master_o(3),
+     slave_o => per_cbar_master_i(3),
      
      SCUB_Data          => A_D,
      nSCUB_DS           => A_nDS,
@@ -903,8 +902,8 @@ U_DAC_ARB : spec_serial_dac_arb
   A_OneWire   <= 'Z';
   A20GATE     <= kbc_out_port(1);
      
-  gpio_slave_i <= per_cbar_master_o(5);
-  per_cbar_master_i(5) <= gpio_slave_o;
+  gpio_slave_i <= per_cbar_master_o(4);
+  per_cbar_master_i(4) <= gpio_slave_o;
   
   -- There is a tool called 'wbgen2' which can autogenerate a Wishbone
   -- interface and C header file, but this is a simple example.
@@ -965,8 +964,8 @@ U_DAC_ARB : spec_serial_dac_arb
     port map(
       clk_sys_i  => clk_sys,
       rst_n_i    => rstn_sys,
-      slave_i    => per_cbar_master_o(6),
-      slave_o    => per_cbar_master_i(6),
+      slave_i    => per_cbar_master_o(5),
+      slave_o    => per_cbar_master_i(5),
       desc_o     => open,
       uart_rxd_i => '1',
       uart_txd_o => open);
@@ -976,8 +975,8 @@ U_DAC_ARB : spec_serial_dac_arb
     port map(	
       clk_i      => clk_sys,
       nRst_i     => rstn_sys,
-      slave_i    => per_cbar_master_o(7),
-      slave_o    => per_cbar_master_i(7),
+      slave_i    => per_cbar_master_o(6),
+      slave_o    => per_cbar_master_i(6),
       RST_DISP_o => hpla_ch(8),
       DC_SPI_o   => hpla_ch(6),
       SS_SPI_o   => hpla_ch(4),

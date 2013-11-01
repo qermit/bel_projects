@@ -48,7 +48,7 @@ architecture rtl of ftm_lm32 is
     date          => x"20131009",
     name          => "ADDR_EXTENSION     ")));
   
-   constant c_cpu_id_sdb : t_sdb_device := (
+   constant c_cpu_info_sdb : t_sdb_device := (
     abi_class     => x"0000", -- undocumented device
     abi_ver_major => x"01",
     abi_ver_minor => x"01",
@@ -56,13 +56,14 @@ architecture rtl of ftm_lm32 is
     wbd_width     => x"7", -- 8/16/32-bit port granularity
     sdb_component => (
     addr_first    => x"0000000000000000",
-    addr_last     => x"0000000000000003",
+    addr_last     => x"0000000000000007",
     product => (
     vendor_id     => x"0000000000000651", -- GSI
     device_id     => x"10040085",
     version       => x"00000001",
     date          => x"20131009",
-    name          => "CPU_ID_ROM         "))); 
+    name          => "CPU_INFO_ROM       ")));
+ 
 
    -- crossbar layout
    constant c_lm32_slaves        : natural := 5;
@@ -70,7 +71,7 @@ architecture rtl of ftm_lm32 is
    constant c_lm32_layout        : t_sdb_record_array(c_lm32_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(f_xwb_dpram(g_size),   x"00000000"),
     1 => f_sdb_embed_device(c_irq_ctrl_sdb,        x"7FFFFE00"),
-    2 => f_sdb_embed_device(c_cpu_id_sdb,          x"7FFFFFF4"),
+    2 => f_sdb_embed_device(c_cpu_info_sdb,        x"7FFFFFF0"),
     3 => f_sdb_embed_device(c_adr_ext_sdb,         x"7FFFFFF8"),  
     4 => f_sdb_embed_bridge(g_bridge_sdb,          x"80000000"));
    constant c_lm32_sdb_address    : t_wishbone_address := x"7FFFFC00";
@@ -163,18 +164,24 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
 
 
 --------------------------------------------------------------------------------
--- Slave 2 - ROM ID 
+-- Slave 2 - INFO ROM 
 --------------------------------------------------------------------------------
 -- physical address extension (yes, it's dirty, but the best way for now)   
    rom_id : process(clk_sys_i)
    begin
     if rising_edge(clk_sys_i) then
       -- This is an easy solution for a device that never stalls:
+		lm32_cb_master_in(2).dat <= (others => '0');		
       lm32_cb_master_in(2).ack <= lm32_cb_master_out(2).cyc and lm32_cb_master_out(2).stb;
+       case(to_integer(unsigned(lm32_cb_master_out(2).adr(2 downto 2)))) is
+            when 0 => lm32_cb_master_in(2).dat <= g_cpu_id;
+            when 1 => lm32_cb_master_in(2).dat <= c_lm32_sdb_address;
+            when others => null;
+       end case;
     end if;
   end process;   
 
-lm32_cb_master_in(2).dat <= g_cpu_id;
+
 
 --------------------------------------------------------------------------------
 -- Slave 3 - External LM32 Master interface 
@@ -184,22 +191,22 @@ lm32_cb_master_in(2).dat <= g_cpu_id;
    begin
     if rising_edge(clk_sys_i) then
       -- This is an easy solution for a device that never stalls:
-      lm32_cb_master_in(3).ack <= lm32_cb_master_out(4).cyc and lm32_cb_master_out(4).stb;
+      lm32_cb_master_in(3).ack <= lm32_cb_master_out(3).cyc and lm32_cb_master_out(3).stb;
       lm32_cb_master_in(3).dat <= (others => '0');
       
       if rst_n_i = '0' then
         r_addr_ext <= (others => '0');
       else
         -- Detect a write to the register byte
-        if lm32_cb_master_out(4).cyc = '1' and lm32_cb_master_out(4).stb = '1' and
-           lm32_cb_master_out(4).we = '1' and lm32_cb_master_out(4).sel(0) = '1' then
-          case(to_integer(unsigned(lm32_cb_master_out(4).adr(2 downto 2)))) is
-            when 0 => r_addr_ext <= lm32_cb_master_out(4).dat(31 downto 32-g_addr_ext_bits);
+        if lm32_cb_master_out(3).cyc = '1' and lm32_cb_master_out(3).stb = '1' and
+           lm32_cb_master_out(3).we = '1' and lm32_cb_master_out(3).sel(0) = '1' then
+          case(to_integer(unsigned(lm32_cb_master_out(3).adr(2 downto 2)))) is
+            when 0 => r_addr_ext <= lm32_cb_master_out(3).dat(31 downto 32-g_addr_ext_bits);
             when others => null;
           end case;
         end if;
         
-        case to_integer(unsigned(lm32_cb_master_out(4).adr(4 downto 2))) is
+        case to_integer(unsigned(lm32_cb_master_out(3).adr(4 downto 2))) is
           when 0 => lm32_cb_master_in(3).dat(31 downto 32-g_addr_ext_bits) <= r_addr_ext ;
           when 1 => lm32_cb_master_in(3).dat <= (others => '0');--std_logic_vector(to_unsigned(2**32 - 2**(32-g_addr_ext_bits), 32));
           when others => null;
@@ -209,14 +216,15 @@ lm32_cb_master_in(2).dat <= g_cpu_id;
   end process;   
 
 
-   lm32_master_o.cyc       <= lm32_cb_master_out(4).cyc;
-   lm32_master_o.stb       <= lm32_cb_master_out(4).stb;
-   lm32_master_o.we        <= lm32_cb_master_out(4).we;
-   lm32_master_o.sel       <= lm32_cb_master_out(4).sel;
-   lm32_master_o.dat       <= lm32_cb_master_out(4).dat;
-   lm32_master_o.adr(31-g_addr_ext_bits downto 0)  <= lm32_cb_master_out(4).adr(31-g_addr_ext_bits downto 0);
-   lm32_master_o.adr(31 downto 32-g_addr_ext_bits) <= r_addr_ext;
-   
+  -- lm32_master_o.cyc       <= lm32_cb_master_out(4).cyc;
+  -- lm32_master_o.stb       <= lm32_cb_master_out(4).stb;
+  -- lm32_master_o.we        <= lm32_cb_master_out(4).we;
+  -- lm32_master_o.sel       <= lm32_cb_master_out(4).sel;
+  -- lm32_master_o.dat       <= lm32_cb_master_out(4).dat;
+  -- lm32_master_o.adr(31-g_addr_ext_bits downto 0)  <= lm32_cb_master_out(4).adr(31-g_addr_ext_bits downto 0);
+  -- lm32_master_o.adr(31 downto 32-g_addr_ext_bits) <= r_addr_ext;
+
+   lm32_master_o <= lm32_cb_master_out(4);
    lm32_cb_master_in(4)   <= lm32_master_i;
 
 end rtl;

@@ -17,10 +17,10 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name ALLOW_POWER_UP_DONT_CARE OFF
 set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS ON
 set_global_assignment -name USE_CONFIGURATION_DEVICE ON
-set_global_assignment -rise -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO"
-set_global_assignment -fall -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO"
-set_global_assignment -rise -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING"
-set_global_assignment -fall -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING"
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall
 set_global_assignment -name ACTIVE_SERIAL_CLOCK FREQ_40MHZ
 set_global_assignment -name ENABLE_SIGNALTAP ON
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "2.5 V"
@@ -2030,5 +2030,5 @@ set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_INVERSION_MASK_LE
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_STORAGE_QUALIFIER_INVERSION_MASK_LENGTH=1861" -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_LOWORD=59942" -section_id auto_signaltap_0
 set_global_assignment -name SLD_NODE_PARAMETER_ASSIGNMENT "SLD_NODE_CRC_HIWORD=54054" -section_id auto_signaltap_0
-set_global_assignment -name SLD_FILE /home/mkreider/hdlprojects/bel_projects/syn/gsi_scu/control/stp2_auto_stripped.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name SLD_FILE /home/mkreider/hdlprojects/bel_projects/syn/gsi_scu/control/stp2_auto_stripped.stp
