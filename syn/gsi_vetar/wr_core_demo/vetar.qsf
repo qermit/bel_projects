@@ -719,7 +719,10 @@ set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_end
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_1000basex_pcs.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_crc_size_check.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_bypass_queue.vhd"
+set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_tx_header_processor.vhd"
+set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_tx_crc_inserter.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_path.vhd"
+set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_tx_path.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_wb_master.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_oob_insert.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/ep_rx_early_address_match.vhd"
@@ -891,8 +894,8 @@ set_global_assignment -name SIGNALTAP_FILE stp1.stp
 #set_global_assignment -name QIP_FILE ../../../platform/altera/sys_pll/sys_pll.qip
 set_global_assignment -name VHDL_FILE ../../../modules/build_id/build_id_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../../modules/build_id/build_id.vhd
-set_global_assignment -name VHDL_FILE ../../../ip_cores/wr-cores/platform/altera/altera_phase.vhd
-set_global_assignment -name VHDL_FILE ../../../ip_cores/wr-cores/platform/altera/altera_reset.vhd
+set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/platform/altera/altera_phase.vhd"
+set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/platform/altera/altera_reset.vhd"
 
 set_instance_assignment -name CONNECT_TO_SLD_NODE_ENTITY_PORT acq_clk -to "sys_pll:sys_inst|c0" -section_id auto_signaltap_0
 
@@ -901,7 +904,7 @@ set_global_assignment -name QIP_FILE "../../../ip_cores/wr-cores/platform/altera
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/platform/altera/altera_butis.vhd"
 set_global_assignment -name QIP_FILE "../../../ip_cores/wr-cores/platform/altera/wr_arria2_phy/wr_arria2_phy.qip"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/platform/altera/wr_arria2_phy/wr_arria2_phy.vhd"
-set_global_assignment -name VHDL_FILE ../../../ip_cores/general-cores/platform/altera/networks/altera_networks_pkg.vhd
+set_global_assignment -name VHDL_FILE "../../../ip_cores/general-cores/platform/altera/networks/altera_networks_pkg.vhd"
 
 
 
