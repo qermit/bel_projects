@@ -17,6 +17,7 @@ modules = {
     "lpc_uart",
     "aux_functions",
     "function_generators",
-    "uart"
+    "uart",
+    "ftm"	
   ]
 }
