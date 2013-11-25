@@ -10,7 +10,7 @@
 -- Platform   : FPGA-generic
 -- Standard   : VHDL'93
 -------------------------------------------------------------------------------
--- Description: Syncs the current (ECA format) to another domain
+-- Description: Syncs the current time (ECA format) to another clock domain
 -------------------------------------------------------------------------------
 -- Copyright (c) 2013 GSI
 -------------------------------------------------------------------------------
@@ -25,47 +25,40 @@ use ieee.numeric_std.all;
 
 library work;
 use work.genram_pkg.all;
-use work.eca_pkg.all;
+use work.gencores_pkg.all;
 
 
 entity time_clk_cross is
+generic (g_delay_comp   : natural := 16);
   port    (clk_ref_i    : in std_logic;
-           time_ref_i   : in  t_time; 
+           time_ref_i   : in  std_logic_vector(63 downto 0); 
 
            clk_2_i      : in std_logic;           
            rst_2_n_i    : in std_logic;             
-           time_2_o     : out std_logic
+           time_2_o     : out std_logic_vector(63 downto 0) 
   );
 end entity;
 
 
 architecture behavioral of time_clk_cross is
 
-constant c_lag : unsigned(t_time'length-1 downto 0) := 4;
 
+signal r_time_ref_cor : std_logic_vector(64 downto 0);
+signal r_time_ref_gray  : std_logic_vector(63 downto 0);
+signal r_time_2_bin,    r_time_2_gray    : std_logic_vector(63 downto 0);
+signal r_time_2_bin_cor : std_logic_vector(64 downto 0);
+signal delta : integer; 
 
-signal r_time_ref_bin,  r_time_ref_gray  : t_time;
-signal r_time_2_bin,    r_time_2_gray    : t_time;
-
-
-  component gc_sync_ffs
-    generic (
-      g_sync_edge : string);
-    port (
-      clk_i    : in  std_logic;
-      rst_n_i  : in  std_logic;
-      data_i   : in  std_logic;
-      synced_o : out std_logic;
-      npulse_o : out std_logic;
-      ppulse_o : out std_logic);
-  end component;
-
+ 
 begin
 
    gray_en : process(clk_ref_i)
    begin
       if rising_edge(clk_ref_i) then
-        r_time_ref_gray <= f_eca_gray_encode(time_ref_i); 
+        -- TODO: Timing wise, this borderline dangerous ... change to big_adder
+        r_time_ref_cor <= f_big_ripple(time_ref_i, std_logic_vector(to_unsigned(g_delay_comp, time_ref_i'length)), '0');  
+      
+        r_time_ref_gray <= f_gray_encode(r_time_ref_cor(time_ref_i'range)); 
       end if;
    end process gray_en;
 
@@ -85,11 +78,11 @@ begin
    gray_de : process(clk_2_i)
    begin
       if rising_edge(clk_2_i) then
-        r_time_2_bin <= f_eca_gray_decode(r_time_2_gray, 1);
-        time_2_o <= std_logic_vector(unsigned(r_time_2_bin) + c_lag); 
-      end if;
+        r_time_2_bin <= f_gray_decode(r_time_2_gray, 1);
+        end if;
    end process gray_de;    
 
-   
+  time_2_o <= r_time_2_bin; 
+  delta <= to_integer(signed(time_ref_i(31 downto 0))) - to_integer(signed(r_time_2_bin(31 downto 0)));
 
 end architecture behavioral;

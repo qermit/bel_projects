@@ -6,8 +6,21 @@
 #define SDB_BRIDGE      0x02
 #define SDB_EMPTY       0xFF
 
-#define SCU_OLED_DISPLAY      0x93a6f3c4
+#define CPU_INFO_ROM          0x10040085
+#define IRQ_TIMER_CTRL_IF     0x10040088
+#define IRQ_MSI_CTRL_IF       0x10040083
+#define SYSTEM_TIME           0x10040084
+#define ATOMIC_BUS_ACCESS     0x10040100
+
 #define LM32_CLUSTER_INFO_ROM 0x10040086
+#define SCU_OLED_DISPLAY      0x93a6f3c4
+#define ETHERBONE_MASTER      0x00000815
+
+
+
+
+
+
 
 extern volatile unsigned int* pSDB_base;
 

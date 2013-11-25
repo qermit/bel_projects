@@ -4,19 +4,22 @@ use ieee.numeric_std.all;
 use work.wishbone_pkg.all;
 use work.wb_irq_pkg.all;
 use work.eca_pkg.all;
+use work.ftm_pkg.all;
 
 entity ftm_lm32_cluster is
 generic(g_cores         : natural := 3;
         g_ram_per_core  : natural := 32768/4;
         g_msi_per_core  : natural := 4;
         g_profile       : string  := "medium_icache_debug";
-        g_init_file     : string  := "";   
+        g_init_file     : string  := "msidemo.mif";   
         g_bridge_sdb    : t_sdb_bridge                      -- periphery crossbar         
    );
 port(
 clk_sys_i      : in  std_logic;
 rst_n_i        : in  std_logic;
 rst_lm32_n_i   : in  std_logic;
+
+tm_tai8ns_i    : in std_logic_vector(63 downto 0);
 
 ext_irq_slave_o    : out t_wishbone_slave_out; 
 ext_irq_slave_i    : in  t_wishbone_slave_in;
@@ -32,46 +35,6 @@ end ftm_lm32_cluster;
 
 architecture rtl of ftm_lm32_cluster is 
 
-   component ftm_lm32 is
-   generic(g_cpu_id        : t_wishbone_data := x"CAFEBABE";
-           g_size          : natural := 16384;                 -- size of the dpram
-           g_bridge_sdb    : t_sdb_bridge;                     -- record for the superior bridge
-           g_profile       : string := "medium_icache_debug";  -- lm32 profile
-           g_init_file     : string := "";                     -- memory init file - binary for lm32
-           g_addr_ext_bits : natural := 1;                     -- address extension bits (starting from MSB)
-           g_msi_queues    : natural := 4);                    -- number of msi queues connected to the lm32
-   port(
-   clk_sys_i      : in  std_logic;  -- system clock
-   rst_n_i        : in  std_logic;  -- reset, active low 
-   rst_lm32_n_i   : in  std_logic;
-   -- wb master interface of the lm32
-   lm32_master_o  : out t_wishbone_master_out; 
-   lm32_master_i: in  t_wishbone_master_in;  
-   -- wb msi interfaces
-   irq_slaves_o   : out t_wishbone_slave_out_array(g_msi_queues-1 downto 0);  
-   irq_slaves_i   : in  t_wishbone_slave_in_array(g_msi_queues-1 downto 0);
-   -- port B of the LM32s DPRAM 
-   ram_slave_o    : out t_wishbone_slave_out;                           
-   ram_slave_i    : in  t_wishbone_slave_in
-
-   );
-   end component;
-
-	constant c_cluster_info_sdb : t_sdb_device := (
-    abi_class     => x"0000", -- undocumented device
-    abi_ver_major => x"01",
-    abi_ver_minor => x"01",
-    wbd_endian    => c_sdb_endian_big,
-    wbd_width     => x"7", -- 8/16/32-bit port granularity
-    sdb_component => (
-    addr_first    => x"0000000000000000",
-    addr_last     => x"00000000000000FF",
-    product => (
-    vendor_id     => x"0000000000000651", -- GSI
-    device_id     => x"10040086",
-    version       => x"00000001",
-    date          => x"20131009",
-    name          => "CLUSTER_INFO_ROM   "))); 
    --**************************************************************************--
    -- dummy periphery crossbar for testing
    ------------------------------------------------------------------------------
@@ -169,11 +132,6 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
    signal irq_rewire_out            : t_wishbone_slave_out_array  (g_msi_per_core*g_cores-1 downto 0);
    signal irq_rewire_in             : t_wishbone_slave_in_array   (g_msi_per_core*g_cores-1 downto 0);
 
--- g_msi_per_core >= 4 
--- c_ext_msi      >= 3
-
-
-
 
   begin
 
@@ -188,7 +146,9 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
                   g_msi_queues                     => g_msi_per_core)
       port map(clk_sys_i                           => clk_sys_i,
                rst_n_i                             => rst_n_i,
-               rst_lm32_n_i                        => rst_lm32_n_i,               
+               rst_lm32_n_i                        => rst_lm32_n_i,
+
+               tm_tai8ns_i                         => tm_tai8ns_i,            
                --LM32               
                lm32_master_o => lm32_cbar_slaveport_in  (I),
                lm32_master_i => lm32_cbar_slaveport_out (I), 
@@ -247,7 +207,7 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
     if rising_edge(clk_sys_i) then
       -- This is an easy solution for a device that never stalls:
       lm32_cbar_masterport_in(g_cores).ack <= lm32_cbar_masterport_out(g_cores).cyc and lm32_cbar_masterport_out(g_cores).stb;
-		  lm32_cbar_masterport_in(g_cores).dat <= std_logic_vector(to_unsigned(g_cores,32));
+		   lm32_cbar_masterport_in(g_cores).dat <= std_logic_vector(to_unsigned(g_cores,32));
     end if;
   end process;   
 	

@@ -32,5 +32,5 @@ unsigned char *find_device_deep(unsigned int base, unsigned int sdb,
 
 unsigned char *find_device(unsigned int devid)
 {
-        return find_device_deep(0, *pSDB_base, devid);
+        return find_device_deep(0, (unsigned int)pSDB_base, devid);
 }

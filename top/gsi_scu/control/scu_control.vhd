@@ -19,6 +19,8 @@ use work.build_id_pkg.all;
 use work.oled_display_pkg.all;
 use work.lpc_uart_pkg.all;
 use work.wb_irq_pkg.all;
+use work.ftm_pkg.all;
+
 --fuck u
 entity scu_control is
   port(
@@ -216,7 +218,7 @@ architecture rtl of scu_control is
     name          => "GSI_GPIO_32        ")));
 
 	constant c_dpram_size : natural := 65536/4;
-	constant c_cores 		 : natural := 7;
+	constant c_cores 		 : natural := 4;
 	constant c_msi_per_core : natural := 4;	
 
 
@@ -258,8 +260,8 @@ architecture rtl of scu_control is
   ----------------------------------------------------------------------------------
   -- GSI Periphery Crossbar --------------------------------------------------------
   ----------------------------------------------------------------------------------
-  constant c_per_slaves   : natural := 9;
-  constant c_per_masters  : natural := 1;
+  constant c_per_slaves   : natural := 10;
+  constant c_per_masters  : natural := 2;
   constant c_per_layout   : t_sdb_record_array(c_per_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(c_xwr_wb_timestamp_latch_sdb, x"00000000"),
     1 => f_sdb_embed_device(c_eca_sdb,                    x"00000800"),
@@ -269,7 +271,8 @@ architecture rtl of scu_control is
     5 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
     6 => f_sdb_embed_device(c_oled_display,               x"00900000"),
     7 => f_sdb_embed_device(f_wb_spi_flash_sdb(24),       x"01000000"),
-    8 => f_sdb_embed_device(c_build_id_sdb,               x"00800400"));
+	 8 => f_sdb_embed_device(c_ebm_sdb,          			 x"02000000"),
+    9 => f_sdb_embed_device(c_build_id_sdb,               x"00800400"));
   constant c_per_sdb_address : t_wishbone_address := x"00001000";
   constant c_per_bridge_sdb  : t_sdb_bridge       :=
     f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);
@@ -300,14 +303,13 @@ architecture rtl of scu_control is
    constant c_ram_bridge_sdb  : t_sdb_bridge       :=
     f_xwb_bridge_layout_sdb(true, c_ram_layout, c_ram_sdb_address);	
 
-  constant c_top_slaves : natural := 5;	 
-  constant c_top_masters : natural := 3; -- ebs, pcie, ftm_lm32
+  constant c_top_slaves : natural := 4;	 
+  constant c_top_masters : natural := 2; -- ebs, pcie
   constant c_top_layout : t_sdb_record_array(c_top_slaves-1 downto 0) :=
    (0 => f_sdb_embed_bridge(c_ram_bridge_sdb,    			 x"00000000"),
     1 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00080000"),
-	 2 => f_sdb_embed_device(c_ebm_sdb,          			 x"01000000"),
-    3 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"02000000"),
-    4 => f_sdb_embed_bridge(c_irq_bridge_sdb,             x"04000000")    
+	 2 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"04000000"),
+    3 => f_sdb_embed_bridge(c_irq_bridge_sdb,             x"08000000")    
    );
   constant c_top_sdb_address : t_wishbone_address := x"000F0000";	 
   
@@ -411,6 +413,8 @@ architecture rtl of scu_control is
   signal tm_tai    : std_logic_vector(39 downto 0);
   signal tm_cycles : std_logic_vector(27 downto 0);
 
+  signal time_sys, time_ref : std_logic_vector(63 downto 0);
+  
   signal channels : t_channel_array(1 downto 0);
   
   signal owr_pwren : std_logic_vector(1 downto 0);
@@ -440,30 +444,7 @@ architecture rtl of scu_control is
   
   signal rst_usr_lm32_n : std_logic;
   
-  component ftm_lm32_cluster is
-   generic(g_cores         : natural := 3;
-           g_ram_per_core  : natural := 32768/4;
-           g_msi_per_core  : natural := 4;
-           g_profile       : string  := "medium_icache_debug";
-           g_init_file     : string  := "msidemo.bin";   
-           g_bridge_sdb    : t_sdb_bridge                      -- periphery crossbar         
-      );
-   port(
-      clk_sys_i      : in  std_logic;
-      rst_n_i        : in  std_logic;
-      rst_lm32_n_i   : in  std_logic;
-
-      ext_irq_slave_o    : out t_wishbone_slave_out; 
-      ext_irq_slave_i    : in  t_wishbone_slave_in;
-               
-      ext_lm32_master_o   : out t_wishbone_master_out; 
-      ext_lm32_master_i 	: in  t_wishbone_master_in;  
-
-      ext_ram_slave_o    : out t_wishbone_slave_out;                            
-      ext_ram_slave_i    : in  t_wishbone_slave_in
-
-   );
-   end component;
+  
   
 begin
 
@@ -641,14 +622,14 @@ begin
   
   ------------------------------------------------
   -- Connect periphery crossbar to top crossbar
-  per_cbar_slave_i(0)  <= top_cbar_master_o(3);
-  top_cbar_master_i(3) <= per_cbar_slave_o(0);
+  per_cbar_slave_i(0)  <= top_cbar_master_o(2);
+  top_cbar_master_i(2) <= per_cbar_slave_o(0);
   ------------------------------------------------
   
    ------------------------------------------------
   -- Connect irq crossbar to top crossbar
-  irq_cbar_slave_i(1)  <= top_cbar_master_o(4);
-  top_cbar_master_i(4) <= irq_cbar_slave_o(1);
+  irq_cbar_slave_i(1)  <= top_cbar_master_o(3);
+  top_cbar_master_i(3) <= irq_cbar_slave_o(1);
   ------------------------------------------------
 
   PER_CON : xwb_sdb_crossbar
@@ -672,11 +653,19 @@ begin
   -- END OF WB Bus Interconnects
   ----------------------------------------------------------------------------------
   
-  
+ sys_time_conv :  time_clk_cross
+ generic map(g_delay_comp => 12)
+ port map (clk_ref_i    => clk_ref,
+           time_ref_i   => time_ref,
+
+           clk_2_i      => clk_sys,          
+           rst_2_n_i    => rstn_sys,            
+           time_2_o     => time_sys);
+ 
   ----------------------------------------------------------------------------------
   -- Top LM32 CPUs & RAMs ------------------------------------------------------------
   ----------------------------------------------------------------------------------
-	DUT : ftm_lm32_cluster
+	lm32cluster : ftm_lm32_cluster
     generic map(  g_cores        => c_cores,
                   g_ram_per_core => c_dpram_size,
                   g_msi_per_core => c_msi_per_core,
@@ -686,9 +675,10 @@ begin
       port map(clk_sys_i         => clk_sys,
                rst_n_i           => rstn_sys,
                rst_lm32_n_i      => rst_usr_lm32_n,
-               --LM32               
-               ext_lm32_master_o => top_cbar_slave_i(2),
-               ext_lm32_master_i => top_cbar_slave_o(2), 
+               tm_tai8ns_i			=> time_sys,
+					--LM32               
+               ext_lm32_master_o => per_cbar_slave_i(1),
+               ext_lm32_master_i => per_cbar_slave_o(1), 
                -- MSI
                ext_irq_slave_o   => irq_cbar_master_i(1),
                ext_irq_slave_i   => irq_cbar_master_o(1),       
@@ -708,8 +698,8 @@ begin
     port map(
       clk_i   => clk_sys,
       rst_n_i => rstn_sys,
-      slave_i => per_cbar_master_o(8),
-      slave_o => per_cbar_master_i(8));
+      slave_i => per_cbar_master_o(9),
+      slave_o => per_cbar_master_i(9));
   
   flash : flash_top
     generic map(
@@ -770,8 +760,8 @@ U_DAC_ARB : spec_serial_dac_arb
     ebs_wb_master_i => top_cbar_slave_o(0),
     
     --ebm (optional)
-    ebm_wb_slave_i  => top_cbar_master_o(2),
-    ebm_wb_slave_o  => top_cbar_Master_i(2));
+    ebm_wb_slave_i  => per_cbar_master_o(8),
+    ebm_wb_slave_o  => per_cbar_master_i(8));
 		 
 
   
@@ -814,6 +804,7 @@ U_DAC_ARB : spec_serial_dac_arb
       tm_time_valid_i => tm_valid,
       tm_tai_i        => tm_tai,
       tm_cycles_i     => tm_cycles,
+		tm_tai8ns_o		 => time_ref,
       wb_slave_i      => per_cbar_master_o(0),
       wb_slave_o      => per_cbar_master_i(0));
 
