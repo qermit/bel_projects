@@ -26,6 +26,24 @@ inline void atomic_off()
 }
 */
 
+inline unsigned long long get_sys_time()
+{
+   unsigned long long systime;  
+   systime =  ((unsigned long long)*(time_sys+0))<<32;
+   systime |= ((unsigned long long)*(time_sys+1)) & 0x00000000ffffffff;
+   return systime;  
+}
+
+inline void cycSleep(unsigned int cycs)
+{
+   for (j = 0; j < cycs; ++j) asm("# noop"); 
+}
+
+inline void uSleep(unsigned long long uSecs)
+{
+   cycSleep((unsigned int)(uSecs * 1000 / c_T_SYS));
+}
+
 inline unsigned int  getCpuID()  {return *cpu_ID};
 inline unsigned int  getCpuIdx() {return *cpu_ID & 0xff};
 inline unsigned int  getCores()  {return *cores  & 0xff};

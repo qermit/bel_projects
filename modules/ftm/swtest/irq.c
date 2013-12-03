@@ -29,12 +29,12 @@
 
 extern unsigned int* irq_slave;
 
-const unsigned int IRQ_REG_RST 	= 0x00000000;
-const unsigned int IRQ_REG_STAT = 0x00000004;
-const unsigned int IRQ_REG_POP	= 0x00000008;
-const unsigned int IRQ_OFFS_MSG = 0x00000000;
-const unsigned int IRQ_OFFS_SRC = 0x00000004;
-const unsigned int IRQ_OFFS_SEL	= 0x00000008;
+const unsigned int IRQ_REG_RST   = 0x00000000;
+const unsigned int IRQ_REG_STAT  = 0x00000004;
+const unsigned int IRQ_REG_POP   = 0x00000008;
+const unsigned int IRQ_OFFS_MSG  = 0x00000000;
+const unsigned int IRQ_OFFS_SRC  = 0x00000004;
+const unsigned int IRQ_OFFS_SEL  = 0x00000008;
 
 inline void irq_pop_msi( unsigned int irq_no)
 {
@@ -57,60 +57,67 @@ inline void isr_table_clr(void)
 
 inline  unsigned int  irq_get_mask(void)
 {
-	 //read IRQ mask
-	 unsigned int im;
-	 asm volatile (	"rcsr %0, im": "=&r" (im));
-	 return im;	             	
+    //read IRQ mask
+    unsigned int im;
+    asm ( "rcsr %0, im": "=&r" (im));
+    return im;                   
 }
 
 inline void irq_set_mask( unsigned int im)
 {
-	 //write IRQ mask
-	 asm volatile (	"wcsr im, %0": "=&r" (im));
-	 return;	             	
+    //write IRQ mask
+    asm (   "wcsr im, %0" \
+            :             \
+            : "r" (im)    \
+        );
+               
 }
 
 inline void irq_disable(void)
 {
-	 //globally disable interrupts
-	  unsigned int ie;
-	 asm volatile (	"rcsr %0, IE\n" \
-			            "andi  %0, %0, 0xFFFE\n" \
-			            "wcsr IE, %0" : "=&r" (ie));
-	 return;		            
+    //globally disable interrupts
+    unsigned foo;
+    asm volatile (   "rcsr %0, IE\n"            \
+                     "andi  %0, %0, 0xFFFE\n"   \
+                     "wcsr IE, %0"              \
+                     : "=r" (foo)               \
+                     :                          \
+                     : 
+                     );
+                   
 }
 
 inline void irq_enable(void)
 {
-	 //globally enable interrupts
-	  unsigned int  ie;
-	 asm volatile (	"rcsr %0, IE\n" \
-			            "ori  %0, %0, 1\n" \
-			            "wcsr IE, %0" : "=&r" (ie));
-	 return;			            
+    //globally enable interrupts
+    unsigned foo;
+    asm volatile (   "rcsr r1, IE\n"      \
+                     "ori  r1, r1, 1\n"   \
+                     "wcsr IE, r1"        \
+                     : "=r" (foo)         \
+                     :                    \
+                     :                    \
+                     );
+                         
 }
 
 inline void irq_clear( unsigned int mask)
 {
-	 //clear pending interrupt flag(s)
-	 unsigned int ip;
-	 asm volatile (	"rcsr %0, ip\n" \
-			            "and  %0, %0, %1\n" \
-			            "wcsr ip, %0" : "=&r" (ip): "r" (mask) );
-	 return;		            
+    //clear pending interrupt flag(s)
+    asm           (   "wcsr ip, %0" \
+                     :              \
+                     : "r" (mask)   \
+                     :              \
+                     );
 }
-
-
 
 inline void irq_process(void)
 {
-  char buffer[12];
-   
   unsigned int ip;
   unsigned char irq_no = 0;
   
   //get pending flags
-  asm volatile ("rcsr %0, ip": "=r"(ip));
+  asm ("rcsr %0, ip": "=r"(ip));
 
   while(ip) //irqs pending ?
   {

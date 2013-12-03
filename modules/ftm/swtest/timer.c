@@ -27,7 +27,9 @@
 
 //#include "display.h" DEBUG
 
-
+const unsigned long long c_F_SYS          = 62500000;
+const unsigned long long c_T_SYS          = 1000000000 / F_SYS;
+const unsigned long      c_CycsMicro      = 1000/16         
 
 const unsigned int TM_REG_RST             = 0x00; // wo, Reset Active Low
 const unsigned int TM_REG_ARM_STAT        = 0x04; // ro, Shows armed timers,  (1 armed, 0 disarmed), 1 bit per timer
@@ -58,14 +60,6 @@ inline void irq_tm_rst()
 {
     *(timer+(TM_REG_RST>>2)) = 1;  
 } 
-
-inline unsigned long long get_sys_time()
-{
-   unsigned long long systime;  
-   systime =  ((unsigned long long)*(time_sys+0))<<32;
-   systime |= ((unsigned long long)*(time_sys+1)) & 0x00000000ffffffff;
-   return systime;  
-}
 
 // timer arm
 inline unsigned int irq_tm_get_arm(void)

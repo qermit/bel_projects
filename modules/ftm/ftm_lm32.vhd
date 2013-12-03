@@ -188,6 +188,8 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
     end if;
   end process;   
 
+  lm32_cb_master_in(3).stall <= '0';
+  lm32_cb_master_in(3).err   <= '0';
 --******************************************************************************
 -- Slave 4 - System Time
 --------------------------------------------------------------------------------
@@ -197,7 +199,7 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
          -- This is an easy solution for a device that never stalls:
          lm32_cb_master_in(4).ack <= lm32_cb_master_out(4).cyc and lm32_cb_master_out(4).stb;
          lm32_cb_master_in(4).dat <= (others => '0');
-
+			
          r_tai_8ns_HI <= tm_tai8ns_i(63 downto 32);  --register hi and low to reduce load on fan out       
          r_tai_8ns_LO <= tm_tai8ns_i(31 downto 0);
 
@@ -212,6 +214,8 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
       end if;
    end process;  
 
+	lm32_cb_master_in(4).stall <= '0';
+	lm32_cb_master_in(4).err   <= '0'; 
 --******************************************************************************
 -- Slave 5 - Atomic Cycle Line Control
 --------------------------------------------------------------------------------
@@ -226,8 +230,8 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
 		   lm32_cb_master_in(5).dat(31 downto 1)  <= (others => '0');
          lm32_cb_master_in(5).dat(0)            <= r_cyc_atomic;		
          lm32_cb_master_in(5).ack <= lm32_cb_master_out(5).cyc and lm32_cb_master_out(5).stb;
-          
-         if(lm32_cb_master_out(5).cyc = '1' and lm32_cb_master_out(5).stb = '1') then         
+        
+			if(lm32_cb_master_out(5).cyc = '1' and lm32_cb_master_out(5).stb = '1') then         
             if( lm32_cb_master_out(5).we = '1') then
                r_cyc_atomic <= lm32_cb_master_out(5).dat(0);
             end if;
@@ -236,7 +240,8 @@ rst_lm32_n <= rst_n_i and rst_lm32_n_i;
     end if;
   end process; 
 
-
+   lm32_cb_master_in(5).stall <= '0';
+	lm32_cb_master_in(5).err   <= '0';
 --******************************************************************************
 -- Slave 6 - external master if
 --------------------------------------------------------------------------------

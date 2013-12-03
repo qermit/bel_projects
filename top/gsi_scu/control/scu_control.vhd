@@ -217,9 +217,9 @@ architecture rtl of scu_control is
     date          => x"20120305",
     name          => "GSI_GPIO_32        ")));
 
-	constant c_dpram_size : natural := 65536/4;
-	constant c_cores 		 : natural := 4;
-	constant c_msi_per_core : natural := 4;	
+   constant c_dpram_size : natural := 65536/4;
+   constant c_cores        : natural := 4;
+   constant c_msi_per_core : natural := 4;   
 
 
   ----------------------------------------------------------------------------------
@@ -235,19 +235,19 @@ architecture rtl of scu_control is
    
    constant c_lm32c_irq_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_lm32c_irq_layout);
     constant c_lm32c_irq_bridge_sdb  : t_sdb_bridge       :=
-    f_xwb_bridge_layout_sdb(true, c_lm32c_irq_layout, c_lm32c_irq_sdb_address);	
-	 
+    f_xwb_bridge_layout_sdb(true, c_lm32c_irq_layout, c_lm32c_irq_sdb_address);   
+    
   constant c_irq_slaves   : natural := 2;
   constant c_irq_masters  : natural := 2;
   constant c_irq_layout   : t_sdb_record_array(c_irq_slaves-1 downto 0) :=
    (0 => f_sdb_embed_device(c_irq_hostbridge_ep_sdb,  x"00000000"),
-	 1 => f_sdb_embed_bridge(c_lm32c_irq_bridge_sdb, x"00010000")
-	 );
-	 
+    1 => f_sdb_embed_bridge(c_lm32c_irq_bridge_sdb, x"00010000")
+    );
+    
  
   constant c_irq_sdb_address : t_wishbone_address := x"00002000";
   constant c_irq_bridge_sdb  : t_sdb_bridge       :=
-    f_xwb_bridge_layout_sdb(true, c_irq_layout, c_irq_sdb_address);	 
+    f_xwb_bridge_layout_sdb(true, c_irq_layout, c_irq_sdb_address);    
 
   signal irq_cbar_slave_i  : t_wishbone_slave_in_array (c_irq_masters-1 downto 0);
   signal irq_cbar_slave_o  : t_wishbone_slave_out_array(c_irq_masters-1 downto 0);
@@ -255,7 +255,7 @@ architecture rtl of scu_control is
   signal irq_cbar_master_o : t_wishbone_master_out_array(c_irq_slaves-1 downto 0);
 
   -- END OF MSI IRQ Crossbar
-  ----------------------------------------------------------------------------------	 
+  ----------------------------------------------------------------------------------    
   
   ----------------------------------------------------------------------------------
   -- GSI Periphery Crossbar --------------------------------------------------------
@@ -271,19 +271,19 @@ architecture rtl of scu_control is
     5 => f_sdb_embed_device(c_wrc_periph1_sdb,            x"00800100"),
     6 => f_sdb_embed_device(c_oled_display,               x"00900000"),
     7 => f_sdb_embed_device(f_wb_spi_flash_sdb(24),       x"01000000"),
-	 8 => f_sdb_embed_device(c_ebm_sdb,          			 x"02000000"),
+    8 => f_sdb_embed_device(c_ebm_sdb,                    x"02000000"),
     9 => f_sdb_embed_device(c_build_id_sdb,               x"00800400"));
   constant c_per_sdb_address : t_wishbone_address := x"00001000";
   constant c_per_bridge_sdb  : t_sdb_bridge       :=
     f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);
-	
+   
   signal per_cbar_slave_i  : t_wishbone_slave_in_array (c_per_masters-1 downto 0);
   signal per_cbar_slave_o  : t_wishbone_slave_out_array(c_per_masters-1 downto 0);
   signal per_cbar_master_i : t_wishbone_master_in_array(c_per_slaves-1 downto 0);
-  signal per_cbar_master_o : t_wishbone_master_out_array(c_per_slaves-1 downto 0);	
+  signal per_cbar_master_o : t_wishbone_master_out_array(c_per_slaves-1 downto 0);   
   
   -- END OF GSI Periphery Crossbar
-  ----------------------------------------------------------------------------------		 
+  ----------------------------------------------------------------------------------       
   
   ----------------------------------------------------------------------------------
   -- Top crossbar ------------------------------------------------------------------
@@ -298,20 +298,20 @@ architecture rtl of scu_control is
                                           g_dev_name_offs   => 0),  x"00000000");
    
    constant c_ram_sdb_address       : t_wishbone_address := f_sdb_create_rom_addr(c_ram_layout);
-	
+   
 
    constant c_ram_bridge_sdb  : t_sdb_bridge       :=
-    f_xwb_bridge_layout_sdb(true, c_ram_layout, c_ram_sdb_address);	
+    f_xwb_bridge_layout_sdb(true, c_ram_layout, c_ram_sdb_address);   
 
-  constant c_top_slaves : natural := 4;	 
+  constant c_top_slaves : natural := 4;    
   constant c_top_masters : natural := 2; -- ebs, pcie
   constant c_top_layout : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (0 => f_sdb_embed_bridge(c_ram_bridge_sdb,    			 x"00000000"),
+   (0 => f_sdb_embed_bridge(c_ram_bridge_sdb,              x"00000000"),
     1 => f_sdb_embed_bridge(c_wrcore_bridge_sdb,          x"00080000"),
-	 2 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"04000000"),
+    2 => f_sdb_embed_bridge(c_per_bridge_sdb,             x"04000000"),
     3 => f_sdb_embed_bridge(c_irq_bridge_sdb,             x"08000000")    
    );
-  constant c_top_sdb_address : t_wishbone_address := x"000F0000";	 
+  constant c_top_sdb_address : t_wishbone_address := x"000F0000";    
   
   signal top_cbar_slave_i  : t_wishbone_slave_in_array (c_top_masters-1 downto 0);
   signal top_cbar_slave_o  : t_wishbone_slave_out_array(c_top_masters-1 downto 0);
@@ -319,7 +319,7 @@ architecture rtl of scu_control is
   signal top_cbar_master_o : t_wishbone_master_out_array(c_top_slaves-1 downto 0);
   
   -- END OF Top crossbar
-  ----------------------------------------------------------------------------------		
+  ----------------------------------------------------------------------------------      
 
   signal eca_2_wb_i : t_wishbone_master_in;
   signal eca_2_wb_o : t_wishbone_master_out;
@@ -665,7 +665,7 @@ begin
   ----------------------------------------------------------------------------------
   -- Top LM32 CPUs & RAMs ------------------------------------------------------------
   ----------------------------------------------------------------------------------
-	lm32cluster : ftm_lm32_cluster
+   lm32cluster : ftm_lm32_cluster
     generic map(  g_cores        => c_cores,
                   g_ram_per_core => c_dpram_size,
                   g_msi_per_core => c_msi_per_core,
@@ -675,8 +675,8 @@ begin
       port map(clk_sys_i         => clk_sys,
                rst_n_i           => rstn_sys,
                rst_lm32_n_i      => rst_usr_lm32_n,
-               tm_tai8ns_i			=> time_sys,
-					--LM32               
+               tm_tai8ns_i         => time_sys,
+               --LM32               
                ext_lm32_master_o => per_cbar_slave_i(1),
                ext_lm32_master_i => per_cbar_slave_o(1), 
                -- MSI
@@ -742,16 +742,16 @@ U_DAC_ARB : spec_serial_dac_arb
 
   eb : eb_master_slave_wrapper
   generic map(
-    g_with_master         	=> true,
-    g_ebs_sdb_address		=> (x"00000000" & c_top_sdb_address),
-	 g_ebm_adr_bits_hi 		=> 10)               
+    g_with_master            => true,
+    g_ebs_sdb_address      => (x"00000000" & c_top_sdb_address),
+    g_ebm_adr_bits_hi       => 10)               
   port map(
-	 clk_i       => clk_sys,
-	 nRst_i      => rstn_sys,
-	 snk_i       => mb_snk_in,
-	 snk_o       => mb_snk_out,
-	 src_o       => mb_src_out,
-	 src_i       => mb_src_in,
+    clk_i       => clk_sys,
+    nRst_i      => rstn_sys,
+    snk_i       => mb_snk_in,
+    snk_o       => mb_snk_out,
+    src_o       => mb_src_out,
+    src_i       => mb_src_in,
   
     --ebs
     ebs_cfg_slave_o => wrc_master_i,
@@ -762,7 +762,7 @@ U_DAC_ARB : spec_serial_dac_arb
     --ebm (optional)
     ebm_wb_slave_i  => per_cbar_master_o(8),
     ebm_wb_slave_o  => per_cbar_master_i(8));
-		 
+       
 
   
   PCIe : pcie_wb
@@ -782,10 +782,12 @@ U_DAC_ARB : spec_serial_dac_arb
        master_o      => top_cbar_slave_i(1),
        master_i      => top_cbar_slave_o(1),
        
-       slave_clk_i   => clk_ref,
-       slave_rstn_i  => rstn_ref,
+       slave_clk_i   => clk_sys,
+       slave_rstn_i  => rstn_sys,
        slave_i       => irq_cbar_master_o(0),
        slave_o       => irq_cbar_master_i(0));
+       
+   
   
   TLU : wb_timestamp_latch
     generic map (
@@ -798,13 +800,13 @@ U_DAC_ARB : spec_serial_dac_arb
       sys_rstn_i      => rstn_sys,
       triggers_i(0)   => lemo_io(1),
       triggers_i(1)   => lemo_io(2),
-		triggers_i(2)	 => eca_gpio(0),
-		triggers_i(3)	 => eca_gpio(1),
-		triggers_i(4)	 => eca_gpio(2),
+      triggers_i(2)    => eca_gpio(0),
+      triggers_i(3)    => eca_gpio(1),
+      triggers_i(4)    => eca_gpio(2),
       tm_time_valid_i => tm_valid,
       tm_tai_i        => tm_tai,
       tm_cycles_i     => tm_cycles,
-		tm_tai8ns_o		 => time_ref,
+      tm_tai8ns_o       => time_ref,
       wb_slave_i      => per_cbar_master_o(0),
       wb_slave_o      => per_cbar_master_i(0));
 
@@ -846,11 +848,11 @@ U_DAC_ARB : spec_serial_dac_arb
       channel_i => channels(1),
       master_o  => eca_2_wb_o,
       master_i  => eca_2_wb_i);
-		
-	 eca_2_irq : xwb_clock_crossing 
-	 generic map(
-				g_size => 256)
-	 port map(
+      
+    eca_2_irq : xwb_clock_crossing 
+    generic map(
+            g_size => 256)
+    port map(
     slave_clk_i    => clk_ref,
     slave_rst_n_i  => rstn_ref,
     slave_i        => eca_2_wb_o,
@@ -858,9 +860,9 @@ U_DAC_ARB : spec_serial_dac_arb
     master_clk_i   => clk_sys, 
     master_rst_n_i => rstn_sys,
     master_i       => irq_cbar_slave_o(0),
-    master_o       => irq_cbar_slave_i(0));	
-		
-		
+    master_o       => irq_cbar_slave_i(0));   
+      
+      
   
   scub_master : wb_scu_bus 
     generic map(
@@ -963,7 +965,7 @@ U_DAC_ARB : spec_serial_dac_arb
       
   -- OLED display
   dcon :  display_console
-    port map(	
+    port map(   
       clk_i      => clk_sys,
       nRst_i     => rstn_sys,
       slave_i    => per_cbar_master_o(6),
@@ -971,7 +973,7 @@ U_DAC_ARB : spec_serial_dac_arb
       RST_DISP_o => hpla_ch(8),
       DC_SPI_o   => hpla_ch(6),
       SS_SPI_o   => hpla_ch(4),
-      SCK_SPI_o  => hpla_ch(2),	
+      SCK_SPI_o  => hpla_ch(2),   
       SD_SPI_o   => hpla_ch(10),
       SH_VR_o    => hpla_ch(0));
     
@@ -1009,7 +1011,7 @@ U_DAC_ARB : spec_serial_dac_arb
       dac_hpll_data_o    => dac_hpll_data,
       dac_dpll_load_p1_o => dac_dpll_load_p1,
       dac_dpll_data_o    => dac_dpll_data,
-		
+      
       phy_ref_clk_i      => clk_ref,
       phy_tx_data_o      => phy_tx_data,
       phy_tx_k_o         => phy_tx_k,

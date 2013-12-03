@@ -46,7 +46,7 @@ architecture rtl of ftm_lm32_cluster is
 
   --constant c_per_sdb_address : t_wishbone_address := x"000F0000";
   --constant c_per_bridge_sdb  : t_sdb_bridge       :=
-  --  f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);	
+  --  f_xwb_bridge_layout_sdb(true, c_per_layout, c_per_sdb_address);   
    ------------------------------------------------------------------------------
 
    --**************************************************************************--
@@ -62,20 +62,20 @@ architecture rtl of ftm_lm32_cluster is
    constant c_lm32_masters  : natural := g_cores; -- lm32's
    constant c_lm32_layout   : t_sdb_record_array(c_lm32_slaves-1 downto 0) := 
    f_sdb_automap_array(f_sdb_join_arrays(f_sdb_create_array(  device            => c_irq_ep_sdb, 
-								instances         => g_cores,
-								g_enum_dev_id     => true,
-								g_dev_id_offs     => 0,
-								g_enum_dev_name   => true,
-								g_dev_name_offs   => 0), 
-								c_local_periphery), x"00000000");
+                        instances         => g_cores,
+                        g_enum_dev_id     => true,
+                        g_dev_id_offs     => 0,
+                        g_enum_dev_name   => true,
+                        g_dev_name_offs   => 0), 
+                        c_local_periphery), x"00000000");
 
-constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm32_layout);
+   constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm32_layout);
    constant c_lm32_bridge_sdb  : t_sdb_bridge       :=
-    f_xwb_bridge_layout_sdb(true, c_lm32_layout, c_lm32_sdb_address);	 	
+    f_xwb_bridge_layout_sdb(true, c_lm32_layout, c_lm32_sdb_address);       
 
    signal lm32_cbar_masterport_in   : t_wishbone_master_in_array  (c_lm32_slaves-1 downto 0);
    signal lm32_cbar_masterport_out  : t_wishbone_master_out_array (c_lm32_slaves-1 downto 0);
-	signal lm32_cbar_slaveport_in    : t_wishbone_slave_in_array   (c_lm32_masters-1 downto 0);
+   signal lm32_cbar_slaveport_in    : t_wishbone_slave_in_array   (c_lm32_masters-1 downto 0);
    signal lm32_cbar_slaveport_out   : t_wishbone_slave_out_array  (c_lm32_masters-1 downto 0);
    ------------------------------------------------------------------------------
    
@@ -101,7 +101,7 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
 
    signal irq_cbar_masterport_in    : t_wishbone_master_in_array  (c_irq_slaves-1 downto 0);
    signal irq_cbar_masterport_out   : t_wishbone_master_out_array (c_irq_slaves-1 downto 0);
-	signal irq_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_irq_masters-1 downto 0);
+   signal irq_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_irq_masters-1 downto 0);
    signal irq_cbar_slaveport_out    : t_wishbone_slave_out_array  (c_irq_masters-1 downto 0);
 
    --**************************************************************************--
@@ -126,7 +126,7 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
   
    signal ram_cbar_masterport_in    : t_wishbone_master_in_array  (c_ram_slaves-1 downto 0);
    signal ram_cbar_masterport_out   : t_wishbone_master_out_array (c_ram_slaves-1 downto 0);
-	signal ram_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_ram_masters-1 downto 0);
+   signal ram_cbar_slaveport_in     : t_wishbone_slave_in_array   (c_ram_masters-1 downto 0);
    signal ram_cbar_slaveport_out    : t_wishbone_slave_out_array  (c_ram_masters-1 downto 0);
    
    signal irq_rewire_out            : t_wishbone_slave_out_array  (g_msi_per_core*g_cores-1 downto 0);
@@ -199,19 +199,19 @@ constant c_lm32_sdb_address   : t_wishbone_address := f_sdb_create_rom_addr(c_lm
    ext_lm32_master_o                         <= lm32_cbar_masterport_out(c_lm32_slaves-1);
    lm32_cbar_masterport_in(c_lm32_slaves-1)  <= ext_lm32_master_i;  
 
-	--------------------------------------------------------------------------------
+   --------------------------------------------------------------------------------
 -- Slave - CLUSTER INFO ROM 
 --------------------------------------------------------------------------------  
    cluster_info_rom : process(clk_sys_i)
    begin
-    if rising_edge(clk_sys_i) then
-      -- This is an easy solution for a device that never stalls:
-      lm32_cbar_masterport_in(g_cores).ack <= lm32_cbar_masterport_out(g_cores).cyc and lm32_cbar_masterport_out(g_cores).stb;
-		   lm32_cbar_masterport_in(g_cores).dat <= std_logic_vector(to_unsigned(g_cores,32));
-    end if;
-  end process;   
-	
-	
+      if rising_edge(clk_sys_i) then
+         -- This is an easy solution for a device that never stalls:
+         lm32_cbar_masterport_in(g_cores).ack <= lm32_cbar_masterport_out(g_cores).cyc and lm32_cbar_masterport_out(g_cores).stb;
+         lm32_cbar_masterport_in(g_cores).dat <= std_logic_vector(to_unsigned(g_cores,32));
+      end if;
+   end process;   
+   
+   
    IRQ_CON : xwb_sdb_crossbar
    generic map(
      g_num_masters => c_irq_masters,

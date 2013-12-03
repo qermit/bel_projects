@@ -17,17 +17,6 @@ package ftm_pkg is
 -- Components declaration
 -------------------------------------------------------------------------------
 
-   component time_clk_cross is
-   generic (g_delay_comp   : natural := 4);
-   port    (clk_ref_i      : in std_logic;
-           time_ref_i      : in  std_logic_vector(63 downto 0); 
-
-           clk_2_i         : in std_logic;           
-           rst_2_n_i       : in std_logic;             
-           time_2_o        : out std_logic_vector(63 downto 0)
-   );
-   end component;
-
    component ftm_lm32 is
    generic(g_cpu_id        : t_wishbone_data := x"CAFEBABE";
       g_size          : natural := 16384;                 -- size of the dpram

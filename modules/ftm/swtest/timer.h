@@ -1,14 +1,17 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#define TM_SYSTIME      0
-#define TM_COUNTER      1
-#define TM_PERIODIC     1
-#define TM_1TIME        0
-#define TM_NO_CASCADE  -1
+#define TIMER_ABS_TIME     0
+#define TIMER_REL_TIME     1
+#define TIMER_PERIODIC     1
+#define TIMER_1TIME        0
+#define TIMER_NO_CASCADE  -1
+#define TIMER_0            0
+#define TIMER_1            1
+#define TIMER_2            2
+#define TIMER_3            3
 
 extern volatile unsigned int* timer;
-extern volatile unsigned int* time_sys;
 
 typedef struct
 {
@@ -21,52 +24,49 @@ typedef struct
 } s_timer;
 
 
-inline void irq_tm_rst(); 
-
-
-inline unsigned long long get_sys_time();
+inline void irq_TIMER_rst(); 
 
 // timer arm
-inline unsigned int irq_tm_get_arm(void);
-inline void irq_tm_set_arm(unsigned int val);
-inline void irq_tm_clr_arm(unsigned int val);
-inline void irq_tm_start(unsigned int val);
-inline void irq_tm_stop (unsigned int val);
+inline unsigned int irq_TIMER_get_arm(void);
+inline void irq_TIMER_set_arm(unsigned int val);
+inline void irq_TIMER_clr_arm(unsigned int val);
+inline void irq_TIMER_start(unsigned int val);
+inline void irq_TIMER_stop (unsigned int val);
 
 // comparator src
-inline unsigned int irq_tm_get_src(void);
-inline void irq_tm_set_src(unsigned int val);
-inline void irq_tm_clr_src(unsigned int val);
+inline unsigned int irq_TIMER_get_src(void);
+inline void irq_TIMER_set_src(unsigned int val);
+inline void irq_TIMER_clr_src(unsigned int val);
 
 // counter mode
-inline unsigned int irq_tm_get_cnt_mode(void);
-inline void irq_tm_set_cnt_mode(unsigned int val);
-inline void irq_tm_clr_cnt_mode(unsigned int val);
+inline unsigned int irq_TIMER_get_cnt_mode(void);
+inline void irq_TIMER_set_cnt_mode(unsigned int val);
+inline void irq_TIMER_clr_cnt_mode(unsigned int val);
 
 // cascaded start
-inline unsigned int irq_tm_get_csc(void);
-inline void irq_tm_set_csc(unsigned int val);
-inline void irq_tm_clr_csc(unsigned int val);
+inline unsigned int irq_TIMER_get_csc(void);
+inline void irq_TIMER_set_csc(unsigned int val);
+inline void irq_TIMER_clr_csc(unsigned int val);
 
 // counter reset
-inline void irq_tm_cnt_rst(unsigned int val);
+inline void irq_TIMER_cnt_rst(unsigned int val);
 
 //timer select
-inline void irq_tm_timer_sel(unsigned int val);
+inline void irq_TIMER_timer_sel(unsigned int val);
 
 //deadline
-inline void irq_tm_deadl_set(unsigned long long deadline);
-unsigned long long irq_tm_deadl_get(unsigned char idx);
+inline void irq_TIMER_deadl_set(unsigned long long deadline);
+unsigned long long irq_TIMER_deadl_get(unsigned char idx);
 
 //irq address and message
-inline void irq_tm_msi_set(unsigned int dst, unsigned int msg);
+inline void irq_TIMER_msi_set(unsigned int dst, unsigned int msg);
 
 //cascade counter 'reciever' to timer 'sender'. sender -1 means no cascade
-inline void irq_tm_cascade(char receiver, char sender);
+inline void irq_TIMER_cascade(char receiver, char sender);
 
-void irq_tm_trigger_at_time(unsigned char idx, unsigned long long deadline);
+void irq_TIMER_trigger_at_time(unsigned char idx, unsigned long long deadline);
 
-void irq_tm_write_config(unsigned char idx, s_timer* tm);
+void irq_TIMER_write_config(unsigned char idx, s_timer* tm);
 
 #endif
 
