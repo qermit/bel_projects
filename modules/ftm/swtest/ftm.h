@@ -2,7 +2,7 @@
 #define _FTM_H_
 
 #include "ebm.h"
-#include "ftm_aux.h"
+#include "aux.h"
 #include "timer.h"
 
 //masks & constants
@@ -53,12 +53,19 @@ typedef t_time unsigned long long;
 typedef unsigned int t_status;
 
 //control & status registers
+
+typedef struct {
+   t_ftmMsg*    groupStart;
+   t_ftmMsg*    groupEnd;   
+   t_msgGroup*  nextGroup;
+} t_msgGroup;
+
+
 typedef struct {
    unsigned int hi;
    unsigned int lo;
 } t_dw;
 
- 
 
 typedef union {
    unsigned long long   v64;
@@ -76,20 +83,22 @@ typedef struct {
 
 typedef struct {
    unsigned int       info;   
-   unsigned long long tTrn;
-   unsigned long long tMargin;
-   unsigned long long tExec;
-   unsigned long long tPeriod;
-   unsigned int       rep;
+   t_time tTrn;
+   t_time tMargin;
+   t_time tStart;
+   t_time tPeriod;
+   int                rep;
+   int                repCnt;
+   int                msgCnt;
    
+   unsigned int       qtyMsgs;
+   unsigned int       procMsg  
    t_ftmMsg           msgs[10];
+   
 } t_ftmCycle;
 
 typedef struct {
    unsigned int   msgChStat;
-   unsigned int   cycCnt;
-   unsigned int   msgCnt;
-   unsigned int   msgChInst;
    unsigned int   cycleSel;
    t_ftmCycle     cycles[2];
    

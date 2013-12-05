@@ -24,12 +24,7 @@
  */
 
 #include "timer.h"
-
-//#include "display.h" DEBUG
-
-const unsigned long long c_F_SYS          = 62500000;
-const unsigned long long c_T_SYS          = 1000000000 / F_SYS;
-const unsigned long      c_CycsMicro      = 1000/16         
+      
 
 const unsigned int TM_REG_RST             = 0x00; // wo, Reset Active Low
 const unsigned int TM_REG_ARM_STAT        = 0x04; // ro, Shows armed timers,  (1 armed, 0 disarmed), 1 bit per timer
@@ -163,7 +158,7 @@ inline void irq_tm_msi_set(unsigned int dst, unsigned int msg)
 //cascade counter 'reciever' to timer 'sender'. sender -1 means no cascade
 inline void irq_tm_cascade(char receiver, char sender)
 {
-   if(sender == TM_NO_CASCADE || sender < 0) irq_tm_clr_csc(1<<receiver);     
+   if(sender > TIMER_NO_CASCADE) irq_tm_clr_csc(1<<receiver);     
    else
    {
       irq_tm_set_csc(1<<receiver);      
@@ -191,10 +186,10 @@ void irq_tm_write_config(unsigned char idx, s_timer* tm )
    irq_tm_cnt_rst(1<<idx);   
    irq_tm_timer_sel(idx);
  
-   if(tm->src == TM_SYSTIME)     irq_tm_clr_src(1<<idx);
+   if(tm->src == TIMER_ABS_TIME)     irq_tm_clr_src(1<<idx);
    else                          irq_tm_set_src(1<<idx);
    
-   if(tm->mode == TM_PERIODIC)   irq_tm_set_cnt_mode(1<<idx);
+   if(tm->mode == TIMER_PERIODIC)   irq_tm_set_cnt_mode(1<<idx);
    else                          irq_tm_clr_cnt_mode(1<<idx);
 
    irq_tm_cascade(idx, tm->cascade);

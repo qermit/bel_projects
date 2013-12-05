@@ -5,6 +5,7 @@
 #include "mini_sdb.h"
 #include "timer.h"
 #include "ebm.h"
+#include "aux.h"
 
 volatile unsigned int* pSDB_base    = (unsigned int*)0x7FFFFA00;
 
@@ -30,73 +31,6 @@ const unsigned int c_period = 375000000/1;
 #define DRAW_STOP  0x01
 #define DRAW_START 0x02
 #define DRAW_RST   0x03
-/*
-inline  unsigned int  atm_get(void)
-{
-	 //read atomic bit (csr 0x1c)
-	 unsigned int atm;
-    // gcc doesnt know csr 0x1c, so we must force it (update your f*cking binutils...)
-	 asm volatile (	".long 0x93800800" : "=&r" (atm));
-    return atm;	             	
-}
-
-inline void atomic_on()
-{
-   //begin atomic operation (hold cycle line on data bus HI)   
-   asm volatile ( "mvi r1,1\n" \
-                  ".long 0xD3810000" );
-   return;	             	
-}
-
-inline void atomic_off()
-{
-	 //end atomic operation (drop cycle line on data bus) 
-    asm volatile ( ".long 0xD3800000" );
-	 return;	             	
-}
-*/
-
-inline  unsigned int  atomic_get(void)
-{
-	 return *atomic;	             	
-}
-
-inline void atomic_on()
-{
-   *atomic = 1;
-}
-
-inline void atomic_off()
-{
-	*atomic = 0;          	
-}
-
-
-
-
-char* sprinthex(char* buffer, unsigned long val, unsigned char digits)
-{
-	unsigned char i,ascii;
-	const unsigned long mask = 0x0000000F;
-
-	for(i=0; i<digits;i++)
-	{
-		ascii= (val>>(i<<2)) & mask;
-		if(ascii > 9) ascii = ascii - 10 + 'A';
-	 	else 	      ascii = ascii      + '0';
-		buffer[digits-1-i] = ascii;		
-	}
-	
-	buffer[digits] = 0x00;
-	return buffer;	
-}
-
-
-char* mat_sprinthex(char* buffer, unsigned long val)
-{
-   return sprinthex(buffer, val, 8);
-}
-
 
 void show_msi()
 {
@@ -108,7 +42,7 @@ void show_msi()
   disp_put_c('\n');
 
   
-  mat_sprinthex(buffer, global_msi.src);
+  mat_sprinthex(buffer, global_msi.adr);
   disp_put_str("A ");
   disp_put_str(buffer);
   disp_put_c('\n');
@@ -169,7 +103,7 @@ void isr0()
       
    
    char buffer[12];
-   unsigned char tm_idx = global_msi.src>>2 & 0xf;
+   unsigned char tm_idx = global_msi.adr>>2 & 0xf;
    unsigned long long deadline = irq_tm_deadl_get(tm_idx);
    static unsigned int calls = 0;  
    static unsigned int msg_old;   
@@ -178,7 +112,7 @@ void isr0()
    unsigned int delta;
 
    atomic_on();
-   ebm_op(0x100000E0, global_msi.src, WRITE);
+   ebm_op(0x100000E0, global_msi.adr, WRITE);
    ebm_op(0x100000E4, (unsigned int)(*cpu_ID & 0xf)+1, WRITE); 
    ebm_op(0x100000E8, (unsigned int)(timestamp>>32), WRITE);
    ebm_op(0x100000EC, (unsigned int)timestamp, WRITE);
@@ -279,7 +213,7 @@ void isr3()
       }
    disp_put_c('\f');   
 }
-
+/*
 void _irq_entry(void) {
 
    timestamp_old = timestamp;    
@@ -289,7 +223,7 @@ void _irq_entry(void) {
 
    
 }
-
+*/
 
 const char mytext[] = "Hallo Welt!...\n\n";
 
@@ -392,9 +326,9 @@ disp_put_c('\f');
    disp_put_c('\n');
 
    s_timer mytm;
-   mytm.mode      = TM_PERIODIC;
-   mytm.src       = TM_COUNTER;
-   mytm.cascade   = 0;
+   mytm.mode      = TIMER_PERIODIC;
+   mytm.src       = TIMER_REL_TIME;
+   mytm.cascade   = TIMER_0;
    mytm.deadline  = c_period;
    mytm.msi_dst   = 0;
    mytm.msi_msg   = 0xCAFEBABE;

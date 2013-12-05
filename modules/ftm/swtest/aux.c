@@ -1,4 +1,6 @@
-#include ftm_aux.h
+#include "aux.h"
+
+
 
 /*
 inline  unsigned int  atm_get(void)
@@ -26,6 +28,9 @@ inline void atomic_off()
 }
 */
 
+
+unsigned int ier = 5;
+
 inline unsigned long long get_sys_time()
 {
    unsigned long long systime;  
@@ -36,17 +41,18 @@ inline unsigned long long get_sys_time()
 
 inline void cycSleep(unsigned int cycs)
 {
+   unsigned int j;
    for (j = 0; j < cycs; ++j) asm("# noop"); 
 }
 
 inline void uSleep(unsigned long long uSecs)
 {
-   cycSleep((unsigned int)(uSecs * 1000 / c_T_SYS));
+   cycSleep((unsigned int)(uSecs * 1000 / T_SYS));
 }
 
-inline unsigned int  getCpuID()  {return *cpu_ID};
-inline unsigned int  getCpuIdx() {return *cpu_ID & 0xff};
-inline unsigned int  getCores()  {return *cores  & 0xff};
+inline unsigned int  getCpuID()  {return *cpu_ID;}
+inline unsigned int  getCpuIdx() {return *cpu_ID & 0xff;}
+inline unsigned int  getCores()  {return *cores  & 0xff;}
 
 inline  unsigned int  atomic_get(void)
 {
@@ -55,12 +61,22 @@ inline  unsigned int  atomic_get(void)
 
 inline void atomic_on()
 {
+   ier = irq_get_enable();
+   irq_disable();
    *atomic = 1;
 }
 
 inline void atomic_off()
 {
-	*atomic = 0;          	
+	*atomic = 0;
+	unsigned int foo;
+	// or the IE bit with ier
+	asm volatile ("rcsr  %0, IE\n"      \
+	              "or    %0, %0, %1\n"  \
+	              "wcsr  IE, %0\n"      \
+                : "+r" (foo)           \
+                : "r" (ier)            \
+        );        	
 }
 
 char* sprinthex(char* buffer, unsigned long val, unsigned char digits)

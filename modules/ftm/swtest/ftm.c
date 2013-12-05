@@ -24,72 +24,127 @@ fesa_init()
 { fesaFtmIf = (fesaFtmIf*) }
 
 
-
-unsigned int 
-
-
-//unsigned int sendMsgIdxHigh(t_ftmCycle* cyc
-
-void setupFtmCycMsgTimer(t_time tOffset, int cycTimerIdx, unsigned int msiMsg)
+void ISR_timer()
 {
-   //make sure tOffset < tPeriod of cycle !!!
+   updateExecTimes();
    
-   //timer timerIdx
-   //cascade to Timer timerIdx
-   tm1.mode      = TIMER_1TIME;
-   tm1.src       = TIMER_REL_TIME;  //Cycle Messages send times are relative to their cycle start
-   tm1.cascade   = timerIdx;        //cascade the message timer to the cycle timer
-   tm1.deadline  = tOffset;
-   tm1.msi_dst   = 0;
-   tm1.msi_msg   = TIMER_MSG_PREP_MSK | (msiMsg & 0xff);
+   if(commit) {
+      udpateDataSrc();
+      updateTimers();
+   }
+   
+   if( (global_msi.msg & (TIMER_CYC_START | TIMER_CYC_PREP)) ) 
+      if (pPageAct->cycles[cycleSel].info & CYC_ACTIVE)
+      && (pPageAct->cycles[cycleSel].repCnt <= pPageAct->cycles[cycleSel].rep) 
+         pPageAct->cycles[cycleSel].repCnt++;
+   } else {
+   
+   }
+         
+}
+
+void ISR_Cmd()
+{
+
+}
+
+void processDueMsgs()
+{
+   t_ftmCycle* cyc = pPageAct->cycles[cycleSel];
+   unsigned char dueIdx = cyc->procMsg;
+   bool  dispatch = false;
+   
+   if( ((c->rep == -1) || (c->rep > c->repCnt)) && (cyc->info & CYC_ACTIVE) )
+   {
+      t_due = cyc->msgs[cyc->procMsg].ts;
+      if(get_system_time() >= tDue - (cyc->tMargin + cyc->tTrn) ) // 
+      
+      for(dueIdx = cyc->procMsg; dueIdx <  cyc->qtyMsgs; dueIdx++)
+      {
+         if ( (tDue + tProc > cyc->msgs[dueIdx].ts) // diff between msgs less than time to process...
+         ||   (cyc->msgs[dueIdx].ts + tProc >= cyc->tExec + cyc->tPeriod) ) // or diff to cycle end less than time to process? 
+         {
+            //dispatch msg
+            addFtmMsg( , cyc->msgs+dueIdx); 
+            dispatch = true;
+            tDue = cyc->msgs[dueIdx].ts;
+            updateMsgExecTime(cyc->msgs + dueIdx, cyc); 
+         } else {
+         
+            if(dispatch) sendFtmMsgPacket();
+            nextIdx = (dueIdx == cyc->qtyMsgs-1) 
+            {
+               if(cycleSwap || pageSwap) 
+               updateCycExecTime(pPageAct->cycles + cycleSel);
+               
+            } ? 0 : dueIdx+1;
+            cyc->procMsg = nextIdx;
+         } 
+      }
+   } 
+}
+
+
+inline void updateCycExecTime(t_ftmCycle* c)
+{
+   if((c->rep == -1) || (c->rep > c->repCnt)) c->tExec = c->tStart + c->repCnt * c->tPeriod; 
+}
+
+
+inline void updateMsgExecTime(t_ftmMsg* m, t_ftmCycle* c)
+{
+   m->ts = c->tExec + m->offs;
+}
+
+
+
+t_status setMsgTimer(t_time tDeadline, unsigned int timerIdx)
+{
+   t_timer  tm;
+  
+   if (getSysTime() + tProc > tDeadline) return TIMER_CFG_ERROR_0;
+   
+   tm.mode      = TIMER_1TIME;
+   tm.src       = TIMER_ABS_TIME;  
+   tm.cascade   = TIMER_NO_CASCADE;
+   tm.deadline  = tDeadline;
+   tm.msi_dst   = 0;
+   tm.msi_msg   = (unsigned int)*mg;
  
    atomic_on();
    irq_tm_write_config(timerIdx, tm);
    irq_tm_set_arm(1<<timerIdx);
    atomic_off();
    
-}
-
-t_time getMsgSendOffset(t_ftmCycle* cyc, unsigned int ftmMsgIdx)
-{
-   tExec = cyc->msg[ftmMsgIdx].tOffs;
-   tPrep = cyc->tMargin + cyc->tTrn;
+   return TIMER_CFG_SUCCESS;
    
-   if(tExec < tPrep) return 0; //too close to cycle start, must be sent with cycle start
-   else return tExec - tPrep;
 }
 
 
 
 
-
-
-t_status setupFtmCycleTimer(t_ftmCycle* cyc)
+t_status setCycleTimer(t_ftmCycle* cyc)
 {
-   t_time   tPrep, tExec, tSend, tPeriod;
+   t_time   tPrep, tExec, tPeriod;
    t_timer  tm0, tm1;
       
    //timer0
-   //calculate transmission time for start
-   tExec = cyc->tExec;
+   //calculate due time for start
+   tExec = cyc->tStart;
    tPrep = cyc->tMargin + cyc->tTrn;
    
-   //if abs time, check if we can actually make it
-   if(cyc->info & CYC_ABS_TIME)
-   {if (getSysTime() + tPrep > tExec) return TIMER_CFG_ERROR_0;}
+   if (getSysTime() + tPrep > tExec) return TIMER_CFG_ERROR_0;
    
-   tSend = tExec - tPrep;
-   //
    tm0.mode      = TIMER_1TIME; 
-   tm0.src       = (bool)(cyc->info & CYC_TIME_TYPE); //absolute or relative value
+   tm0.src       = TIMER_ABS_TIME; //absolute or relative value
    tm0.cascade   = TIMER_NO_CASCADE;
-   tm0.deadline  = tSend;
+   tm0.deadline  = tExec - tPrep;
    tm0.msi_dst   = 0;
-   tm0.msi_msg   = TIMER_CYC_PREP | CYC_0;
+   tm0.msi_msg   = TIMER_CYC_PREP;
    
-   // if the cycle duration is shorter than preparation time, pack multiple cycles in one packet
-   if(cyc->tPeriod > tPrep) { tPeriod = cyc->tPeriod; factor = 1;}
-   else  {  factor = tPrep/cyc->tPeriod + ((tPrep % cyc->tPeriod) ? 1 : 0);
+   // if the cycle duration is shorter than processing time, pack multiple cycles in one packet
+   if(cyc->tPeriod > tProc) { tPeriod = cyc->tPeriod; factor = 1;}
+   else  {  factor = tProc/cyc->tPeriod + ((tProc % cyc->tPeriod) ? 1 : 0);
             tPeriod = factor * cyc->tPeriod;     
    }                        
    //timer1
@@ -99,7 +154,7 @@ t_status setupFtmCycleTimer(t_ftmCycle* cyc)
    tm1.cascade   = TM_0;
    tm1.deadline  = tPeriod;
    tm1.msi_dst   = 0;
-   tm1.msi_msg   = TIMER_CYC_START | CYC_0 | factor;
+   tm1.msi_msg   = TIMER_CYC_START;
  
    atomic_on();
    irq_tm_write_config(0, tm0);
@@ -148,5 +203,8 @@ void fesaCmdEval()
          
    }
 }
+
+
+
 
 
