@@ -1,19 +1,28 @@
 #ifndef _FTM_H_
 #define _FTM_H_
 
-#include "ebm.h"
-#include "aux.h"
-#include "timer.h"
+
 
 //masks & constants
 #define MSK_PAGE              (1<<0)
 
+#define NORMAL                0
+#define OFFSET                1
+#define NOW                   2
+
+
 #define CMD_RST           		(1<<0)	//Reset FTM status and counters
 #define CMD_PAGESWAP      		(1<<1)	//Use mempage A/B
 #define CMD_PAGESWAP_I   		(1<<2)	//Use mempage A/B immediately
-#define CMD_START    		   (1<<3)	//Use mempage A/B immediately
-#define CMD_STOP    		      (1<<4)	//Use mempage A/B immediately
-#define CMD_STOP_I  		      (1<<5)	//Use mempage A/B immediately
+#define CMD_RUN    		      (1<<3)	//Use mempage A/B immediately
+#define CMD_RUN_NOW 		      (1<<4)	//Use mempage A/B immediately
+#define CMD_STOP    		      (1<<5)	//Use mempage A/B immediately
+#define CMD_STOP_NOW 	      (1<<6)	//Use mempage A/B immediately
+
+#define CMD_DBG_0             (1<<8)
+#define CMD_DBG_1             (1<<9)
+
+#define FTM_RUNNING           (1<<0)
 
 #define CYC_START_ABS_MSK     (1<<8)	   //Start timing cycle at time specified
 #define CYC_START_REL_MSK     (1<<8)	   //Start timing cycle at now + time specifed
@@ -48,18 +57,11 @@
 
 
 
-typedef t_time unsigned long long;
+
 
 typedef unsigned int t_status;
 
 //control & status registers
-
-typedef struct {
-   t_ftmMsg*    groupStart;
-   t_ftmMsg*    groupEnd;   
-   t_msgGroup*  nextGroup;
-} t_msgGroup;
-
 
 typedef struct {
    unsigned int hi;
@@ -67,10 +69,13 @@ typedef struct {
 } t_dw;
 
 
+
 typedef union {
    unsigned long long   v64;
    t_dw                 v32;               
 } u_dword;
+
+typedef u_dword t_time ;
 
 typedef struct {
    u_dword id;
@@ -82,17 +87,18 @@ typedef struct {
 } t_ftmMsg;
 
 typedef struct {
-   unsigned int       info;   
+   unsigned int       status;   
    t_time tTrn;
    t_time tMargin;
    t_time tStart;
    t_time tPeriod;
+   t_time tExec;
    int                rep;
    int                repCnt;
    int                msgCnt;
    
    unsigned int       qtyMsgs;
-   unsigned int       procMsg  
+   unsigned int       procMsg;  
    t_ftmMsg           msgs[10];
    
 } t_ftmCycle;
@@ -111,16 +117,37 @@ typedef struct {
    t_fesaPage page[2];
 } t_fesaFtmIf;
 
+extern const t_time tProc;
+
 extern unsigned int* _startshared[];
 extern unsigned int* _endshared[];
-volatile t_fesaFtmIf* pFesaFtmIf = (t_fesaFtmIf*)_startshared; 
 
-t_fesaPage* pPageAct;
-t_fesaPage* pPageInAct;
+
+volatile t_fesaPage* pPageAct;
+volatile t_fesaPage* pPageInAct;
+extern volatile t_fesaFtmIf* pFesaFtmIf;
+volatile unsigned int swap;
+volatile unsigned int msgProcPending;
+
+inline void updateCycExecTime(t_ftmCycle* c);
+inline void updatePageExecTimes(t_fesaPage* pPage);
+inline void updateAllExecTimes();
+
+unsigned int setMsgTimer(t_time tDeadline, unsigned int msg, unsigned int timerIdx);
+unsigned int setCycleTimer(t_ftmCycle* cyc, unsigned int mode);
+
+
+void processDueMsgs();
+void ISR_timer();
+
+void ftmInit(void);
+void fesaInit(void);
 
 void fesaCmdEval();
 
-t_ftmMsg* addFtmMsg(unsigned int* eca_adr, t_ftmMsg* pMsg);
+void ISR_timer();
+
+t_ftmMsg* addFtmMsg(unsigned int eca_adr, t_ftmMsg* pMsg);
 
 void sendFtmMsgPacket();
 

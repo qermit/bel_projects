@@ -1,9 +1,12 @@
 #ifndef _AUX_H_
 #define _AUX_H_
 
-#include "irq.h"
+
 extern volatile unsigned int* cpu_ID;
 extern volatile unsigned int* atomic;
+
+#define false 0   //cant believe I'm doing this ...
+#define true  1
 
 #define F_SYS          62500000ULL
 #define T_SYS          1000000000ULL / F_SYS
@@ -20,10 +23,12 @@ extern volatile unsigned int* cores;
 extern volatile unsigned int* time_sys;
 
 inline unsigned int  getCores();
-inline unsigned long long get_sys_time();
+inline unsigned long long getSysTime();
 
 inline void cycSleep(unsigned int cycs);
 inline void uSleep(unsigned long long uSecs);
+
+char progressWheel();
 char* sprinthex(char* buffer, unsigned long val, unsigned char digits);
 char* mat_sprinthex(char* buffer, unsigned long val);
 #endif

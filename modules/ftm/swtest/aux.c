@@ -1,5 +1,5 @@
 #include "aux.h"
-
+#include "irq.h"
 
 
 /*
@@ -31,7 +31,7 @@ inline void atomic_off()
 
 unsigned int ier = 5;
 
-inline unsigned long long get_sys_time()
+inline unsigned long long getSysTime()
 {
    unsigned long long systime;  
    systime =  ((unsigned long long)*(time_sys+0))<<32;
@@ -66,10 +66,20 @@ inline void atomic_on()
    *atomic = 1;
 }
 
+char progressWheel()
+{
+   static unsigned char index = 0;
+   const char c_running[4] = {'|', '/', '-', '\\'};
+   
+   return c_running[index++ & 0x03];
+
+}
+
+
 inline void atomic_off()
 {
 	*atomic = 0;
-	unsigned int foo;
+	unsigned int foo = 0;
 	// or the IE bit with ier
 	asm volatile ("rcsr  %0, IE\n"      \
 	              "or    %0, %0, %1\n"  \

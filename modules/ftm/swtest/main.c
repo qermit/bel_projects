@@ -2,10 +2,12 @@
 #include <string.h>
 #include "display.h"
 #include "irq.h"
+#include "ftm.h"
 #include "mini_sdb.h"
 #include "timer.h"
 #include "ebm.h"
 #include "aux.h"
+
 
 volatile unsigned int* pSDB_base    = (unsigned int*)0x7FFFFA00;
 
@@ -19,18 +21,13 @@ volatile unsigned int* ebm;
 volatile unsigned int* cores;
 volatile unsigned int* atomic;        
 
-volatile int xinc, yinc, timeinc, x, y, xmax, xmin, ymax, ymin, time;
+
 volatile char color; 
 unsigned int cpuID, cpuMAX;
    char buffer[12];
 volatile unsigned long long timestamp, timestamp_old;
 
 const unsigned int c_period = 375000000/1;
-
-
-#define DRAW_STOP  0x01
-#define DRAW_START 0x02
-#define DRAW_RST   0x03
 
 void show_msi()
 {
@@ -56,43 +53,8 @@ void show_msi()
 
 void pause_and_show_msi() 
 {
-  const unsigned int src = (cpuID<<2);
-  unsigned int dst, i;
-  unsigned int* pIRQ;    
-  char buffer[12];
+  
 
- 
-
-   for(i = 0; i<*cores; i++) {
-      if(i != cpuID )
-      {
-
-         dst = (i<<8);
-         pIRQ = (unsigned int*)0x80000000 + ((dst | src)>>2);
-         //mat_sprinthex(buffer, adr);
-         //disp_put_str(buffer);
-         //disp_put_c('\n');           
-         *pIRQ = DRAW_STOP; //send an irq to the msi queue of <dst> from <src>
- 
-     } 
-   }
-
-   show_msi();
-   for (i = 0; i < 2*125000000; ++i) {asm("# noop");}
-   disp_put_c('\f');   
- for(i = 0; i<*cores; i++) {
-      if(i != cpuID )
-      {
-
-         dst = (i<<8);
-         pIRQ = (unsigned int*)0x80000000 + ((dst | src)>>2);
-         //mat_sprinthex(buffer, adr);
-         //disp_put_str(buffer);
-         //disp_put_c('\n');           
-         *pIRQ = DRAW_START; //send an irq to the msi queue of <dst> from <src>
- 
-     } 
-   }
 }
 
 
@@ -153,38 +115,6 @@ void isr0()
    disp_put_str(sprinthex(buffer, deltamax-deltamin, 5));
 }
 
-void isr1()
-{
-  unsigned int msg = global_msi.msg & 0xff;
-  static int xincsave, yincsave;
-  static char colorsave; 
-
-   switch(msg) {
-   case DRAW_STOP :  xincsave = xinc;
-                     yincsave = yinc;
-                     colorsave = color;
-                     yinc = 0;         //stop drawing
-    	               xinc = 0;
-                     timeinc = 0;
-                     break; 
-   case DRAW_START : color = colorsave;
-                     yinc = yincsave;
-                     xinc = xincsave;
-                     timeinc = 1;
-                     break; 
-   case DRAW_RST :   disp_put_c('\f'); //restart drawing
-                     color = 0xFF;               
-                     yinc = -1;
-       	            xinc = 1;
-                     timeinc = 1;
-                     x = xmin+2;
-	                  y = ymin+5;
-                     time = 0;
-                     break; 
-   default   :    break;            //nothing
-   }
-
-}
 
 void isr2()
 {
@@ -213,17 +143,7 @@ void isr3()
       }
    disp_put_c('\f');   
 }
-/*
-void _irq_entry(void) {
 
-   timestamp_old = timestamp;    
-   timestamp = get_sys_time();
-     
-   irq_process();
-
-   
-}
-*/
 
 const char mytext[] = "Hallo Welt!...\n\n";
 
@@ -244,8 +164,8 @@ void init()
    ebm_config_meta(80, 0x11, 16, 0x00000000 ); 
 
    isr_table_clr();
-   isr_ptr_table[0]= isr0; //timer
-   isr_ptr_table[1]= isr1; //lm32
+   isr_ptr_table[0]= ISR_timer; //timer
+   isr_ptr_table[1]= 0; //lm32
    isr_ptr_table[2]= isr2; //ilck
    isr_ptr_table[3]= isr3; //other    
    irq_set_mask(0x0f);
@@ -257,123 +177,28 @@ void init()
 
 void main(void) {
 
-     const int xlen = 64;
-   const int ylen = 48;
-   int j, m, n, xl, yl;
-   unsigned int addr_raw_off;
+
+   int j;
 
    init();
-   cpuID = *cpu_ID  & 0xff;
-   cpuMAX = *cores       & 0xff;
   
-   //calc matrix dimension
-   n = 1;   
-   m = cpuMAX;
-   while(m > n) 
-   {
-      if((m-1)*n >= cpuMAX) m--;
-      else n++; 
-   }
-    if (m*(n-1) >= cpuMAX) n--;
-
-       
-
-  
-   xl = xlen/m;
-   yl = ylen/n;
-
-   xmin = (cpuID % m)      * xl;
-   xmax = ((cpuID % m)+1)  * xl-1;
-   ymin = cpuID/m          * yl;
-   ymax = (cpuID/m+1)      * yl-1;
-   
-     color = 0xFF;
-
- /*
- 
-  disp_put_str(mytext);
-*/
-
-
-
-  
-  
-   timeinc = 1;
-   x = xmin+2+cpuID;
-	y = ymin+3+cpuID;
-
-
-	
-	yinc = -1;
- 	xinc = 1;
-	addr_raw_off = 0;
-
-
  
 
 
 disp_put_c('\f');
 
-  disp_put_str("Timer...\n");
-   
-   unsigned long long systime = get_sys_time();
+  disp_put_str("FTM ready\n");
   
-   disp_put_str("H ");
-   disp_put_str(mat_sprinthex(buffer,  (unsigned int)(systime>>32)));
-   disp_put_c('\n');
-    disp_put_str("L ");
-   disp_put_str(mat_sprinthex(buffer,  (unsigned int)(systime)));
-   disp_put_c('\n');
-
-   s_timer mytm;
-   mytm.mode      = TIMER_PERIODIC;
-   mytm.src       = TIMER_REL_TIME;
-   mytm.cascade   = TIMER_0;
-   mytm.deadline  = c_period;
-   mytm.msi_dst   = 0;
-   mytm.msi_msg   = 0xCAFEBABE;
-   irq_tm_write_config(1, &mytm);
-   irq_tm_start(1<<1);
-   
-   irq_tm_timer_sel(0);
-   irq_tm_msi_set(0, 0xBEEF);
-   irq_tm_trigger_at_time(0, get_sys_time()+375000000);
-   
-   disp_put_str("Go!");
+  
 
    for (j = 0; j < (125000000/160)*(cpuID<<3); ++j) {
         asm("# noop"); // no-op the compiler can't optimize away
       }
 
   while (1) {
-    /* Rotate the LEDs */
-    //63
-   //47
-/*
-
-   atomic_on();
-   disp_put_raw( get_pixcol_val((unsigned char)y), get_pixcol_addr((unsigned char)x, (unsigned char)y), color);
-   atomic_off();
-
-	if(x == xmax) xinc = -1;
-	if(x == xmin)  xinc = 1;
-
-	if(y == ymax) yinc = -1;
-	if(y == ymin)  yinc = 1;
-
-	x += xinc;
-	y += yinc;
-
-
-
-
-     for (j = 0; j < 125000000/160; ++j) {
-        asm("# noop"); // no-op the compiler can't optimize away
-      }
-
-	if(time > 500) {time = 0; color = ~color; }
-	time += timeinc;
-*/  
+      fesaCmdEval();
+      processDueMsgs();
+ 
   }
 
 }
