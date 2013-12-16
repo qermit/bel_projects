@@ -319,7 +319,9 @@ architecture rtl of vetar_top is
   signal oneWire_i: std_logic;
   signal oneWire_o: std_logic;
   signal dit : std_logic_vector(6 downto 0);
- 
+  --irq test
+  signal     irq_test : std_logic :='0';
+  signal     width    : std_logic :='0';
 begin
 
   -- one wire
@@ -625,12 +627,13 @@ begin
       vme_iack_n_i    => vme_iack_n_i,
       vme_iackout_n_o => vme_iackout_n_o,
       -- buffer
-      vme_dtack_oe_o  => s_vme_dtack_oe_o,
+      --vme_dtack_oe_o  => s_vme_dtack_oe_o,
       vme_buffer_o    => s_vme_buffer,
       --vme_retry_oe_o  => vme_retry_oe_o,
 		vme_retry_oe_o  => open,
       --IRQ Generator    
-      irq_i           => '0',  -- => wbirq_i,  
+      --irq_i           => '0',  -- => wbirq_i,  
+      irq_i           => irq_test,
       int_ack_o       => open, -- => s_int_ack,
       reset_o         => open, -- => s_rst,
       -- WB Interface
@@ -651,19 +654,22 @@ begin
       data_buff_f2v_o  =>  vme_data_oe_ba_o,
       addr_buff_v2f_o  =>  vme_addr_oe_ab_o,
       addr_buff_f2v_o  =>  vme_addr_oe_ba_o,
+      dtack_oe_o       =>  s_vme_dtack_oe_o,
       latch_buff_o     =>  s_buffer_latch);
 
   vme_buffer_latch_o  <=  (others => s_buffer_latch);
 
   -- DATA & ADDR BUS MUX
-  vme_addr_data_b <=  s_vme_data_o                      when  s_vme_buffer.s_buffer_eo = data_buff and 
-																                              s_vme_buffer.s_datadir = fpga2vme         else
-								      (s_vme_addr_o & s_vme_lword_n_o)	when  s_vme_buffer.s_buffer_eo = addr_buff and 
-																					                    s_vme_buffer.s_addrdir = fpga2vme         else
-								      (others => 'Z');
+  vme_addr_data_b <=  s_vme_data_o                       when  s_vme_buffer.s_buffer_eo = data_buff and 
+																               s_vme_buffer.s_datadir = fpga2vme         else
+						    (s_vme_addr_o & s_vme_lword_n_o)	when  s_vme_buffer.s_buffer_eo = addr_buff and 
+																				   s_vme_buffer.s_addrdir = fpga2vme         else
+						    (others => 'Z');
 
   s_vme_lword_n_i	<= vme_addr_data_b(0);	
-	
+
+  -- completely redundant. There is already a signal for controlling the oe 
+  -- of the buffer. To be removed and tested.
   vme_dtack_oe_o  <=  s_vme_dtack_n_o	when s_vme_dtack_oe_o = '1' else 
                       '1';
 	
@@ -671,6 +677,43 @@ begin
   
   --Rst <= VME_RST_n_i and Reset;
   --rst	<= vme_rst_n_i;
+
+  process(clk_sys)
+  
+  VARIABLE   cnt : INTEGER RANGE 0 TO 125000000;
+  VARIABLE   width_cnt : INTEGER RANGE 0 TO 100;
+
+  begin
+
+   if rising_edge(clk_sys) then
+
+      if cnt = 125000000 then
+         cnt := 0;
+         width <= '1';
+      else 
+         cnt := cnt + 1;
+         width <= '0';
+      end if;
+
+      if width = '1' then
+
+         if width_cnt = 100 then
+
+            width_cnt := 0;
+            irq_test <= '0';
+            width <= '0';
+
+         else
+            width_cnt := width_cnt + 1;            
+            irq_test <= '1';
+            width <= '1';
+         end if;
+
+      end if;
+   end if;
+  end process;
+
+
   ----------------------------------------
 
   U_DAC_ARB : spec_serial_dac_arb
