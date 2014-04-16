@@ -99,7 +99,7 @@ t_ftmCycle* createCyc(xmlNode* cycNode, t_ftmCycle* pCyc)
       if(subFieldNode != NULL) pCyc->condMsk = (uint64_t)strtoul( (const char*)xmlNodeGetContent(subFieldNode), NULL,  0 );
       else printf("ERROR condmask\n");
    }
-   else printf("no condition found\n");
+   //else printf("no condition found\n");
    
    fieldNode = checkNode(xmlNextElementSibling(curNode), "signal");
    if(fieldNode != NULL)
@@ -113,7 +113,7 @@ t_ftmCycle* createCyc(xmlNode* cycNode, t_ftmCycle* pCyc)
       if(subFieldNode != NULL) pCyc->sigVal = (uint32_t)strtoul( (const char*)xmlNodeGetContent(subFieldNode), NULL,  0 );
       else printf("ERROR sigval\n");
    }
-   else printf("no signal found \n");
+   //else printf("no signal found \n");
          
    return pCyc;       
 }
@@ -165,7 +165,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
    if(checkNode(curNode, "page") != NULL) pageNode = curNode;
    else return 0;
    planNode = pageNode->children;
-   printf("PAGE\n");
+   //printf("PAGE\n");
    
    pPage    = createPage(pageNode, calloc(1, sizeof(t_ftmPage)));
    planIdx  = 0;
@@ -173,7 +173,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
    while( checkNode(planNode, "plan") != NULL)
    {
       planNode = checkNode(planNode, "plan");
-      printf("\tPLAN\n");
+      //printf("\tPLAN\n");
       
       cycIdx      = 0;
       cycNode     = planNode->children;
@@ -186,7 +186,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
          pCycPrev = pCyc;
          pCyc     = createCyc(cycNode, calloc(1, sizeof(t_ftmCycle)));
     
-         printf("\t\tCYC\n");
+         //printf("\t\tCYC\n");
          
          //if this is the first cycle of a plan, save the pointer for the plan array
          if(planStart) 
@@ -209,7 +209,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
          while( checkNode(msgNode, "msg") != NULL)
          {
             msgNode = checkNode(msgNode, "msg");
-            printf("\t\t\tMSG\n");
+            //printf("\t\t\tMSG\n");
             createMsg(msgNode, &pMsg[msgIdx++]);
             msgNode = xmlNextElementSibling(msgNode);      
          }

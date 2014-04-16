@@ -163,6 +163,7 @@ uint8_t* serPage  (t_ftmPage*  pPage, uint8_t* bufStart, uint32_t offset);
 uint8_t* serCycle (t_ftmCycle* pCyc, uint8_t* bufStart, uint8_t* buf, uint32_t offset);
 uint8_t* serMsg   (t_ftmMsg* pMsg, uint8_t* buf);
 void showFtmPage(t_ftmPage* pPage);
+const char* strFtmPage(t_ftmPage* pPage, const char* str);
 
 uint16_t    getIdFID(uint64_t id);
 uint16_t    getIdGID(uint64_t id);

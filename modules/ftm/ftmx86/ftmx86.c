@@ -47,14 +47,14 @@ const t_ftmCycle Idle = { .tStart         = 0,
 uint8_t* uint32ToBytes(uint8_t* pBuf, uint32_t val)
 {
    uint8_t i;
-   for(i=0;i<FTM_WORD_SIZE;   i++) pBuf[i]  = val >> (8*(FTM_WORD_SIZE-i-1)) & 0xff;
+   for(i=0;i<FTM_WORD_SIZE;   i++) pBuf[i]  = val >> (8*i) & 0xff;
    return pBuf+4;
 }
 
 uint8_t* uint64ToBytes(uint8_t* pBuf, uint64_t val)
 {
    uint8_t i;
-   for(i=0;i<FTM_DWORD_SIZE;   i++) pBuf[i]  = val >> (8*(FTM_DWORD_SIZE-i-1)) & 0xff;
+   for(i=0;i<FTM_DWORD_SIZE;   i++) pBuf[i]  = val >> (8*i) & 0xff;
    return pBuf+8;
 }
 
@@ -64,7 +64,7 @@ uint32_t bytesToUint32(uint8_t* pBuf)
    uint8_t i;
    uint32_t val=0;
    
-   for(i=0;i<FTM_WORD_SIZE;   i++) val |= (uint32_t)pBuf[i] << (8*(FTM_WORD_SIZE-i-1));
+   for(i=0;i<FTM_WORD_SIZE;   i++) val |= (uint32_t)pBuf[i] << (8*i);
    return val;
 }
 
@@ -73,7 +73,7 @@ uint64_t bytesToUint64(uint8_t* pBuf)
    uint8_t i;
    uint64_t val=0;
    
-   for(i=0;i<FTM_DWORD_SIZE;   i++) val |= (uint64_t)pBuf[i] << (8*(FTM_DWORD_SIZE-i-1));
+   for(i=0;i<FTM_DWORD_SIZE;   i++) val |= (uint64_t)pBuf[i] << (8*i);
    return val;
 }
 
@@ -95,7 +95,7 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t*    pBufStart, uint32_t embeddedOff
       cycIdx=0;
       while(cycIdx++ < pPage->plans[planIdx].cycQty && pCyc != NULL)
       {
-         printf("Cyc %02u/%02u starts @", cycIdx, pPage->plans[planIdx].cycQty);
+         printf("Cyc %02u/%02u\n", cycIdx, pPage->plans[planIdx].cycQty);
          pBuf = serCycle(pCyc, pBufStart, pBuf, embeddedOffs);
          pCyc = (t_ftmCycle*)pCyc->pNext;
       }   
@@ -177,6 +177,12 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
    pPage->idxBp      = bytesToUint32(&pBufStart[FTM_PAGE_IDX_BP]);
    
    pPage->planQty = bytesToUint32(&pBufStart[FTM_PAGE_QTY]);
+   if(pPage->planQty > FTM_PLAN_MAX || pPage->planQty == 0) {
+      printf("error during page header deser\n");
+      return NULL;
+   }
+   else printf("Found %u plans\n", pPage->planQty);
+   
    for(j=0;j<pPage->planQty;    j++)
    {
       
@@ -316,6 +322,60 @@ void showFtmPage(t_ftmPage* pPage)
 }
 
 
+const char* strFtmPage(t_ftmPage* pPage, const char* str)
+{
+   uint32_t planIdx, cycIdx, msgIdx;
+   t_ftmCycle* pCyc  = NULL;
+   t_ftmMsg*   pMsg  = NULL;
+   char* s = (char*)str;
+   
+   s += sprintf(s, "---PAGE \n");
+   s += sprintf(s-1, "StartPlan:\t%c\nAltPlan:\t%c\n", pPage->idxStart + 'A', pPage->idxBp + 'A');
+         
+   for(planIdx = 0; planIdx < pPage->planQty; planIdx++)
+   {
+      s += sprintf(s-1, "\t---PLAN %c\n", planIdx+'A');
+      cycIdx = 0;
+      pCyc = pPage->plans[planIdx].pStart;
+      while(cycIdx++ < pPage->plans[planIdx].cycQty && pCyc != NULL)
+      {
+         s += sprintf(s-1, "\t\t---CYC %c%u\n", planIdx+'A', cycIdx-1);
+         s += sprintf(s-1, "\t\tStart:\t\t%08x%08x\n\t\tperiod:\t\t%08x%08x\n\t\trep:\t\t\t%08x\n\t\tmsg:\t\t\t%08x\n", 
+         (uint32_t)(pCyc->tStart>>32), (uint32_t)pCyc->tStart, 
+         (uint32_t)(pCyc->tPeriod>>32), (uint32_t)pCyc->tPeriod,
+         pCyc->repQty,
+         pCyc->msgQty);
+         
+         s += sprintf(s-1, "\t\tFlags:\t");
+         if(pCyc->flags & FLAGS_IS_BP) s += sprintf(s-1,"-IS_BP\t");
+         if(pCyc->flags & FLAGS_IS_COND_MSI) s += sprintf(s-1,"-IS_CMSI\t");
+         if(pCyc->flags & FLAGS_IS_COND_SHARED) s += sprintf(s-1,"-IS_CSHA\t");
+         if(pCyc->flags & FLAGS_IS_SIG) s += sprintf(s-1,"-IS_SIG");
+         if(pCyc->flags & FLAGS_IS_END) s += sprintf(s-1,"-IS_END");
+         s += sprintf(s-1, "\n");
+         
+         s += sprintf(s-1, "\t\tCondVal:\t%08x%08x\n\t\tCondMsk:\t%08x%08x\n\t\tSigDst:\t\t\t%08x\n\t\tSigVal:\t\t\t%08x\n", 
+         (uint32_t)(pCyc->condVal>>32), (uint32_t)pCyc->condVal, 
+         (uint32_t)(pCyc->condMsk>>32), (uint32_t)pCyc->condMsk,
+         pCyc->sigDst,
+         pCyc->sigVal);  
+         
+         pMsg = pCyc->pMsg;
+         for(msgIdx = 0; msgIdx < pCyc->msgQty; msgIdx++)
+         {
+            s += sprintf(s-1, "\t\t\t---MSG %c%u%c\n", planIdx+'A', cycIdx-1, msgIdx+'A');
+            s += sprintf(s-1, "\t\t\tid:\t%08x%08x\n\t\t\tpar:\t%08x%08x\n\t\t\ttef:\t\t%08x\n\t\t\toffs:\t%08x%08x\n", 
+            (uint32_t)(pMsg[msgIdx].id>>32), (uint32_t)pMsg[msgIdx].id, 
+            (uint32_t)(pMsg[msgIdx].par>>32), (uint32_t)pMsg[msgIdx].par,
+            pMsg[msgIdx].tef,
+            (uint32_t)(pMsg[msgIdx].offs>>32), (uint32_t)pMsg[msgIdx].offs);   
+         }
+         pCyc = (t_ftmCycle*)pCyc->pNext;
+      }
+           
+   }   
+   return str;
+}
 
 
 
