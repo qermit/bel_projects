@@ -33,8 +33,9 @@ entity pci_control is
     -----------------------------------------------------------------------
     -- OneWire
     -----------------------------------------------------------------------
-    rom_data        : inout std_logic;
-    
+    rom_data        : inout std_logic; -- AA2
+    rom_user        : inout std_logic; -- N5
+
     -----------------------------------------------------------------------
     -- display
     -----------------------------------------------------------------------
@@ -53,6 +54,7 @@ entity pci_control is
     hpw             : inout std_logic_vector(15 downto 0) := (others => 'Z'); -- logic analyzer
     ant             : inout std_logic_vector(26 downto 1) := (others => 'Z'); -- trigger bus
     
+
     -----------------------------------------------------------------------
     -- pexaria5db1/2
     -----------------------------------------------------------------------
@@ -86,7 +88,7 @@ entity pci_control is
     p14             : out   std_logic := 'Z'; -- n/c
     n14             : out   std_logic := 'Z'; -- TTLEN5  = TTLIO3 output enable, 0=enable, 1|Z=disable
     p15             : out   std_logic := 'Z'; -- n/c
-    n15             : inout std_logic := 'Z'; -- ROM_DATA
+--    n15             : inout std_logic := 'Z'; -- ROM_DATA => See signal "rom_user"
     p16             : out   std_logic := 'Z'; -- FPLED5  = TTLIO3 (red)  0=on, Z=off
     n16             : out   std_logic := 'Z'; -- FPLED6           (blue)
     
@@ -237,7 +239,8 @@ begin
       g_lvds_invert => true,
       g_en_pcie     => true,
       g_en_usb      => true,
-      g_en_lcd      => true)
+      g_en_lcd      => true,
+      g_en_user_ow  => true)
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
       core_clk_125m_pllref_i => clk_125m_pllref_i,
@@ -284,6 +287,7 @@ begin
       usb_slwrn_o            => slwr,
       usb_pktendn_o          => pa(6),
       usb_fd_io              => fd,
+      ow_io                  => rom_user,
       lcd_scp_o              => di(3),
       lcd_lp_o               => di(1),
       lcd_flm_o              => di(2),
@@ -368,5 +372,5 @@ begin
   
   -- Wires to CPLD, currently unused
   con <= (others => 'Z');
-  
+
 end rtl;

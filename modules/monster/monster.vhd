@@ -229,14 +229,14 @@ entity monster is
     lcd_lp_o               : out   std_logic := 'Z';
     lcd_flm_o              : out   std_logic := 'Z';
     lcd_in_o               : out   std_logic := 'Z';
-	 -- g_en_ssd1325
-	 ssd1325_rst_o          : out   std_logic := 'Z';
-	 ssd1325_dc_o           : out   std_logic := 'Z';
-	 ssd1325_ss_o           : out   std_logic := 'Z';
-	 ssd1325_sclk_o         : out   std_logic := 'Z';
-	 ssd1325_data_o         : out   std_logic := 'Z';
+    -- g_en_ssd1325
+    ssd1325_rst_o          : out   std_logic := 'Z';
+    ssd1325_dc_o           : out   std_logic := 'Z';
+    ssd1325_ss_o           : out   std_logic := 'Z';
+    ssd1325_sclk_o         : out   std_logic := 'Z';
+    ssd1325_data_o         : out   std_logic := 'Z';
     -- g_en_user_ow
-    ow_io                  : inout std_logic_vector(1 downto 0));
+    ow_io                  : inout std_logic);
 end monster;
 
 architecture rtl of monster is
@@ -1564,8 +1564,7 @@ begin
   end generate;
   ow_y : if g_en_user_ow generate
     
-    ow_io(0) <= user_ow_pwren(0) when (user_ow_pwren(0) = '1' or user_ow_en(0) = '1') else 'Z';
-    ow_io(1) <= user_ow_pwren(1) when (user_ow_pwren(1) = '1' or user_ow_en(1) = '1') else 'Z';
+    ow_io <= user_ow_pwren(0) when (user_ow_pwren(0) = '1' or user_ow_en(0) = '1') else 'Z';
     
     ONEWIRE : xwb_onewire_master
       generic map(
@@ -1586,7 +1585,8 @@ begin
 
         owr_pwren_o => user_ow_pwren,
         owr_en_o    => user_ow_en,
-        owr_i       => ow_io
+        owr_i(0)    => ow_io,
+        owr_i(1)    => '0'
         );
   end generate;
 

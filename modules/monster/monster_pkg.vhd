@@ -55,7 +55,7 @@ package monster_pkg is
       g_en_oled     : boolean := false;
       g_en_lcd      : boolean := false;
       g_en_ssd1325  : boolean := false;
-      g_en_user_ow  : boolean := false;  
+      g_en_user_ow  : boolean := false;
       g_lm32_cores           : natural := 1;
       g_lm32_MSIs            : natural := 1;
       g_lm32_ramsizes        : natural := 131072/4;
@@ -210,14 +210,14 @@ package monster_pkg is
       lcd_lp_o               : out   std_logic;
       lcd_flm_o              : out   std_logic;
       lcd_in_o               : out   std_logic;
-	   -- g_en_ssd1325
-	   ssd1325_rst_o          : out   std_logic;
-	   ssd1325_dc_o           : out   std_logic;
-	   ssd1325_ss_o           : out   std_logic;
-	   ssd1325_sclk_o         : out   std_logic;
-	   ssd1325_data_o         : out   std_logic;
+      -- g_en_ssd1325
+      ssd1325_rst_o          : out   std_logic;
+      ssd1325_dc_o           : out   std_logic;
+      ssd1325_ss_o           : out   std_logic;
+      ssd1325_sclk_o         : out   std_logic;
+      ssd1325_data_o         : out   std_logic;
       -- g_en_user_ow
-      ow_io                  : inout std_logic_vector(1 downto 0));
+      ow_io                  : inout std_logic);
   end component;
 
   constant c_iodir_sdb : t_sdb_device := (
