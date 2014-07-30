@@ -358,7 +358,7 @@ architecture rtl of monster is
     c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
     c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
     c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
-    c_tops_user_uart => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_uart));
+    c_tops_user_uart => f_sdb_auto_device(c_wrc_periph1_sdb,                g_en_user_uart));
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
                                                   := f_sdb_auto_layout(c_top_layout_req);
