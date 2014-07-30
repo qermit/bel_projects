@@ -205,6 +205,7 @@ entity pci_control is
     sfp4_mod0         : in    std_logic; -- grounded by module
     sfp4_mod1         : inout std_logic; -- SCL
     sfp4_mod2         : inout std_logic); -- SDA
+    
 end pci_control;
 
 architecture rtl of pci_control is
@@ -222,22 +223,26 @@ architecture rtl of pci_control is
   signal lvds_n_o     : std_logic_vector(2 downto 0);
   signal lvds_o_led   : std_logic_vector(2 downto 0);
   signal lvds_oen     : std_logic_vector(2 downto 0);
+  
+  signal user_uart_rx : std_logic;
+  signal user_uart_tx : std_logic;
 
 begin
 
   main : monster
     generic map(
-      g_family      => "Arria V",
-      g_project     => "pci_control",
-      g_flash_bits  => 25,
-      g_gpio_out    => 8,
-      g_lvds_in     => 2,
-      g_lvds_out    => 0,
-      g_lvds_inout  => 3,
-      g_lvds_invert => true,
-      g_en_pcie     => true,
-      g_en_usb      => true,
-      g_en_lcd      => true)
+      g_family       => "Arria V",
+      g_project      => "pci_control",
+      g_flash_bits   => 25,
+      g_gpio_out     => 8,
+      g_lvds_in      => 2,
+      g_lvds_out     => 0,
+      g_lvds_inout   => 3,
+      g_lvds_invert  => true,
+      g_en_pcie      => true,
+      g_en_usb       => true,
+      g_en_lcd       => true,
+      g_en_user_uart => true)
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
       core_clk_125m_pllref_i => clk_125m_pllref_i,
@@ -284,6 +289,8 @@ begin
       usb_slwrn_o            => slwr,
       usb_pktendn_o          => pa(6),
       usb_fd_io              => fd,
+      user_uart_o            => user_uart_rx,
+      user_uart_i            => user_uart_tx,
       lcd_scp_o              => di(3),
       lcd_lp_o               => di(1),
       lcd_flm_o              => di(2),

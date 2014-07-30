@@ -74,8 +74,9 @@ entity monster is
     g_en_mil               : boolean;
     g_en_oled              : boolean;
     g_en_lcd               : boolean;
-	 g_en_ssd1325           : boolean;
+    g_en_ssd1325           : boolean;
     g_en_user_ow           : boolean;
+    g_en_user_uart         : boolean;
     g_lm32_cores           : natural;
     g_lm32_MSIs            : natural;
     g_lm32_ramsizes        : natural;
@@ -229,14 +230,17 @@ entity monster is
     lcd_lp_o               : out   std_logic := 'Z';
     lcd_flm_o              : out   std_logic := 'Z';
     lcd_in_o               : out   std_logic := 'Z';
-	 -- g_en_ssd1325
-	 ssd1325_rst_o          : out   std_logic := 'Z';
-	 ssd1325_dc_o           : out   std_logic := 'Z';
-	 ssd1325_ss_o           : out   std_logic := 'Z';
-	 ssd1325_sclk_o         : out   std_logic := 'Z';
-	 ssd1325_data_o         : out   std_logic := 'Z';
+    -- g_en_ssd1325
+    ssd1325_rst_o          : out   std_logic := 'Z';
+    ssd1325_dc_o           : out   std_logic := 'Z';
+    ssd1325_ss_o           : out   std_logic := 'Z';
+    ssd1325_sclk_o         : out   std_logic := 'Z';
+    ssd1325_data_o         : out   std_logic := 'Z';
     -- g_en_user_ow
-    ow_io                  : inout std_logic_vector(1 downto 0));
+    ow_io                  : inout std_logic_vector(1 downto 0);
+    -- g_en_user_uart      
+    user_uart_o            : out   std_logic;
+    user_uart_i            : in    std_logic := '0');
 end monster;
 
 architecture rtl of monster is
@@ -294,7 +298,7 @@ architecture rtl of monster is
   constant c_topm_fpq       : natural := 5;
   
   -- required slaves
-  constant c_top_slaves     : natural := 21;
+  constant c_top_slaves     : natural := 22;
   constant c_tops_irq       : natural := 0;
   constant c_tops_wrc       : natural := 1;
   constant c_tops_lm32      : natural := 2;
@@ -317,6 +321,7 @@ architecture rtl of monster is
   constant c_tops_scubirq   : natural := 18;
   constant c_tops_ssd1325   : natural := 19;
   constant c_tops_vme_info  : natural := 20;
+  constant c_tops_user_uart : natural := 21;
   
   -- We have to specify the values for WRC as there is no generic out in vhdl
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
@@ -352,7 +357,8 @@ architecture rtl of monster is
     c_tops_mil       => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
     c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
     c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
-    c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow));
+    c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
+    c_tops_user_uart => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_uart));
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
                                                   := f_sdb_auto_layout(c_top_layout_req);
@@ -1558,7 +1564,6 @@ begin
         nsig_wb_err    => open);
   end generate;
   
-  
   ow_n : if not g_en_user_ow generate
     top_cbar_master_i(c_tops_ow) <= cc_dummy_slave_out;
   end generate;
@@ -1587,6 +1592,33 @@ begin
         owr_pwren_o => user_ow_pwren,
         owr_en_o    => user_ow_en,
         owr_i       => ow_io
+        );
+  end generate;
+  
+  user_uart_n : if not g_en_user_uart generate
+    top_cbar_master_i(c_tops_user_uart) <= cc_dummy_slave_out;
+  end generate;
+  user_uart_y : if g_en_user_uart generate
+    
+    USER_UART : xwb_simple_uart
+      generic map(
+        g_with_virtual_uart   => true,
+        g_with_physical_uart  => false,
+        g_interface_mode      => PIPELINED,
+        g_address_granularity => BYTE,
+        g_vuart_fifo_size     => 1024
+        )
+      port map(
+        clk_sys_i => clk_sys,
+        rst_n_i   => rstn_sys,
+
+        -- Wishbone
+        slave_i => top_cbar_master_o(c_tops_user_uart),
+        slave_o => top_cbar_master_i(c_tops_user_uart),
+        desc_o  => open,
+        
+        uart_rxd_i => user_uart_i,
+        uart_txd_o => user_uart_o
         );
   end generate;
 
