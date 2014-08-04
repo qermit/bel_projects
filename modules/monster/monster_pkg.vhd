@@ -219,7 +219,7 @@ package monster_pkg is
       ssd1325_sclk_o         : out   std_logic;
       ssd1325_data_o         : out   std_logic;
       -- g_en_user_ow
-      ow_io                  : inout std_logic_vector(1 downto 0));
+      ow_io                  : inout std_logic);
   end component;
 
   constant c_iodir_sdb : t_sdb_device := (
