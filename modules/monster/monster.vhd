@@ -52,6 +52,7 @@ use work.VME_Buffer_pack.all;
 use work.wb_mil_scu_pkg.all;
 use work.wr_serialtimestamp_pkg.all;
 use work.wb_ssd1325_serial_driver_pkg.all;
+use work.wb_mux1xn_pkg.all;
 
 entity monster is
   generic(
@@ -77,6 +78,7 @@ entity monster is
     g_en_ssd1325           : boolean;
     g_en_user_ow           : boolean;
     g_en_user_uart         : boolean;
+    g_en_mux1xn            : boolean;
     g_lm32_cores           : natural;
     g_lm32_MSIs            : natural;
     g_lm32_ramsizes        : natural;
@@ -237,10 +239,7 @@ entity monster is
     ssd1325_sclk_o         : out   std_logic := 'Z';
     ssd1325_data_o         : out   std_logic := 'Z';
     -- g_en_user_ow
-    ow_io                  : inout std_logic_vector(1 downto 0);
-    -- g_en_user_uart      
-    user_uart_o            : out   std_logic;
-    user_uart_i            : in    std_logic := '0');
+    ow_io                  : inout std_logic_vector(1 downto 0));
 end monster;
 
 architecture rtl of monster is
@@ -298,7 +297,7 @@ architecture rtl of monster is
   constant c_topm_fpq       : natural := 5;
   
   -- required slaves
-  constant c_top_slaves     : natural := 22;
+  constant c_top_slaves     : natural := 23;
   constant c_tops_irq       : natural := 0;
   constant c_tops_wrc       : natural := 1;
   constant c_tops_lm32      : natural := 2;
@@ -322,6 +321,7 @@ architecture rtl of monster is
   constant c_tops_ssd1325   : natural := 19;
   constant c_tops_vme_info  : natural := 20;
   constant c_tops_user_uart : natural := 21;
+  constant c_tops_mux1xn    : natural := 22;
   
   -- We have to specify the values for WRC as there is no generic out in vhdl
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
@@ -358,7 +358,8 @@ architecture rtl of monster is
     c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
     c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
     c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
-    c_tops_user_uart => f_sdb_auto_device(c_wrc_periph1_sdb,                g_en_user_uart));
+    c_tops_user_uart => f_sdb_auto_device(c_wrc_periph1_sdb,                g_en_user_uart),
+    c_tops_mux1xn    => f_sdb_auto_device(c_wb_mux1xn_sdb,                  g_en_mux1xn));
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
                                                   := f_sdb_auto_layout(c_top_layout_req);
@@ -429,6 +430,15 @@ architecture rtl of monster is
   -- BuTiS T0 clocks
   signal clk_butis_t0     : std_logic; -- 100KHz
   signal clk_butis_t0_ts  : std_logic; -- 100KHz + timestamp
+  
+  -- UARTs     
+  signal s_user_uart_rx      : std_logic; -- to user UART
+  signal s_user_uart_tx      : std_logic; -- from user UART
+  signal s_wrc_uart_rx       : std_logic; -- to wrc UART
+  signal s_wrc_uart_tx       : std_logic; -- from wrc UART
+  signal s_muxed_uart_rx     : std_logic; -- user or wrc
+  signal s_muxed_uart_tx     : std_logic; -- user or wrc
+  signal s_muxed_uart_rx_ext : std_logic; -- user or wrc OR txt uart in 
   
   -- END OF Clock networks
   ----------------------------------------------------------------------------------
@@ -987,8 +997,15 @@ begin
         rstn_i    => rstn_sys,
         master_i  => top_cbar_slave_o(c_topm_usb),
         master_o  => top_cbar_slave_i(c_topm_usb),
-        uart_o    => uart_usb,
-        uart_i    => uart_wrc,
+        --uart_o    => uart_usb,
+        --uart_i    => uart_wrc,
+        --uart_o    => s_muxed_uart_tx,
+        --uart_i    => s_muxed_uart_rx,
+        --uart_o    => s_muxed_uart_rx,
+        --uart_o    => s_muxed_uart_rx_ext,
+        --uart_i    => s_muxed_uart_tx,
+        uart_o    => s_muxed_uart_rx,
+        uart_i    => s_muxed_uart_tx,
         rstn_o    => usb_rstn_o,
         ebcyc_i   => usb_ebcyc_i,
         speed_i   => usb_speed_i,
@@ -1006,8 +1023,8 @@ begin
         fd_oen_o  => s_usb_fd_oen);
   end generate;
   
-  wr_uart_o <= uart_wrc;
-  uart_mux <= uart_usb or wr_uart_i;
+  --wr_uart_o <= uart_wrc;
+  --uart_mux <= uart_usb or wr_uart_i;
   
   -- END OF Wishbone masters
   ----------------------------------------------------------------------------------
@@ -1066,8 +1083,10 @@ begin
       sfp_det_i            => wr_sfp_det_i,
       btn1_i               => '0',
       btn2_i               => '0',
-      uart_rxd_i           => uart_mux,
-      uart_txd_o           => uart_wrc,
+      --uart_rxd_i           => uart_mux,
+      --uart_txd_o           => uart_wrc,
+      uart_rxd_i           => s_wrc_uart_rx,
+      uart_txd_o           => s_wrc_uart_tx,
       owr_pwren_o          => owr_pwren,
       owr_en_o             => owr_en,
       owr_i(0)             => wr_onewire_io,
@@ -1603,7 +1622,7 @@ begin
     USER_UART : xwb_simple_uart
       generic map(
         g_with_virtual_uart   => true,
-        g_with_physical_uart  => false,
+        g_with_physical_uart  => true,
         g_interface_mode      => PIPELINED,
         g_address_granularity => BYTE,
         g_vuart_fifo_size     => 1024
@@ -1617,10 +1636,45 @@ begin
         slave_o => top_cbar_master_i(c_tops_user_uart),
         desc_o  => open,
         
-        uart_rxd_i => user_uart_i,
-        uart_txd_o => user_uart_o
-        );
+        uart_rxd_i => s_user_uart_rx,
+        uart_txd_o => s_user_uart_tx
+      );
   end generate;
+  
+  mux1xn_n : if not g_en_mux1xn generate
+    top_cbar_master_i(c_tops_mux1xn) <= cc_dummy_slave_out;
+    s_muxed_uart_rx <= s_wrc_uart_rx; -- to be checked
+    s_muxed_uart_tx <= s_wrc_uart_tx; -- to be checked
+  end generate;
+  
+  mux1xn_y : if g_en_mux1xn generate
+    UART_MUX : wb_mux1xn
+      generic map(
+        g_default_output => '0'
+      )
+      port map(
+        clk_sys_i => clk_sys,
+        rst_n_i   => rstn_sys,
+
+        -- Wishbone
+        slave_i => top_cbar_master_o(c_tops_mux1xn),
+        slave_o => top_cbar_master_i(c_tops_mux1xn),
+
+        -- Multiplexed signals
+        -- UART RX
+        signal_rx_o(0) => s_wrc_uart_rx,
+        signal_rx_o(1) => s_user_uart_rx,
+        signal_rx_i    => s_muxed_uart_rx,
+        -- UART TX
+        signal_tx_i(0) => s_wrc_uart_tx,
+        signal_tx_i(1) => s_user_uart_tx,
+        signal_tx_o    => s_muxed_uart_tx
+      );
+  end generate;
+  
+  -- involve single/real external UART
+  wr_uart_o <= s_muxed_uart_tx; -- directly output selected UART
+  s_muxed_uart_rx_ext <= wr_uart_i or s_muxed_uart_rx; -- can be connected to the USB unit to use the direct input as well
 
   -- END OF Wishbone slaves
   ----------------------------------------------------------------------------------

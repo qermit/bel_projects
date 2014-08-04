@@ -98,9 +98,9 @@ unsigned char *find_device(unsigned int devid)
 void discoverPeriphery(void)
 {
   sdb_location found_sdb[20];
-  sdb_location found_sdb_w1[2];
+  sdb_location found_sdb_user[2];
   unsigned int idx = 0;
-  unsigned int idx_w1 = 0;
+  unsigned int idx_user = 0;
    
   pCpuId         = find_device_adr(GSI, CPU_INFO_ROM);
   pCpuAtomic     = find_device_adr(GSI, CPU_ATOM_ACC);
@@ -122,11 +122,23 @@ void discoverPeriphery(void)
   pEbm           = find_device_adr(GSI, ETHERBONE_MASTER);
   pEca           = find_device_adr(GSI, ECA_EVENT);
   pUart          = find_device_adr(CERN, WR_UART);
-  BASE_UART      = pUart; //make WR happy ...
+  pUartMux       = find_device_adr(GSI, UART_MUX);
   
   /* Get the second onewire/w1 record (0=white rabbit w1 unit, 1=user w1 unit) */
-  find_device_multi(&found_sdb_w1[0], &idx_w1, 2, CERN, WR_1Wire);
-  pOneWire         = (unsigned int*)getSdbAdr(&found_sdb_w1[1]);
+  idx_user = 0;
+  find_device_multi(&found_sdb_user[0], &idx_user, 2, CERN, WR_1Wire);
+  pOneWire = (unsigned int*)getSdbAdr(&found_sdb_user[1]);
+
+  /* Get the second UART record (0=white rabbit UART unit, 1=user UART unit) */
+  idx_user = 0;
+  find_device_multi(&found_sdb_user[0], &idx_user, 2, CERN, WR_UART);
+  pUartUser = (unsigned int*)getSdbAdr(&found_sdb_user[1]);
+  
+#ifdef CONFIG_USER_UART   
+  BASE_UART = pUartUser; /* BASE_UART is needed by dev/uart.c */
+#else
+  BASE_UART = pUart; /* Use white rabbit core UART also */
+#endif
 
 }
 

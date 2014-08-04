@@ -57,6 +57,7 @@ package monster_pkg is
       g_en_ssd1325           : boolean := false;
       g_en_user_ow           : boolean := false;
       g_en_user_uart         : boolean := false;
+      g_en_mux1xn            : boolean := false;
       g_lm32_cores           : natural := 1;
       g_lm32_MSIs            : natural := 1;
       g_lm32_ramsizes        : natural := 131072/4;
@@ -218,10 +219,7 @@ package monster_pkg is
       ssd1325_sclk_o         : out   std_logic;
       ssd1325_data_o         : out   std_logic;
       -- g_en_user_ow
-      ow_io                  : inout std_logic_vector(1 downto 0);
-      -- g_en_user_uart      
-      user_uart_o            : out   std_logic;
-      user_uart_i            : in    std_logic := '0');
+      ow_io                  : inout std_logic_vector(1 downto 0));
   end component;
 
   constant c_iodir_sdb : t_sdb_device := (

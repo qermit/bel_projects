@@ -39,6 +39,7 @@
 #define ECA_EVENT             0x8752bf45
 #define ECA_CTRL              0x8752bf44 
 #define WR_UART               0xe2d13d04
+#define UART_MUX              0xc07f1680
 #define SCU_BUS_MASTER        0x9602eb6f
 #define SCU_IRQ_CTRL          0x9602eb70
 
@@ -62,6 +63,8 @@ volatile unsigned int* BASE_UART;
 volatile unsigned int* pSharedRam;
 volatile unsigned int* pCluCB;
 volatile unsigned int* pOneWire;
+volatile unsigned int* pUartUser;
+volatile unsigned int* pUartMux;
 
 typedef struct pair64 {
   unsigned int high;
