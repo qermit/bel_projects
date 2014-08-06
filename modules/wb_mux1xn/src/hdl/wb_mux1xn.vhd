@@ -102,19 +102,9 @@ begin
   begin
   -- plausibility check
     if (g_input_size > to_integer(unsigned(s_control_reg(g_data_size-1 downto 0)))) then
-      case s_control_reg(1 downto 0) is
-        when "00" =>
-          signal_rx_o(0) <= signal_rx_i;
-          signal_rx_o(1) <= g_default_output;
-          signal_tx_o    <= signal_tx_i(0);
-        when "01" =>
-          signal_rx_o(0) <= g_default_output;
-          signal_rx_o(1) <= signal_rx_i;
-          signal_tx_o    <= signal_tx_i(1);
-        when others =>
-          signal_rx_o <= (others => g_default_output);
-          signal_tx_o <= g_default_output;
-      end case;
+      signal_rx_o                                                              <= (others => g_default_output);
+      signal_rx_o(to_integer(unsigned(s_control_reg(g_data_size-1 downto 0)))) <= signal_rx_i;
+      signal_tx_o                                                              <= signal_tx_i(to_integer(unsigned(s_control_reg(g_data_size-1 downto 0))));
     else
       signal_rx_o <= (others => g_default_output);
       signal_tx_o <= g_default_output;
@@ -134,19 +124,9 @@ begin
     elsif (rising_edge(clk_sys_i)) then
       -- plausibility check
       if (g_input_size > to_integer(unsigned(s_control_reg(g_data_size-1 downto 0)))) then
-        case s_control_reg(1 downto 0) is
-          when "00" =>
-            signal_rx_o(0) <= signal_rx_i;
-            signal_rx_o(1) <= g_default_output;
-            signal_tx_o    <= signal_tx_i(0);
-          when "01" =>
-            signal_rx_o(0) <= g_default_output;
-            signal_rx_o(1) <= signal_rx_i;
-            signal_tx_o    <= signal_tx_i(1);
-          when others =>
-            signal_rx_o <= (others => g_default_output);
-            signal_tx_o <= g_default_output;
-        end case;
+        signal_rx_o                                                              <= (others => g_default_output);
+        signal_rx_o(to_integer(unsigned(s_control_reg(g_data_size-1 downto 0)))) <= signal_rx_i;
+        signal_tx_o                                                              <= signal_tx_i(to_integer(unsigned(s_control_reg(g_data_size-1 downto 0))));
       else
         signal_rx_o <= (others => g_default_output);
         signal_tx_o <= g_default_output;

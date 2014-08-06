@@ -999,11 +999,6 @@ begin
         master_o  => top_cbar_slave_i(c_topm_usb),
         --uart_o    => uart_usb,
         --uart_i    => uart_wrc,
-        --uart_o    => s_muxed_uart_tx,
-        --uart_i    => s_muxed_uart_rx,
-        --uart_o    => s_muxed_uart_rx,
-        --uart_o    => s_muxed_uart_rx_ext,
-        --uart_i    => s_muxed_uart_tx,
         uart_o    => s_muxed_uart_rx,
         uart_i    => s_muxed_uart_tx,
         rstn_o    => usb_rstn_o,
@@ -1651,6 +1646,7 @@ begin
   mux1xn_y : if g_en_mux1xn generate
     UART_MUX : wb_mux1xn
       generic map(
+        g_input_size     => 2,
         g_default_output => '0'
       )
       port map(
@@ -1665,7 +1661,7 @@ begin
         -- UART RX
         signal_rx_o(0) => s_wrc_uart_rx,
         signal_rx_o(1) => s_user_uart_rx,
-        signal_rx_i    => s_muxed_uart_rx,
+        signal_rx_i    => s_muxed_uart_rx_ext,
         -- UART TX
         signal_tx_i(0) => s_wrc_uart_tx,
         signal_tx_i(1) => s_user_uart_tx,
@@ -1674,8 +1670,8 @@ begin
   end generate;
   
   -- involve single/real external UART
-  wr_uart_o <= s_muxed_uart_tx; -- directly output selected UART
-  s_muxed_uart_rx_ext <= wr_uart_i or s_muxed_uart_rx; -- can be connected to the USB unit to use the direct input as well
+  wr_uart_o <= s_muxed_uart_tx; -- directly output to standard UART
+  s_muxed_uart_rx_ext <= wr_uart_i or s_muxed_uart_rx; -- use input signals from standard UART also
 
   -- END OF Wishbone slaves
   ----------------------------------------------------------------------------------
