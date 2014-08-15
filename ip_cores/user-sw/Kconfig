@@ -1,0 +1,228 @@
+
+mainmenu "WR PTP Core software configuration"
+
+# Later we'll build wr_cpu.bin for wr-switch from this code base
+config WR_SWITCH
+	bool "Build rt_cpu.bin, for the WR-Switch FPGA"
+	default n
+	select UART
+
+config WR_NODE
+	bool
+	default !WR_SWITCH
+
+# most options with no prompt here are prompted-for in the "advanced" section
+
+config PRINT_BUFSIZE
+	int
+	default 128
+
+config PRINTF_XINT
+	boolean
+	default y
+
+config RAMSIZE
+	int
+	default 28672 if WR_SWITCH
+	default 90112
+
+# CONFIG_WR_SWITCH has no further options at all at this point
+if WR_NODE
+
+config STACKSIZE
+	int  
+	default 2048
+
+config PPSI
+	boolean
+	default y
+
+config UART
+	boolean
+	default y
+
+config W1
+	boolean
+	default y
+
+# The other ones can be set by non-developers
+
+config ETHERBONE
+	boolean "Compile Etherbone support in wrpc-sw"
+	help
+	  This allows to run LM32 code that is aware of Etherbone.
+	  You need to run a gateware file that includes Etherbone support.
+	  If in doubt, say No.
+
+config WRNIC
+	boolean "Compile White Rabbit NIC support in wrpc-sw"
+	help
+	  This allows to run LM32 code that is aware of Etherbone and
+	  NIC. You need to run a gateware file that includes Etherbone
+	  and NIC support. This option needs ETHERBONE enabled.
+	  If in doubt, say No.
+
+config CMD_CONFIG
+	boolean "Include configuration in the output binary"
+	help
+	  This options adds the "config" command to the shell, which
+	  reports the current configuration.  This adds half a kilobyte
+	  to the binary size (100b for the code plus the .config file).
+
+config NIC_PFILTER
+	depends on ETHERBONE
+	bool "Add packet filter rules for wr-nic"
+	help
+	  When using wr-nic, the host must receive frames that are not
+	  ptp nor etherbone ones.  This adds the needed filter rules
+	  to that effect.  Such rules are not needed when no Etherbone
+	  is there, because in that case all non-ptp frames reach the
+	  host.
+
+#
+# This is a set of configuration options that should not be changed by
+# normal users. If the "developer" menu is used, the binary is tainted.
+
+comment "wrpc-sw is tainted if you change the following options"
+config DEVELOPER
+	bool "Advanced configurations, only for developers"
+	help
+	  The following options are new features under testing, or
+	  special customizations not normally useful for people not
+	  directly working on this package.  Please don't use unless
+	  you are a developer of wrpc-sw.
+
+config RAMSIZE
+	depends on DEVELOPER
+	int "Size of the RAM in the FPGA for this program"
+	default 90112
+	help
+	  The usual configuration for wrpc-sw is 0x16000 bytes
+	  (i.e. 88kB = 90112 bytes) but if your project has less or
+	  more features you may want to adjust the FPGA size and
+	  choose your preferred value here.
+
+config STACKSIZE
+	depends on DEVELOPER
+	int "Size of the stack area needed by this program"
+	default 2048
+	help
+	  The linker complains if the code doesn't fit into RAM, but
+	  we must also consider the stack, or the program will crash
+	  at run time. (However, we have a detector for overflows).
+
+config PRINT_BUFSIZE
+	depends on DEVELOPER
+	int "Size for the temporary output string of pp_printf"
+	default 128
+	help
+	  This buffer is constant storage (i.e. wasted space), but it
+	  also constraints the maximum lenght of text that can be written
+	  in a single call to printf.
+
+config CHECK_RESET
+	depends on DEVELOPER
+	bool "Print a stack trace if reset happens"
+	help
+	  If the CPU is following a NULL pointer, the program will
+	  be restarted. If this option is activated, the main function
+	  detects that it is re-executed and dumps a stack trace; it
+	  then clears the stack (for next time) and restarts again.
+
+choice
+	prompt "Implementation of pp_printf"
+	depends on DEVELOPER
+
+config PRINTF_XINT
+	bool "hex-and-int"
+	help
+	  This selects a printf that can only print decimal and hex
+	  numbers, without obeying the format modifiers. %c and %s are
+	  supported too, and %p is equivalent to %x.
+	  See pp_printf/README for details.
+
+config PRINTF_FULL
+	bool "full"
+	help
+	  This selects an implementation that supports all standard
+	  formats with modifiers, like "%08X" and "%.5s". It costs
+	  around 2k of compiled code more than XINT.
+	  See pp_printf/README for details.
+
+config PRINTF_MINI
+	bool "minimal"
+	help
+	  This selects a printf that prints all integers as hex,
+	  without obeying the format modifiers. %c and %s are
+	  supported too. See pp_printf/README for details.
+	  This is not probably what you want for wrpc-sw.
+
+config PRINTF_NONE
+	bool "empty"
+	help
+	  This selects a printf that prints the format string
+	  alone and ignores all further arguments. Minimal size,
+	  but not suited for wrpc-sw. See pp_printf/README for details.
+endchoice
+
+choice
+	prompt "Choose your preferred ptp engine"
+	depends on DEVELOPER
+
+config PPSI
+	boolean "ppsi"
+	help
+	  Select this option for the ppsi engine
+
+config PTP_NOPOSIX
+	boolean "ptp-noposix"
+	help
+	  Select this option for the ptp-noposix engine
+
+endchoice
+
+config DETERMINISTIC_BINARY
+	depends on DEVELOPER
+	boolean "Build a binary that is the same every time"
+	help
+	  This option is used to #ifdef __DATE__ and __TIME__ strings
+	  out of the compiled WRC binary. If you set it you'll get the
+	  same binary bit-by-bit at each rebuild.  I am using this
+	  option to hack the build procedure and use a simple "diff"
+	  between the old and new output to verify I didn't introduce
+	  changes.
+
+	  If in doubt, say No.
+
+config UART
+	boolean "Use hardware uart (and/or vuart if available)"
+	depends on DEVELOPER
+	default y
+	help
+	  This option selects the serial driver, connected to either
+	  the USB socket, or "vuart" (software fifo) or both, according
+	  to how the gateware is built. 
+
+config UART_SW
+	depends on DEVELOPER
+	default !UART
+	boolean "Use software uart"
+	help
+	  The software uart is made up of two circular buffers. It can
+	  be used either as an alternative to the harwdare UART or as
+	  an addition. If the option is turned on, ppsi log messages
+	  are routed to the software uart. The interactive wrpc shell
+	  and diagnostics run on the hardware UART if available.
+
+config SDB_EEPROM
+	depends on DEVELOPER && W1
+	boolean "Use SDB to manage EEPROM (instead of legacy code)"
+	help
+	  New experimental code to unify W1 and EEPROM storage
+
+config LEGACY_EEPROM
+	boolean
+	default !SDB_EEPROM
+
+endif
+# CONFIG_WR_NODE
