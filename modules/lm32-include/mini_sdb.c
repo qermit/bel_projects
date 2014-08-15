@@ -2,6 +2,9 @@
 #include "mini_sdb.h"
 #include "dbg.h"
 
+extern volatile unsigned int* BASE_UART;
+extern volatile unsigned int* pOneWire;
+
 sdb_location *find_sdb_deep(sdb_record_t *parent_sdb, sdb_location *found_sdb, unsigned int base, unsigned int *idx, unsigned int qty, unsigned int venId, unsigned int devId)
 {
   sdb_record_t *record = parent_sdb;

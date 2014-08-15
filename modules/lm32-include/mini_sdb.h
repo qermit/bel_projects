@@ -59,10 +59,10 @@ volatile unsigned int* pCpuSysTime;
 volatile unsigned int* pCpuTimer;
 volatile unsigned int* pCluInfo;
 volatile unsigned int* pUart;
-volatile unsigned int* BASE_UART;
+//volatile unsigned int* BASE_UART;
 volatile unsigned int* pSharedRam;
 volatile unsigned int* pCluCB;
-volatile unsigned int* pOneWire;
+//volatile unsigned int* pOneWire;
 volatile unsigned int* pUartUser;
 volatile unsigned int* pUartMux;
 
