@@ -45,6 +45,7 @@
 
 #define SCU_BUS_MASTER        0x9602eb6f
 #define WR_1Wire              0x779c5443
+#define INFO_VME              0x22ffee84
 
 //periphery device pointers
 volatile unsigned int* pEbm;     
@@ -65,6 +66,7 @@ volatile unsigned int* pCluCB;
 //volatile unsigned int* pOneWire;
 volatile unsigned int* pUartUser;
 volatile unsigned int* pUartMux;
+volatile unsigned int* pVmeInfo;
 
 typedef struct pair64 {
   unsigned int high;

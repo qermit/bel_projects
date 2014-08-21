@@ -13,6 +13,7 @@
 #include "aux.h"
 #include "w1.h"
 #include "onewire.h"
+#include "disp-lcd.h"
 
 #define LINK_WENT_UP 1
 #define LINK_WENT_DOWN 2
@@ -34,19 +35,35 @@ uint32_t cal_phase_transition = 2389;
 extern uint32_t _endram;
 extern uint32_t _fstack;
 
-void wrc_debug_printf(int subsys, const char *fmt, ...)
-{
-  /* To be deleted */
-}
+/* Prototypes */
+/* ==================================================================================================== */
+int  init(void);
+void ui_update(void);
 
-void _irq_entry(void)
-{
-  /* Stub */
-}
-
+/* Function main(...) */
+/* ==================================================================================================== */
 int main(void)
 {
+  
+  /* Initialize units and global variables */
+  init();
+  
+  /* Start endless loop */
+  for (;;)
+  {
+    ui_update();
+  }
+  
+  /* Should never get here */
+  return(0);
+  
+}
 
+/* Function init(...) */
+/* ==================================================================================================== */
+int init(void)
+{
+  
   /* Initialize shell mode */
   wrc_ui_mode = UI_SHELL_MODE;
 
@@ -58,14 +75,56 @@ int main(void)
   
   /* Show start message */
   mprintf("User Core: Starting up...\n");
+  
+  /* Initialize lcdisplay */
+  if (disp_init())
+  {
+    mprintf("Warning: Initialization of LCD failed!\n");
+    return (1);
+  }
 
-  /* Start endless loop */
-  for (;;)
+  /* Done */
+  return(0);
+  
+}
+
+/* Function ui_update(...) */
+/* ==================================================================================================== */
+void ui_update(void)
+{
+  /* ASCII symbol 27 = ESC (Escape) */
+  if (wrc_ui_mode == UI_GUI_MODE)
+  {
+    if (uart_read_byte() == 27 || wrc_ui_refperiod == 0)
+    {
+      shell_init();
+      wrc_ui_mode = UI_SHELL_MODE;
+    }
+  } 
+  else if (wrc_ui_mode == UI_STAT_MODE)
+   {
+    if (uart_read_byte() == 27 || wrc_ui_refperiod == 0)
+    {
+      shell_init();
+      wrc_ui_mode = UI_SHELL_MODE;
+    }
+  } 
+  else
   {
     shell_interactive();
   }
-  
-  /* Should never get here */
-  return(0);
-  
+}
+
+/* Function wrc_debug_printf(...) */
+/* ==================================================================================================== */
+void wrc_debug_printf(int subsys, const char *fmt, ...)
+{
+  /* Stub */
+}
+
+/* Function _irq_entry(...) */
+/* ==================================================================================================== */
+void _irq_entry(void)
+{
+  /* Stub */
 }

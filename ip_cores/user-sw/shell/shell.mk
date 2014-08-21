@@ -9,4 +9,5 @@ obj-$(CONFIG_WR_NODE) += \
 	shell/cmd_user.o \
 	shell/cmd_ip.o \
 	shell/cmd_config.o \
+	shell/cmd_vmeinfo.o \
 	shell/cmd_help.o

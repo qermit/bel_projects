@@ -8,7 +8,8 @@ obj-$(CONFIG_WR_NODE) += \
 	$(WRPC_SW_PATH)/dev/pps_gen.o \
 	$(WRPC_SW_PATH)/dev/syscon.o \
 	$(WRPC_SW_PATH)/dev/sdb.o \
-	../../modules/lm32-include/mini_sdb.o
+	../../modules/lm32-include/mini_sdb.o \
+	../../modules/lm32-include/disp-lcd.o
 
 obj-$(CONFIG_WR_SWITCH) += \
 	$(WRPC_SW_PATH)/dev/timer-wrs.o \

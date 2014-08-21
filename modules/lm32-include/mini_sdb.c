@@ -131,14 +131,22 @@ void discoverPeriphery(void)
   idx_user = 0;
   find_device_multi(&found_sdb_user[0], &idx_user, 2, CERN, WR_1Wire);
   pOneWire = (unsigned int*)getSdbAdr(&found_sdb_user[1]);
-
+  pVmeInfo = find_device_adr(GSI, INFO_VME);
+  
   /* Get the second UART record (0=white rabbit UART unit, 1=user UART unit) */
   idx_user = 0;
   find_device_multi(&found_sdb_user[0], &idx_user, 2, CERN, WR_UART);
   pUartUser = (unsigned int*)getSdbAdr(&found_sdb_user[1]);
   
 #ifdef CONFIG_USER_UART   
-  BASE_UART = pUartUser; /* BASE_UART is needed by dev/uart.c */
+  if(pUartUser==NULL)
+  {
+    BASE_UART = pUartUser; /* BASE_UART is needed by dev/uart.c */
+  }
+  else
+  {
+    BASE_UART = pUart; /* Use white rabbit core UART also */
+  }
 #else
   BASE_UART = pUart; /* Use white rabbit core UART also */
 #endif
