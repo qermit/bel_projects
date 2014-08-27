@@ -71,6 +71,7 @@ int init(void)
   discoverPeriphery();
 
   /* Initialize uart unit */
+  uart_init_sw();
   uart_init_hw();
   
   /* Show start message */

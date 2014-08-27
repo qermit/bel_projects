@@ -139,7 +139,7 @@ void discoverPeriphery(void)
   pUartUser = (unsigned int*)getSdbAdr(&found_sdb_user[1]);
   
 #ifdef CONFIG_USER_UART   
-  if(pUartUser==NULL)
+  if(pUartUser!=NULL)
   {
     BASE_UART = pUartUser; /* BASE_UART is needed by dev/uart.c */
   }
