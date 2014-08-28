@@ -43,7 +43,7 @@ CFLAGS                 = $(CFLAGS_PLATFORM) $(cflags-y) -Wall \
                          -I$(WRPC_SW_PATH)/softpll
 LDFLAGS                = $(LDFLAGS_PLATFORM) \
                          -Wl,--gc-sections -Os -lgcc -lc
-obj-$(CONFIG_WR_NODE) += wrc_main.o
+obj-$(CONFIG_WR_NODE) += main.o
 cflags-y               = -ffreestanding -include $(AUTOCONF) -Iinclude/std -Iinclude \
                          -I. -Iipc
 cflags-y              += -I$(WRPC_SW_PATH)/pp_printf
@@ -74,7 +74,7 @@ obj-$(CONFIG_WR_NODE)    += $(WRPC_SW_PATH)/check-error.o
 obj-$(CONFIG_WR_NODE)    += sdb-lib/libsdbfs.a
 cflags-$(CONFIG_WR_NODE) += -Isdb-lib
 OBJS                      = $(obj-y)
-OUTPUT-$(CONFIG_WR_NODE)  = main
+OUTPUT-$(CONFIG_WR_NODE)  = user_main
 OUTPUT                   := $(OUTPUT-y)
 
 # ====================================================================================================

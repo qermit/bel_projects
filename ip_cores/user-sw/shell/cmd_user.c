@@ -5,8 +5,8 @@
 #include <wrc.h>
 #include "shell.h"
 
-__attribute__((weak)) int user_main(void);
-__attribute__((weak)) int user_main(void)
+__attribute__((weak)) int user_function(void);
+__attribute__((weak)) int user_function(void)
 {
   return(0);
 }
@@ -18,7 +18,7 @@ static int cmd_user(const char *args[])
   mprintf("Calling user function...\n");
   
   /* Call user function */
-  user_main();
+  user_function();
 
   /* Done */
   return(0);
