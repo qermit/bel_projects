@@ -37,15 +37,15 @@ LDFLAGS_PLATFORM       = -mmultiply-enabled -mbarrel-shift-enabled \
                          -nostdlib -T $(LDS-y)
 CFLAGS                 = $(CFLAGS_PLATFORM) $(cflags-y) -Wall \
                          -ffunction-sections -fdata-sections -Os \
-                         -include include/trace.h -ggdb \
+                         -include $(WRPC_SW_PATH)/include/trace.h -ggdb \
                          -I$(USER_LM32_INC_PATH) \
                          -DCONFIG_USER_UART -DBASE_ONEWIRE=pOneWire -DCONFIG_USER_ONE_WIRE \
                          -I$(WRPC_SW_PATH)/softpll
 LDFLAGS                = $(LDFLAGS_PLATFORM) \
                          -Wl,--gc-sections -Os -lgcc -lc
 obj-$(CONFIG_WR_NODE) += main.o
-cflags-y               = -ffreestanding -include $(AUTOCONF) -Iinclude/std -Iinclude \
-                         -I. -Iipc
+cflags-y               = -ffreestanding -include $(AUTOCONF) -I$(WRPC_SW_PATH)/include/std \
+                         -I$(WRPC_SW_PATH)/include -Iinclude -I. -Iipc
 cflags-y              += -I$(WRPC_SW_PATH)/pp_printf
 REVISION               = $(shell git describe --dirty --always)
 
