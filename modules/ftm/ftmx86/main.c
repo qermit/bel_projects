@@ -270,6 +270,32 @@ const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len)
    return buf;
 }
 
+static void ebRamClear(uint32_t address, uint32_t len)
+{
+   eb_status_t status;
+   eb_cycle_t cycle;
+   uint32_t i,j, parts, partLen, start;  
+   
+   //wrap frame buffer in EB packet
+   parts = (len/PACKET_SIZE)+1;
+   start = 0;
+   
+   for(j=0; j<parts; j++)
+   {
+      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
+      else partLen = PACKET_SIZE;
+      
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
+      
+      for(i= start>>2; i< (start + partLen) >>2;i++)  
+      {
+         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, 0); 
+      }
+      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
+      start = start + partLen;
+   }
+}
+
 static void help(void) {
   fprintf(stderr, "\nUsage: %s [OPTION] <etherbone-device> [command]\n", program);
   fprintf(stderr, "\n");
@@ -285,6 +311,7 @@ static void help(void) {
   fprintf(stderr, "  idle                      request idle state on this core\n");
   fprintf(stderr, "  swap                      swap active and inactive page on this core\n");
   fprintf(stderr, "  put    <filename>         puts ftm data from xml file to inactive page on this core\n");
+  fprintf(stderr, "  clear                     clears all pages on this core\n");
   fprintf(stderr, "  get                       gets ftm data from inactive page and displays it\n");
   fprintf(stderr, "  dump                      gets ftm data from active page and displays it\n");
   fprintf(stderr, "  loadfw <filename>         puts firmware from bin file to core\n");
@@ -593,6 +620,16 @@ int main(int argc, char** argv) {
        }
        ebstatus = eb_device_write(device, embeddedOffset + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_SHOW_ACT, 0, eb_block) ;
        if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
+       sleep(1); 
+     } 
+     
+     else if (!strcasecmp(command, "clear")) {
+       
+       if (verbose) {
+         printf("Clearing all pages on FTM CPU %u \n", k);
+       }
+       ebRamClear(embeddedOffset + inaOffset, BUF_SIZE);
+       ebRamClear(embeddedOffset + actOffset, BUF_SIZE);
        sleep(1); 
      } 
      

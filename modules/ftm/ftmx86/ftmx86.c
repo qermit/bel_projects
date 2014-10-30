@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -159,17 +160,17 @@ static uint8_t* serChain(t_ftmChain* pChain, uint32_t pPlanStart, uint8_t* pBufS
    uint32ToBytes(&pBuf[FTM_CHAIN_MSGQTY],    pChain->msgQty);
    uint32ToBytes(&pBuf[FTM_CHAIN_MSGIDX],    0);
    
-   pBufMsg  = embeddedOffs + _FTM_CHAIN_LEN + ( (uint32_t)( (uintptr_t)pBuf - (uintptr_t)pBufStart ) );
+   pBufMsg  = embeddedOffs + FTM_CHAIN_END_ + ( (uint32_t)( (uintptr_t)pBuf - (uintptr_t)pBufStart ) );
    uint32ToBytes(&pBuf[FTM_CHAIN_PMSG],    pBufMsg);
    
    if(pChain->pNext != NULL) {
       if(((pChain->flags & FLAGS_IS_END) && (pChain->flags & FLAGS_IS_ENDLOOP)))   pBufNext = (uint32_t)pPlanStart;
-      else                                                                         pBufNext = pBufMsg + pChain->msgQty * _FTM_MSG_LEN;
+      else                                                                         pBufNext = pBufMsg + pChain->msgQty * FTM_MSG_END_;
    } 
    else pBufNext = FTM_NULL;
    uint32ToBytes(&pBuf[FTM_CHAIN_PNEXT],    pBufNext);
  
-   pBuf += _FTM_CHAIN_LEN;
+   pBuf += FTM_CHAIN_END_;
    for(msgIdx = 0; msgIdx < pChain->msgQty; msgIdx++) pBuf = serMsg(&pMsg[msgIdx], pBuf);   
    
    return pBuf;   
@@ -185,7 +186,7 @@ static uint8_t* serMsg(  t_ftmMsg* pMsg, uint8_t* pBuf)
    uint64ToBytes(&pBuf[FTM_MSG_TS],     0);
    uint64ToBytes(&pBuf[FTM_MSG_OFFS],   pMsg->offs);
    
-   return pBuf + _FTM_MSG_LEN;
+   return pBuf + FTM_MSG_END_;
 }
 
 t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs)
@@ -275,7 +276,7 @@ static uint8_t* deserChain(t_ftmChain* pChain, t_ftmChain* pNext, uint8_t* pChai
    pChain->pMsg     = calloc(pChain->msgQty, sizeof(t_ftmMsg));
    pChain->pNext    = (struct t_ftmChain*)pNext;
    //deserialise messages until msgQty is reached
-   pBuf = &pBuf[_FTM_CHAIN_LEN];
+   pBuf = &pBuf[FTM_CHAIN_END_];
    for(msgIdx = 0; msgIdx < pChain->msgQty; msgIdx++) pBuf = deserMsg(pBuf, &pChain->pMsg[msgIdx]);   
    //set pBuf ptr to 
    
@@ -293,8 +294,63 @@ static uint8_t* deserMsg(uint8_t* pBuf, t_ftmMsg* pMsg)
    pMsg->ts    = bytesToUint64(&pBuf[FTM_MSG_TS]); 
    pMsg->offs  = bytesToUint64(&pBuf[FTM_MSG_OFFS]); 
    
-   return pBuf + (uintptr_t)_FTM_MSG_LEN; 
+   return pBuf + (uintptr_t)FTM_MSG_END_; 
 }
+
+t_ftmPage* freePage(t_ftmPage* pPage)
+{
+   uint32_t planIdx, chainIdx;
+   t_ftmChain* pChain   = NULL;
+   t_ftmChain* pNext    = NULL;
+   t_ftmMsg*   pMsg     = NULL;
+                    
+   for(planIdx = 0; planIdx < pPage->planQty; planIdx++)
+   {
+      chainIdx = 0;
+      pChain = pPage->plans[planIdx].pStart;
+      while(chainIdx++ < pPage->plans[planIdx].chainQty && pChain != NULL)
+      {
+         pMsg = pChain->pMsg;
+         free(pMsg);
+         pNext = (t_ftmChain*)pChain->pNext;
+         free(pChain);
+         pChain = pNext;
+      }
+   }
+   free(pPage);
+   return NULL; 
+}
+
+
+
+//DEBUG functions, mainly for FESA bullshit
+t_ftmChain* getChain(t_ftmPage* pPage, uint32_t planIdx, uint32_t chainIdx)
+{
+   uint32_t cIdx = 0;
+   t_ftmChain* pChain   = NULL;
+
+   if(chainIdx < pPage->plans[planIdx].chainQty) {
+   
+      pChain = pPage->plans[planIdx].pStart;
+      while(cIdx++ < chainIdx && pChain != NULL) {pChain = (t_ftmChain*)pChain->pNext;}
+   }  
+   
+   return pChain;
+}
+
+t_ftmMsg* getMsg(t_ftmChain* pChain, uint32_t msgIdx)
+{
+   t_ftmMsg*   pMsg     = NULL;
+   
+   if(pChain != NULL) {
+      pMsg = pChain->pMsg;
+      if(msgIdx < pChain->msgQty) pMsg += (uintptr_t)msgIdx;
+   }
+   
+   return pMsg;
+}
+
+
 
 void showFtmPage(t_ftmPage* pPage)
 {

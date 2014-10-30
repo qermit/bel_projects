@@ -1,6 +1,12 @@
 #include "xmlaux.h"
 
 const char* msgIdFields[] = {"FID", "GID", "EVTNO", "SID", "BPID", "SCTR"};
+long parsedLineNo;
+
+static void showError(const char* nodeName)
+{
+   printf("ERROR after line %ld: Could not find Tag <%s> \n",  parsedLineNo, nodeName);
+}
 
 xmlNode* checkNode(xmlNode* aNode, const char* name)
 {
@@ -14,8 +20,10 @@ xmlNode* checkNode(xmlNode* aNode, const char* name)
          aNode = xmlNextElementSibling(aNode);
          if(aNode == NULL) break;
       }
+      if(aNode != NULL) parsedLineNo = xmlGetLineNo(aNode);
       return aNode;
    }
+   if(aNode != NULL) parsedLineNo = xmlGetLineNo(aNode);
    return aNode;
 }
 
@@ -53,26 +61,26 @@ t_ftmMsg* createMsg(xmlNode* msgNode, t_ftmMsg* pMsg)
                subFieldNode = checkNode(subFieldNode, msgIdFields[i]);
                vals[i] = (uint16_t)strtou64( (const char*)xmlNodeGetContent(subFieldNode));
             }
-            else printf("ERROR %s\n", msgIdFields[i]);
+            else showError(msgIdFields[i]);
             subFieldNode =  xmlNextElementSibling(subFieldNode);
             //printf("\t %02x", vals[i]);
          }   
          pMsg->id = getId(vals[0], vals[1], vals[2], vals[3], vals[4], 0);
-   } else printf("ERROR id %s \n",  fieldNode->name);
+   } else showError("id");
    //printf("\n");
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "par");
    if(fieldNode != NULL) pMsg->par = strtou64( (const char*)xmlNodeGetContent(fieldNode));
-   else printf("ERROR par\n");
+   else showError("par");
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "tef");
    if(fieldNode != NULL) pMsg->tef = strtou64( (const char*)xmlNodeGetContent(fieldNode));
-   else printf("ERROR tef\n");
+   else showError("tef");
    
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "offs");
    
    if(fieldNode != NULL) pMsg->offs = strtou64( (const char*)xmlNodeGetContent(fieldNode))>>3;
-   else printf("ERROR offs\n");
+   else showError("offs");
    
 
    return pMsg;       
@@ -85,12 +93,12 @@ t_ftmChain* createChain(xmlNode* chainNode, t_ftmChain* pChain)
    
    fieldNode =  checkNode(chainNode->children, "meta");
    if(fieldNode != NULL) fieldNode =  fieldNode->children;
-   else printf("ERROR meta \n");
+   else showError("meta");
    
    
    fieldNode = checkNode(fieldNode, "rep");
    if(fieldNode != NULL) pChain->repQty = (int32_t)strtou64( (const char*)xmlNodeGetContent(fieldNode));
-   else printf("ERROR repQty\n");
+   else showError("repQty");
    /*
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "persistent");
    if(fieldNode != NULL) {if(strncmp( (const char*)xmlNodeGetContent(fieldNode), "yes",  3) == 0) pChain->flags |= FLAGS_IS_PERS_REP_CNT;}
@@ -98,11 +106,11 @@ t_ftmChain* createChain(xmlNode* chainNode, t_ftmChain* pChain)
    */
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "period");
    if(fieldNode != NULL) pChain->tPeriod = (uint64_t)strtou64( (const char*)xmlNodeGetContent(fieldNode))>>3;
-   else printf("ERROR Period\n");
+   else showError("period");
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "branchpoint");
    if(fieldNode != NULL) {if(strncmp( (const char*)xmlNodeGetContent(fieldNode), "yes",  3) == 0) pChain->flags |= FLAGS_IS_BP;}
-   else printf("ERROR branchpoint\n");
+   else showError("branchpoint");
    
    curNode = fieldNode;
    fieldNode = checkNode(xmlNextElementSibling(curNode), "condition");
@@ -115,15 +123,15 @@ t_ftmChain* createChain(xmlNode* chainNode, t_ftmChain* pChain)
          else  if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "msi",     3) == 0) pChain->flags |= FLAGS_IS_COND_MSI;
          else  if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "0x",      2) == 0) {strtou64( (const char*)xmlNodeGetContent(subFieldNode));
          pChain->flags |= FLAGS_IS_COND_ADR;} 
-      } else printf("ERROR cond source\n");
+      } else showError("source");
       
       subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "pattern");
       if(subFieldNode != NULL) pChain->condVal = strtou64( (const char*)xmlNodeGetContent(subFieldNode));
-      else printf("ERROR cond pattern\n");
+      else showError("pattern");
       
       subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "mask");
       if(subFieldNode != NULL) pChain->condMsk = strtou64( (const char*)xmlNodeGetContent(subFieldNode));
-      else printf("ERROR condmask\n");
+      else showError("mask");
       subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "always");
       if(subFieldNode != NULL) if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "yes",  3) == 0) pChain->flags |= FLAGS_IS_COND_ALL;
       
@@ -140,16 +148,16 @@ t_ftmChain* createChain(xmlNode* chainNode, t_ftmChain* pChain)
          else  if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "msi",     3) == 0) pChain->flags |= FLAGS_IS_SIG_MSI;
          else  if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "0x",      2) == 0) {strtou64( (const char*)xmlNodeGetContent(subFieldNode));
          pChain->flags |= FLAGS_IS_SIG_ADR;}
-      } else printf("ERROR sig destination\n");
+      } else showError("destination");
           
       
       subFieldNode = checkNode(fieldNode->children, "cpu");
       if(subFieldNode != NULL) pChain->sigCpu = (uint32_t)strtou64( (const char*)xmlNodeGetContent(subFieldNode));
-      else printf("ERROR sig cpu\n");
+      else showError("cpu");
       
       subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "value");
       if(subFieldNode != NULL) pChain->sigVal = (uint32_t)strtou64( (const char*)xmlNodeGetContent(subFieldNode));
-      else printf("ERROR sig val\n");
+      else showError("value");
       
       subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "always");
       if(subFieldNode != NULL) if(strncmp( (const char*)xmlNodeGetContent(subFieldNode), "yes",  3) == 0) pChain->flags |= FLAGS_IS_SIG_ALL;
@@ -169,7 +177,7 @@ t_ftmPage* createPage(xmlNode* pageNode, t_ftmPage* pPage)
    
    fieldNode =  checkNode(pageNode->children, "meta");
    if(fieldNode != NULL) fieldNode =  fieldNode->children;
-   else printf("ERROR meta \n");
+   else showError("meta");
    
    
    fieldNode = checkNode(fieldNode, "startplan");
@@ -179,7 +187,7 @@ t_ftmPage* createPage(xmlNode* pageNode, t_ftmPage* pPage)
       if (strcmp(planChar, "idle") == 0) pPage->idxStart = 0xdeadbeef;
       else pPage->idxStart = (uint32_t)(planChar[0] & 0xdf) - 'A';
    }
-   else printf("ERROR startplan\n");
+   else showError("startplan");
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "altplan");
    if(fieldNode != NULL)
@@ -188,7 +196,7 @@ t_ftmPage* createPage(xmlNode* pageNode, t_ftmPage* pPage)
       if (strcmp(planChar, "idle") == 0) pPage->idxBp = 0xdeadbeef;
       else pPage->idxBp = (uint32_t)(planChar[0] & 0xdf) - 'A';
    }
-   else printf("ERROR altplan\n");
+   else showError("altplan");
    return pPage;       
 }
 
@@ -230,7 +238,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
    fieldNode =  checkNode(planNode->children, "meta");
    subFieldNode = NULL;
    if(fieldNode != NULL) subFieldNode = fieldNode->children;
-   else printf("ERROR meta \n");
+   else showError("meta");
    
    
    subFieldNode = checkNode(subFieldNode, "starttime");
@@ -238,7 +246,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
    {  
        starttime = strtou64( (const char*)xmlNodeGetContent(subFieldNode));
    }
-   else printf("ERROR starttime\n");
+   else showError("starttime");
    
    subFieldNode = checkNode(xmlNextElementSibling(subFieldNode), "lastjump");
    if(subFieldNode != NULL)
@@ -247,7 +255,7 @@ t_ftmPage* convertDOM2ftmPage(xmlNode * aNode)
       if (strcmp(planChar, "self") == 0) { planIsLoop = 1; }
       else planIsLoop = 0;
    }
-   else printf("ERROR lastjump\n");
+   else showError("lastjump");
    
    chainNode = xmlNextElementSibling(fieldNode);   
 
