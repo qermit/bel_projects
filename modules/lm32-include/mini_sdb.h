@@ -28,6 +28,7 @@
 #define IRQ_TIMER_CTRL_IF     0x10040088
 #define IRQ_MSI_CTRL_IF       0x10040083
 #define IRQ_ENDPOINT          0x10050082
+#define PCIE_IRQ_ENDP         0x8a670e73
 
 #define OLED_DISPLAY          0x93a6f3c4
 #define SSD1325_SER_DRIVER    0x55d1325d
@@ -48,6 +49,8 @@
 #define WR_1Wire              0x779c5443
 #define WB_FG_QUAD            0x863e07f0
 
+#define WR_CFIPFlash          0x12122121  
+
 //periphery device pointers
 volatile unsigned int* pTlu; 
 volatile unsigned int* pEbm;     
@@ -66,6 +69,8 @@ volatile unsigned int* BASE_UART;
 volatile unsigned int* pSharedRam;
 volatile unsigned int* pCluCB;
 volatile unsigned int* pOneWire;
+
+volatile unsigned int* pCfiPFlash;
 
 typedef struct pair64 {
   unsigned int high;
