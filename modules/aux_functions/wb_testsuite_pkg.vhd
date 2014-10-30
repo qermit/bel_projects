@@ -9,6 +9,8 @@ library work;
 package wb_testsuite_pkg is
 
 
+subtype t_cmp_tmo      is std_logic_vector(2 downto 2);
+subtype t_cmp_err_ack  is std_logic_vector(1 downto 0); 
 
 subtype t_wb_ref        is std_logic_vector(3 + 32 + 32 + 32 -1 downto 0); -- expected result, timeout, msk, dat
 subtype t_wb_ref_exres  is std_logic_vector(3 + 32 + 32 + 32 -1 downto 32 + 32 + 32); -- expected result
@@ -37,28 +39,58 @@ constant c_TMO : std_logic_vector := "100";
 constant c_XDC : std_logic_vector := "111";
 
 
+constant c_ERR_NONE  : std_logic_vector := x"00";
+constant c_PASS      : std_logic_vector := x"01";
+constant c_ERR_FRZ   : std_logic_vector := x"02";
+constant c_ERR_RES   : std_logic_vector := x"04";
+constant c_ERR_VAL   : std_logic_vector := x"08";
+constant c_ERR_STL   : std_logic_vector := x"10";
+constant c_ERR_TMO   : std_logic_vector := x"20";
+
+
+constant c_iACK : natural := 1;
+constant c_iERR : natural := 2;
+constant c_iTMO : natural := 4;
+constant c_iXDC : natural := 7;
+
+
 type t_wb_data_gen is record
-    we      : std_logic;
-    adr     : t_slv32;
-    dat     : t_slv32;
-    msk     : t_slv32;
-    delay   : natural range 255 downto 0;
-    stall   : natural range 255 downto 0;
-    tmo     : natural range 65535 downto 0;
-    exres   : std_logic_vector(2 downto 0);
+    -- WB operation parameters
+    we      : std_logic;                     -- Read or Write Operation
+    adr     : t_slv32;                       -- Target Address
+    dat     : t_slv32;                       -- Write Data / Expected Read back Value
+    msk     : t_slv32;                       -- bitmask, applied on 'dat' field before write/ read back comparison.
+                                             -- Used to generate select lines for Writes. Read select lines can be overridden by g_override_rd_bsel
+    delay   : natural range 255 downto 0;    -- delay before operation is strobed
+    
+    -- validation criteria. not matching a criterium will increase the error counter
+    stall   : natural range 255 downto 0;    -- maximum tolerated stall before err count is incresed
+    tmo     : natural range 65535 downto 0;  -- timeout for acknowledgement of operation
+    exres   : std_logic_vector(2 downto 0);  -- expected result of operation. Can be one or more of ACK, ERR or timeout
 end record t_wb_data_gen;
 
 type t_wb_dgen_rep is record
-    total         : unsigned(31 downto 0); -- total number of operations
-    flag_err      : unsigned(31 downto 0); -- number of errors (unexpected err signal, freeze timeout)
-    idx_1st_flag  : unsigned(31 downto 0);
-    val_err       : unsigned(31 downto 0); -- number of warnings (unexpected ack signal, unexpected read value, op timeout) 
-    idx_1st_val   : unsigned(31 downto 0);
+    duration      : unsigned(31 downto 0); -- test duration in clock cycles
+    
+    total         : unsigned(23 downto 0); -- total number of operations
+    flags         : std_logic_vector( 7 downto 0); -- flags showing test pass or occurred error types
+    
+    err_res       : unsigned(15 downto 0); -- number of errors from unexpected result
+    err_val       : unsigned(15 downto 0); -- number of errors from mismatched readback values
+    
+    err_stall     : unsigned(15 downto 0); -- number of errors from operations that stalled too long
+    err_tmo       : unsigned(15 downto 0); -- number of errors from timed out operations (including freeze timeout)
+    
+    idx_1st_err   : unsigned(23 downto 0); -- index of the first operation that produced an error
+    type_1st_err  : std_logic_vector( 7 downto 0); -- type of the first occurred error
+    rx_val        : std_logic_vector( 31 downto 0);
+    rx_sig        : std_logic_vector( 2 downto 0);
+     -- number of value errors (unexpected readback value) 
 end record t_wb_dgen_rep;
 
+constant c_empty_rep : t_wb_dgen_rep := ( x"00000000", x"000000", x"00", x"0000", x"0000", x"0000", x"0000", x"000000", x"00", x"00000000", "000");
 
 type t_wb_data_gen_array is array(natural range <>) of t_wb_data_gen;
-
 
 component wb_data_gen is
    generic(
@@ -77,13 +109,14 @@ component wb_data_gen is
       
       data_i   : t_wb_data_gen_array;
       
-      report_o : out unsigned(31 downto 0);
+      report_o : out std_logic_vector(31 downto 0);
       
       -- Master out
       master_o : out t_wishbone_master_out;
       master_i : in  t_wishbone_master_in := ('0', '0', '0', '0', '0', x"00000000")
       );
 end component;
+
 
 
 function f_sel_2_msk          (sel     : std_logic_vector) return std_logic_vector;
@@ -96,7 +129,28 @@ function f_set_stall_column   (stall   : integer_vector; dataset : t_wb_data_gen
 function f_set_tmo_column     (tmo     : integer_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)  return t_wb_data_gen_array;
 function f_set_exres_column   (exres   : integer_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)  return t_wb_data_gen_array;
 
-function f_new_dataset       (qty   : natural) return t_wb_data_gen_array;
+function f_max(a : integer_vector) return integer;
+
+function f_new_dataset (we : std_logic_vector;
+                        adr : t_slv32_array;
+                        dat : t_slv32_array;
+                        msk : t_slv32_array;
+                        delay : integer_vector;
+                        stall : integer_vector;
+                        tmo   : integer_vector;
+                        exres : integer_vector)
+return t_wb_data_gen_array;
+
+function f_new_partial_dataset ( we : std_logic_vector   := (0 => '0');
+                                 adr : t_slv32_array     := (0 => c_NUL);
+                                 dat : t_slv32_array     := (0 => C_NUL);
+                                 msk : t_slv32_array     := (0 => c_NUL);
+                                 delay : integer_vector  := (0 => 0);
+                                 stall : integer_vector  := (0 => 0);
+                                 tmo   : integer_vector  := (0 => 65535);
+                                 exres : integer_vector  := (0 => c_iACK);
+                                 qty   : natural := 0)
+return t_wb_data_gen_array;
 
 --function f_csv_dataset    (csv : string) return t_wb_data_gen_array;
 
@@ -140,17 +194,144 @@ end wb_testsuite_pkg;
 
 package body wb_testsuite_pkg is
 
-function f_new_dataset       (qty   : natural) return t_wb_data_gen_array is
-     variable result : t_wb_data_gen_array(qty-1 downto 0);
-     variable i : natural;   
+function f_max(a : integer_vector)
+return integer is
+   variable i : natural;
+   variable result : integer;
+begin
+   result := 0;
+   for i in a'range loop
+      if(result < a(i)) then
+         result := a(i);
+      end if;   
+   end loop;
+   return result;
+end f_max;
+
+
+function f_new_partial_dataset ( we : std_logic_vector   := (0 => '0');
+                                 adr : t_slv32_array     := (0 => c_NUL);
+                                 dat : t_slv32_array     := (0 => C_NUL);
+                                 msk : t_slv32_array     := (0 => c_NUL);
+                                 delay : integer_vector  := (0 => 0);
+                                 stall : integer_vector  := (0 => 0);
+                                 tmo   : integer_vector  := (0 => 65535);
+                                 exres : integer_vector  := (0 => c_iACK);
+                                 qty   : natural := 0)
+return t_wb_data_gen_array is
+     constant max : natural := f_max((qty, we'length, adr'length, dat'length, msk'length, delay'length, stall'length, tmo'length, exres'length));
+     variable result : t_wb_data_gen_array(max-1 downto 0);
+     variable i : natural;
+     variable nwe : std_logic_vector(max-1 downto 0); 
+     variable nadr, ndat, nmsk : t_slv32_array(max-1 downto 0); 
+     variable ndelay, nstall, ntmo, nexres : integer_vector(max-1 downto 0);
+        
+   begin
+      
+     
+     --pad all vectors to max length using their last value
+      for i in we'range loop
+         nwe(i)      := we(i);
+      end loop;
+      if(we'length < max) then
+         for i in we'length to nwe'length-1 loop
+            nwe(i) := we(we'length-1);
+         end loop;   
+      end if; 
+      
+      for i in adr'range loop
+         nadr(i)     := adr(i);
+      end loop;
+      if(adr'length < max) then
+         for i in adr'length to nadr'length-1 loop
+            nadr(i) := adr(adr'length-1);
+         end loop;   
+      end if;
+      
+      for i in dat'range loop
+         ndat(i)     := dat(i);
+      end loop;
+      if(dat'length < max) then
+         for i in dat'length to ndat'length-1 loop
+            ndat(i) := dat(dat'length-1);
+         end loop;   
+      end if; 
+      
+      for i in msk'range loop
+         nmsk(i)     := msk(i);
+      end loop;
+      if(msk'length < max) then
+         for i in msk'length to nmsk'length-1 loop
+            nmsk(i) := msk(msk'length-1);
+         end loop;   
+      end if;  
+      
+      for i in delay'range loop
+         ndelay(i)   := delay(i);
+      end loop;     
+      if(delay'length < max) then
+         for i in delay'length to ndelay'length-1 loop
+            ndelay(i) := delay(delay'length-1);
+         end loop;   
+      end if;  
+      
+      for i in stall'range loop
+         nstall(i)   := stall(i);
+      end loop;
+      if(stall'length < max) then
+         for i in stall'length to nstall'length-1 loop
+            nstall(i) := stall(stall'length-1);
+         end loop;   
+      end if;
+      
+      for i in tmo'range loop
+         ntmo(i)     := tmo(i);
+      end loop;
+      if(tmo'length < max) then
+         for i in tmo'length to ntmo'length-1 loop
+            ntmo(i) := tmo(tmo'length-1);
+         end loop;   
+      end if;
+      
+      for i in exres'range loop
+         nexres(i)   := exres(i);
+      end loop;
+      if(exres'length < max) then
+         for i in exres'length to nexres'length-1 loop
+            nexres(i) := exres(exres'length-1);
+         end loop;   
+      end if;  
+        
+     return f_new_dataset(nwe, nadr, ndat, nmsk, ndelay, nstall, ntmo, nexres);
+     
+end f_new_partial_dataset;
+
+
+
+
+function f_new_dataset (we : std_logic_vector;
+                        adr : t_slv32_array;
+                        dat : t_slv32_array;
+                        msk : t_slv32_array;
+                        delay : integer_vector;
+                        stall : integer_vector;
+                        tmo   : integer_vector;
+                        exres : integer_vector)
+return t_wb_data_gen_array is
+   constant max : natural := f_max((we'length, adr'length, dat'length, msk'length, delay'length, stall'length, tmo'length, exres'length));
+   variable result : t_wb_data_gen_array(max-1 downto 0);
+   variable i : natural;
+
    begin
      for i in result'range loop 
-      result(i).we      := '0';
-      result(i).adr     := (others => '0');
-      result(i).dat     := (others => '0');
-      result(i).msk     := (others => '1');
-      result(i).delay   := 0;
-      result(i).exres   := "111";
+      result(i).we      := we(i);
+      result(i).adr     := adr(i);
+      result(i).dat     := dat(i);
+      result(i).msk     := msk(i);
+      result(i).delay   := delay(i);
+      result(i).stall   := stall(i);
+      result(i).tmo     := tmo(i);
+      result(i).exres   := std_logic_vector(to_unsigned(exres(i), 3));
      end loop;
      return result;
 end f_new_dataset;
