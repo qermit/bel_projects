@@ -8,7 +8,7 @@ library work;
 
 package wb_testsuite_pkg is
 
-
+-- subtypes for easy 'range access of slices
 subtype t_cmp_tmo      is std_logic_vector(2 downto 2);
 subtype t_cmp_err_ack  is std_logic_vector(1 downto 0); 
 
@@ -23,37 +23,39 @@ subtype t_wb_rx_res     is std_logic_vector(2 + 32 + 32 -1 downto 32 + 32); -- r
 subtype t_wb_rx_ts      is std_logic_vector(32 +32 -1 downto 32); -- timestamp
 subtype t_wb_rx_dat     is std_logic_vector(32 -1 downto 0); -- dat
 
+--std logic vectors
+subtype t_slv32 is std_logic_vector(31 downto 0); -- 32 bit standard logic vector (slv)
+type t_slv32_array  is array(natural range <>) of t_slv32; -- array of 32 bit slv
 
+--constants
+constant c_NUL : t_slv32 := (others => '0'); -- 32 bit slv, no bits set
+constant c_ALL : t_slv32 := (others => '1'); -- 32 bit slv, all bits set
+constant c_WR : std_logic := '1';            -- WB Write Operation
+constant c_RD : std_logic := '0';            -- WB Read Operation
 
-subtype t_slv32 is std_logic_vector(31 downto 0); 
+--expected result constants
+constant c_ACK : std_logic_vector := "001";  -- expect ACK
+constant c_ERR : std_logic_vector := "010";  -- expect ERR
+constant c_TMO : std_logic_vector := "100";  -- expect Timeout
+constant c_XDC : std_logic_vector := "111";  -- expect ACK or ERR or Timeout
 
-type t_slv32_array  is array(natural range <>) of t_slv32; 
-
-constant c_NUL : t_slv32 := (others => '0');
-constant c_ALL : t_slv32 := (others => '1');
-constant c_WR : std_logic := '1';
-constant c_RD : std_logic := '0';
-constant c_ACK : std_logic_vector := "001";
-constant c_ERR : std_logic_vector := "010";
-constant c_TMO : std_logic_vector := "100";
-constant c_XDC : std_logic_vector := "111";
-
-
-constant c_ERR_NONE  : std_logic_vector := x"00";
-constant c_PASS      : std_logic_vector := x"01";
-constant c_ERR_FRZ   : std_logic_vector := x"02";
-constant c_ERR_RES   : std_logic_vector := x"04";
-constant c_ERR_VAL   : std_logic_vector := x"08";
-constant c_ERR_STL   : std_logic_vector := x"10";
-constant c_ERR_TMO   : std_logic_vector := x"20";
-
-
+--integer version of above for integervector creation
 constant c_iACK : natural := 1;
 constant c_iERR : natural := 2;
 constant c_iTMO : natural := 4;
 constant c_iXDC : natural := 7;
 
+--report constants
+constant c_ERR_NONE  : std_logic_vector := x"00"; -- no error found
+constant c_PASS      : std_logic_vector := x"01"; -- test passed
+constant c_ERR_FRZ   : std_logic_vector := x"02"; -- complete freeze detected
+constant c_ERR_RES   : std_logic_vector := x"04"; -- bad operation result (Timeout/ERR/ACK)
+constant c_ERR_VAL   : std_logic_vector := x"08"; -- bad readback value
+constant c_ERR_STL   : std_logic_vector := x"10"; -- stalled too long
+constant c_ERR_TMO   : std_logic_vector := x"20"; -- reply timed out
 
+
+-- records
 type t_wb_data_gen is record
     -- WB operation parameters
     we      : std_logic;                     -- Read or Write Operation
@@ -117,8 +119,19 @@ component wb_data_gen is
       );
 end component;
 
+-- functions
 
+-- output
+function f_set_wb_out(a : t_wb_data_gen; enabled, send_now : std_logic; ovr_rd_bsel : std_logic_vector) return t_wishbone_master_out;
+function f_set_wb_ref(a : t_wb_data_gen; rtime : unsigned) return t_wb_ref;
+function f_set_wb_rx(a : t_wishbone_master_in; rtime : unsigned) return t_wb_rx;
 
+-- conversion etc
+function "&" (a, b : t_wb_data_gen_array) return t_wb_data_gen_array; 
+function to_slv32_vector(a : integer_vector) return t_slv32_array;
+function to_slv32(a : natural) return t_slv32;
+
+-- dataset manipulation
 function f_sel_2_msk          (sel     : std_logic_vector) return std_logic_vector;
 function f_set_we_column      (we      : std_logic_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)   return t_wb_data_gen_array;
 function f_set_adr_column     (adr     : t_slv32_array; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)   return t_wb_data_gen_array;
@@ -128,8 +141,6 @@ function f_set_delay_column   (delay   : integer_vector; dataset : t_wb_data_gen
 function f_set_stall_column   (stall   : integer_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)  return t_wb_data_gen_array;
 function f_set_tmo_column     (tmo     : integer_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)  return t_wb_data_gen_array;
 function f_set_exres_column   (exres   : integer_vector; dataset : t_wb_data_gen_array; b : integer := 0; e : integer := -1)  return t_wb_data_gen_array;
-
-function f_max(a : integer_vector) return integer;
 
 function f_new_dataset (we : std_logic_vector;
                         adr : t_slv32_array;
@@ -152,31 +163,16 @@ function f_new_partial_dataset ( we : std_logic_vector   := (0 => '0');
                                  qty   : natural := 0)
 return t_wb_data_gen_array;
 
---function f_csv_dataset    (csv : string) return t_wb_data_gen_array;
+--TODO: function f_csv_dataset    (csv : string) return t_wb_data_gen_array;
 
-function f_concat_dataset (a : t_wb_data_gen_array; b : t_wb_data_gen_array) return t_wb_data_gen_array; 
-
-function f_set_wb_out(a : t_wb_data_gen; enabled, send_now : std_logic; ovr_rd_bsel : std_logic_vector) return t_wishbone_master_out;
-function f_set_wb_ref(a : t_wb_data_gen; rtime : unsigned) return t_wb_ref;
-function f_set_wb_rx(a : t_wishbone_master_in; rtime : unsigned) return t_wb_rx;
-
-function to_slv32_vector(a : integer_vector) return t_slv32_array;
-function to_slv32(a : natural) return t_slv32;
-
-shared variable RV : RandomPType;
--- raw data generation
-
-
---impure function f_set_seed(s : natural) return;
- 
-
-
-function f_lin_space(  first : natural;
+-- raw data creation
+function f_lin_space(first : natural;
                      last  : natural;
                      step  : natural;
-                     qty   : natural)
+                     qty   : natural := 0)
 return integer_vector;
 
+shared variable RV : RandomPType;
 impure function f_rnd_bound( lower_bound : integer;
                         upper_Bound : integer;
                         qty         : natural )
@@ -188,8 +184,6 @@ impure function f_rnd_bits(  prob_hi     : natural := 50;
                     qty         : natural)
 return std_logic_vector;
 
-
- 
 end wb_testsuite_pkg;
 
 package body wb_testsuite_pkg is
@@ -495,37 +489,55 @@ function f_set_exres_column    (exres : integer_vector; dataset : t_wb_data_gen_
 end f_set_exres_column;
 
 
+function f_ret_non_zero(a : natural;
+                        b : natural)
+return integer is
+begin                        
 
-function f_lin_space(     first : natural;
+   if( a /= 0 ) then
+      return a;
+   else
+      return b;
+   end if;
+end f_ret_non_zero;          
+
+function f_lin_space(   first : natural;
                         last  : natural;
                         step  : natural;
-                        qty   : natural)
+                        qty   : natural := 0)
 return integer_vector is
-      variable tmp    : natural;    
-      variable result : integer_vector(qty-1 downto 0);
-      variable i : natural;
+      constant delta    : natural := abs (last-first);
+      constant qtystep  : natural := ((delta + step - 1) / step) +1;
+
+      
+      constant len      : natural := f_ret_non_zero(qty, qtystep);
+      variable tmp      : natural;    
+      variable result   : integer_vector(len-1 downto 0);
+      variable i        : natural;
    begin
    
     
-    tmp := first;
+   tmp := first;
+   
     
-    if(first <= last) then
-       for i in 0 to qty-1 loop
+   if(first <= last) then
+      for i in 0 to len-1 loop
          result(i) := tmp;
          if (tmp + step <= last) then
            tmp := tmp + step;
          end if;
-       end loop; 
-    else
-      for i in 0 to qty-1 loop
+      end loop;
+   else
+      for i in 0 to len-1 loop
          result(i) := tmp;
          if (tmp - step >= last) then
            tmp := tmp - step;
          end if;
-       end loop;
-    end if;
+      end loop;
+   end if;
     
-    return result;
+   return result;
+   
 end f_lin_space;
 
 impure function f_rnd_bound( lower_bound : integer;
@@ -577,7 +589,7 @@ begin
    return result;
 end f_rnd_bits;
 
-function f_concat_dataset (a : t_wb_data_gen_array; b : t_wb_data_gen_array)
+function "&" (a, b : t_wb_data_gen_array)
 return t_wb_data_gen_array is 
    variable result : t_wb_data_gen_array( a'length + b'length -1 downto 0);  
    variable i : natural;
@@ -591,7 +603,7 @@ begin
    end loop; 
    return result;
    
-end f_concat_dataset;
+end "&";
 
 function f_set_wb_out(a : t_wb_data_gen; enabled, send_now : std_logic; ovr_rd_bsel : std_logic_vector)
 return t_wishbone_master_out is 
