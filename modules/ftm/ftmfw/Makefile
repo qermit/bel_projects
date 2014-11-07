@@ -3,7 +3,7 @@ CC        := lm32-elf-gcc
 DEBUGLVL  = 0
 TARGET    = ftm
 MYPATH    = .
-CHECKOUT  = /home/mkreider/hdlprojects/new_bel_projects
+CHECKOUT  = ../../..
 INCPATH   = $(CHECKOUT)/modules/lm32-include
 W1        = $(CHECKOUT)/ip_cores/wrpc-sw
 CFLAGS    = -I$(INCPATH) -mmultiply-enabled -mbarrel-shift-enabled -Os -I$(W1)/include -I$(W1)/pp_printf -DDEBUGLEVEL=$(DEBUGLVL)
