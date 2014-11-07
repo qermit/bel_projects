@@ -290,141 +290,153 @@ begin
          s_done   <= '0';
          
          case r_rx_state is
-            when e_IDLE       => rep <= c_empty_rep;
-                                 s_rx_done <= '0';
-                                 if(start_i = '1') then
-                                    r_rx_state <= e_RUNNING;
-                                 end if;
-            when e_RUNNING    => -- TODO: TX op counts
-                                 rep.duration <= rep.duration +1;
-                                 if(ref_fifo_pop = '1') then
-                                 rep.total <= rep.total +1;
-                              
-                                 
-                                 if(s_freeze_tmo = '1') then
-                                    -- freeze ?
-                                    rep.err_tmo <= rep.err_tmo +1;
-                                    rep.flags   <= rep.flags or c_ERR_FRZ;
-                                    -- note index of first error
-                                    if(rep.flags = c_ERR_NONE) then
-                                       rep.idx_1st_err   <= rep.total;
-                                       rep.type_1st_err  <= c_ERR_FRZ;
-                                    end if;
-                                 end if;
-                                 
-                                  if(s_cmp_flag(t_cmp_tmo'range) /= "0") then
-                                    -- unexpected timeout
-                                    rep.err_tmo <= rep.err_tmo +1;
-                                    rep.flags   <= rep.flags or c_ERR_TMO;
-                                    -- note index of first error
-                                    if(rep.flags = c_ERR_NONE) then
-                                       rep.idx_1st_err   <= rep.total;
-                                       rep.type_1st_err  <= c_ERR_TMO;
-                                       rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
-                                       rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
-                                    end if;
-                                 end if;   
-                                 
-                                 
-                                 if(s_cmp_flag(t_cmp_err_ack'range) /= "00") then
-                                    -- if expected ack/err does not match...
-                                    rep.err_res <= rep.err_res +1;
-                                    rep.flags   <= rep.flags or c_ERR_RES;
-                                    -- note index of first error
-                                    if(rep.flags = c_ERR_NONE) then
-                                       rep.idx_1st_err   <= rep.total;
-                                       rep.type_1st_err  <= c_ERR_RES;
-                                       rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
-                                       rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
-                                    end if;
-                                 end if;
-                              
-                                 if(s_cmp_val /= std_logic_vector(to_unsigned(0, s_cmp_val'length))) then
-                                    -- if expected values do not match, there was a value error
-                                    rep.err_val <= rep.err_val +1;
-                                    rep.flags   <= rep.flags or c_ERR_VAL;
-                                    -- note index of first error
-                                    if(rep.flags = c_ERR_NONE) then
-                                       rep.idx_1st_err   <= rep.total;
-                                       rep.type_1st_err  <= c_ERR_VAL;
-                                       rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
-                                       rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
-                                    end if;
-                                 end if;
-                                 
-                                 -- if, including current element, these were all, or freeze timeout occurred, we're done
-                                 if(rep.total = data_i'length or s_freeze_tmo = '1') then
-                                    s_rx_done <= '1';
-                                    if(rep.flags = c_ERR_NONE) then
-                                       rep.flags <= c_PASS;
-                                    end if;
-                                    r_rx_state <= e_FINISH0;
-                                 end if;
-                              end if;
-                              
-                              -- if these were all, or freeze timeout occurred, we're done
-                              if(rep.total = data_i'length or s_freeze_tmo = '1') then
-                                 s_rx_done <= '1';
-                                 if(rep.flags = c_ERR_NONE) then
-                                    rep.flags <= c_PASS;
-                                 end if;
-                                 r_rx_state <= e_FINISH0;
-                              end if;
-                              
+            --+-----------------------------------------------------------------------------------------------+
+            when e_IDLE       => 
+            
+               rep <= c_empty_rep;
+               s_rx_done <= '0';
+               if(start_i = '1') then
+                  r_rx_state <= e_RUNNING;
+               end if;
+            --+-----------------------------------------------------------------------------------------------+   
+            when e_RUNNING    => 
+               -- TODO: TX op counts
+               rep.duration <= rep.duration +1;
+               if(ref_fifo_pop = '1') then
+                  rep.total <= rep.total +1;
+               
+                  
+                  if(s_freeze_tmo = '1') then
+                     -- freeze ?
+                     rep.err_tmo <= rep.err_tmo +1;
+                     rep.flags   <= rep.flags or c_ERR_FRZ;
+                     -- note index of first error
+                     if(rep.flags = c_ERR_NONE) then
+                        rep.idx_1st_err   <= rep.total;
+                        rep.type_1st_err  <= c_ERR_FRZ;
+                     end if;
+                  end if;
+                  
+                   if(s_cmp_flag(t_cmp_tmo'range) /= "0") then
+                     -- unexpected timeout
+                     rep.err_tmo <= rep.err_tmo +1;
+                     rep.flags   <= rep.flags or c_ERR_TMO;
+                     -- note index of first error
+                     if(rep.flags = c_ERR_NONE) then
+                        rep.idx_1st_err   <= rep.total;
+                        rep.type_1st_err  <= c_ERR_TMO;
+                        rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
+                        rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
+                     end if;
+                  end if;   
+                  
+                  
+                  if(s_cmp_flag(t_cmp_err_ack'range) /= "00") then
+                     -- if expected ack/err does not match...
+                     rep.err_res <= rep.err_res +1;
+                     rep.flags   <= rep.flags or c_ERR_RES;
+                     -- note index of first error
+                     if(rep.flags = c_ERR_NONE) then
+                        rep.idx_1st_err   <= rep.total;
+                        rep.type_1st_err  <= c_ERR_RES;
+                        rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
+                        rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
+                     end if;
+                  end if;
+               
+                  if(s_cmp_val /= std_logic_vector(to_unsigned(0, s_cmp_val'length))) then
+                     -- if expected values do not match, there was a value error
+                     rep.err_val <= rep.err_val +1;
+                     rep.flags   <= rep.flags or c_ERR_VAL;
+                     -- note index of first error
+                     if(rep.flags = c_ERR_NONE) then
+                        rep.idx_1st_err   <= rep.total;
+                        rep.type_1st_err  <= c_ERR_VAL;
+                        rep.rx_sig        <= (s_rx_tmo & rx_fifo_q(t_wb_rx_res'range));
+                        rep.rx_val        <= (ref_fifo_q(t_wb_ref_msk'range) and rx_fifo_q(t_wb_rx_dat'range));
+                     end if;
+                  end if;
+                  
+                  -- if, including current element, these were all, or freeze timeout occurred, we're done
+                  if(rep.total = data_i'length or s_freeze_tmo = '1') then
+                     s_rx_done <= '1';
+                     if(rep.flags = c_ERR_NONE) then
+                        rep.flags <= c_PASS;
+                     end if;
+                     r_rx_state <= e_FINISH0;
+                  end if;
+               end if;
+            
+               -- if these were all, or freeze timeout occurred, we're done
+               if(rep.total = data_i'length or s_freeze_tmo = '1') then
+                  s_rx_done <= '1';
+                  if(rep.flags = c_ERR_NONE) then
+                     rep.flags <= c_PASS;
+                  end if;
+                  r_rx_state <= e_FINISH0;
+               end if;
+            --+-----------------------------------------------------------------------------------------------+                     
             when e_FINISH0  =>   
-                                 s_done   <= '1';
-                                 
-                                 
-                                 report_o <= std_logic_vector(rep.duration);
-                                 r_rx_state <= e_FINISH1; 
-            when e_FINISH1  =>   s_done   <= '1';
-                                 report_o <= rep.flags & std_logic_vector(rep.total);
-                                 r_rx_state <= e_FINISH2;
+               
+               s_done   <= '1';
+               report_o <= std_logic_vector(rep.duration);
+               r_rx_state <= e_FINISH1;
+            --+-----------------------------------------------------------------------------------------------+    
+            when e_FINISH1  =>   
+               s_done   <= '1';
+               report_o <= rep.flags & std_logic_vector(rep.total);
+               r_rx_state <= e_FINISH2;
+            --+-----------------------------------------------------------------------------------------------+   
             when e_FINISH2  =>   s_done   <= '1';
                                  report_o <= std_logic_vector(rep.err_res & rep.err_val);
                                  r_rx_state <= e_FINISH3;
+            
+            --+-----------------------------------------------------------------------------------------------+                     
             when e_FINISH3  =>   s_done   <= '1';
                                  report_o <= std_logic_vector(rep.err_stall & rep.err_tmo);
                                  r_rx_state <= e_FINISH4;
-            when e_FINISH4  =>   s_done   <= '1';
-                                 report_o <= rep.type_1st_err & std_logic_vector(rep.idx_1st_err);
-                                 r_rx_state <= e_IDLE;
-                                 if(rep.flags = c_PASS) then
-                                    report lf & lf & "##############################" & lf & lf & "#  +++ Test PASSED +++" & lf & lf & 
-                                    "#  Elapsed Time      : " & integer'image(to_integer(rep.duration)) & lf &
-                                    "#  WB Operations     : " & integer'image(to_integer(rep.total)) & lf & 
-                                    "#  Flags             : " & f_bits2string(rep.flags) & lf & 
-                                    "##############################"  & lf & lf severity failure;
-                                    
-                                 else
-                                   report lf & lf & 
-                                    "##############################" & lf & lf & 
-                                    "#  +++ !!!Test FAILED!!! +++" & lf & lf & 
-                                    "#  Elapsed Time      : " & integer'image(to_integer(rep.duration)) & lf &
-                                    "#  WB Operations     : " & integer'image(to_integer(rep.total)) & lf & 
-                                    "#  Flags             : " & f_bits2string(rep.flags) & lf &
-                                    "#  bad ERR/ACK       : " & integer'image(to_integer(rep.err_res)) & lf & 
-                                    "#  bad readback val  : " & integer'image(to_integer(rep.err_val)) & lf & 
-                                    "#  stalled too long  : " & integer'image(to_integer(rep.err_stall)) & lf & 
-                                    "#  reply timed out   : " & integer'image(to_integer(rep.err_tmo)) & lf & 
-                                    "#  Idx  of 1st error : " & integer'image(to_integer(rep.idx_1st_err)) & lf &
-                                    "#  Type of 1st error : " & f_bits2string(rep.type_1st_err) & lf & lf &
-                                    "##############################" & lf & lf &
-                                    "#  Failed Op @ " & integer'image(to_integer(rep.idx_1st_err)) & " ***" & lf &
-                                    "#     We               : " & f_bits2string((0 => data_i(to_integer(rep.idx_1st_err)).we)) & lf &
-                                    "#     Address          : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).adr) & lf &
-                                    "#     Data             : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).dat) & lf &
-                                    "#     Mask             : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).msk) & lf &
-                                    "#     Delay            : " & integer'image(data_i(to_integer(rep.idx_1st_err)).delay) & lf &
-                                    "#     Stall            : " & integer'image(data_i(to_integer(rep.idx_1st_err)).stall) & lf &
-                                    "#     Timeout          : " & integer'image(data_i(to_integer(rep.idx_1st_err)).tmo) & lf & lf &
-                                    "#     Exp. Readback    : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).dat and data_i(to_integer(rep.idx_1st_err)).msk) & lf & 
-                                    "#     Rec. Readback    : " & f_bits2string(rep.rx_val) & lf & lf &
-                                    "#     Exp. TMO/ERR/ACK : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).exres) & lf & 
-                                    "#     Rec. TMO/ERR/ACK : " & f_bits2string(rep.rx_sig) & lf & lf &
-                                    "##############################"  & lf & lf severity failure;
-                                 end if;
-            
+            --+-----------------------------------------------------------------------------------------------+                     
+            when e_FINISH4  =>
+               
+               s_done   <= '1';
+               report_o <= rep.type_1st_err & std_logic_vector(rep.idx_1st_err);
+               r_rx_state <= e_IDLE;
+               if(rep.flags = c_PASS) then
+                  report lf & lf & "##############################" & lf & lf & "#  +++ Test PASSED +++" & lf & lf & 
+                  "#  Elapsed Time      : " & integer'image(to_integer(rep.duration)) & lf &
+                  "#  WB Operations     : " & integer'image(to_integer(rep.total)) & lf & 
+                  "#  Flags             : " & f_bits2string(rep.flags) & lf & 
+                  "##############################"  & lf & lf severity failure;
+                  
+               else
+                 report lf & lf & 
+                  "##############################" & lf & lf & 
+                  "#  +++ !!!Test FAILED!!! +++" & lf & lf & 
+                  "#  Elapsed Time      : " & integer'image(to_integer(rep.duration)) & lf &
+                  "#  WB Operations     : " & integer'image(to_integer(rep.total)) & lf & 
+                  "#  Flags             : " & f_bits2string(rep.flags) & lf &
+                  "#  bad ERR/ACK       : " & integer'image(to_integer(rep.err_res)) & lf & 
+                  "#  bad readback val  : " & integer'image(to_integer(rep.err_val)) & lf & 
+                  "#  stalled too long  : " & integer'image(to_integer(rep.err_stall)) & lf & 
+                  "#  reply timed out   : " & integer'image(to_integer(rep.err_tmo)) & lf & 
+                  "#  Idx  of 1st error : " & integer'image(to_integer(rep.idx_1st_err)) & lf &
+                  "#  Type of 1st error : " & f_bits2string(rep.type_1st_err) & lf & lf &
+                  "##############################" & lf & lf &
+                  "#  Failed Op @ " & integer'image(to_integer(rep.idx_1st_err)) & " ***" & lf &
+                  "#     We               : " & f_bits2string((0 => data_i(to_integer(rep.idx_1st_err)).we)) & lf &
+                  "#     Address          : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).adr) & lf &
+                  "#     Data             : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).dat) & lf &
+                  "#     Mask             : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).msk) & lf &
+                  "#     Delay            : " & integer'image(data_i(to_integer(rep.idx_1st_err)).delay) & lf &
+                  "#     Stall            : " & integer'image(data_i(to_integer(rep.idx_1st_err)).stall) & lf &
+                  "#     Timeout          : " & integer'image(data_i(to_integer(rep.idx_1st_err)).tmo) & lf & lf &
+                  "#     Exp. Readback    : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).dat and data_i(to_integer(rep.idx_1st_err)).msk) & lf & 
+                  "#     Rec. Readback    : " & f_bits2string(rep.rx_val) & lf & lf &
+                  "#     Exp. TMO/ERR/ACK : " & f_bits2string(data_i(to_integer(rep.idx_1st_err)).exres) & lf & 
+                  "#     Rec. TMO/ERR/ACK : " & f_bits2string(rep.rx_sig) & lf & lf &
+                  "##############################"  & lf & lf severity failure;
+               end if;
+               
             when e_ERROR   => r_rx_state <= e_IDLE; 
             when others    => r_rx_state <= e_ERROR;
          end case;    

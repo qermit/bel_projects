@@ -35,6 +35,9 @@ signal r_time : std_logic_vector(63 downto 0);
 
 signal s_triggers : t_trigger_array(c_num_triggers-1 downto 0);
 
+signal rangetest0 : std_logic_vector(15 downto 8);
+signal rangetest1 : std_logic_vector(7 downto 0);
+
 --+###############################################################################################+
 --|                                DUT Register Layout                                            |
 --+-----------------------------------------------------------------------------------------------+
@@ -331,6 +334,8 @@ begin
 --      end if;
 --      end if;
 -- end process;
+   
+   rangetest1 <= rangetest0(rangetest0'range - 8); 
    
    stimulus: process
       variable i, j : natural;

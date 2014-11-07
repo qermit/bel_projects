@@ -152,6 +152,8 @@ function f_new_dataset (we : std_logic_vector;
                         exres : integer_vector)
 return t_wb_data_gen_array;
 
+
+
 function f_new_partial_dataset ( we : std_logic_vector   := (0 => '0');
                                  adr : t_slv32_array     := (0 => c_NUL);
                                  dat : t_slv32_array     := (0 => C_NUL);
@@ -179,9 +181,9 @@ impure function f_rnd_bound( lower_bound : integer;
 return integer_vector;
 
 
-impure function f_rnd_bits(  prob_hi     : natural := 50;
-                    max_streak  : integer := -1; 
-                    qty         : natural)
+impure function f_rnd_bits(prob_hi     : natural := 50;
+                           max_streak  : integer := -1; 
+                           qty         : natural)
 return std_logic_vector;
 
 end wb_testsuite_pkg;
