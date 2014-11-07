@@ -121,7 +121,8 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_BP],         pPage->pBp);
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_START],      pPage->pStart);
-   uint32ToBytes(&pBufStart[FTM_PAGE_PTR_SHAREDMEM],  pPage->pSharedMem);
+   //printf ("Shared mem will be at %08x", pPage->pSharedMem);
+   //uint32ToBytes(&pBufStart[FTM_PAGE_PTR_SHAREDMEM],  pPage->pSharedMem);
    
    return pBuf;   
 }

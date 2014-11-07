@@ -23,12 +23,14 @@ const uint32_t devID_Reset       = 0x3a362063;
 const uint32_t devID_RAM         = 0x66cfeb52;
 const uint64_t vendID_CERN       = 0x000000000000ce42;
 const uint32_t devID_ClusterInfo = 0x10040086;
+const uint32_t devID_ClusterCB   = 0x10041000;
 const uint64_t vendID_GSI        = 0x0000000000000651;
+
 char           devName_RAM_pre[] = "WB4-BlockRAM_";
 
 eb_data_t tmpRead[2];
       
-volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset;
+volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset, clusterOffset;
 uint8_t error, verbose, readonly;
 volatile uint32_t cpuQty;
 
@@ -137,7 +139,12 @@ void ebRamOpen(const char* netaddress, uint8_t cpuId)
       fprintf(stderr, "%s: device #%d could not be found; only %d present\n", program, idx, num_devices);
       goto error;
    }
-      
+   
+   //FIXME:
+   //bad hack, but eb_sdb_find_by_identity doesn't seemt to return crossbars. 
+   //cut off 0x100 from cluster info rom to get base address
+   clusterOffset = (eb_address_t)devices[0].sdb_component.addr_first & 0xfffffe00;
+   
    //get number of CPUs and create search string
    status = eb_device_read(device, (eb_address_t)devices[0].sdb_component.addr_first, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0], 0, eb_block);
    if (status != EB_OK) die(status, "failed to create cycle");
@@ -193,6 +200,8 @@ void ebRamOpen(const char* netaddress, uint8_t cpuId)
    
    actOffset = (uint32_t) tmpRead[0];
    inaOffset = (uint32_t) tmpRead[1];
+   
+   
    
    return;
    
@@ -325,12 +334,16 @@ static void help(void) {
 
 static void status(uint8_t cpuId)
 {
-       uint32_t ftmStatus;
+       uint32_t ftmStatus, sharedMem;
        eb_status_t status;
        
     if ((status = eb_device_read(device, embeddedOffset + FTM_STAT_OFFSET, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0], 0, eb_block)) != EB_OK)
-    die(status, "failed to read");  
+    die(status, "failed to read");
     ftmStatus = (uint32_t) tmpRead[0];
+    if ((status = eb_device_read(device, embeddedOffset + FTM_SHARED_PTR_OFFSET, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1], 0, eb_block)) != EB_OK)
+    die(status, "failed to read");   
+    sharedMem = clusterOffset + ((uint32_t) tmpRead[1] & 0x3fffffff); //convert lm32's view to pcie's view
+    
     printf("***********************************************************************************\n");
     printf("** Core #%u: Status: %08x MsgCnt: %8u                                    **\n", cpuId, ftmStatus, (ftmStatus >> 16));
     printf("***********************************************************************************\n");
@@ -342,10 +355,11 @@ static void status(uint8_t cpuId)
     if(ftmStatus & STAT_WAIT)       printf("WAIT_COND\t");  else printf("    -    \t");
     printf("\n");
     printf("-----------------------------------------------------------------------------------\n");
-    if(actOffset < inaOffset) printf("  Active Page: A @ 0x%08x\nInactive Page: B @ 0x%08x\n", actOffset, inaOffset);
-    else                      printf("  Active Page: B @ 0x%08x\nInactive Page: A @ 0x%08x\n", actOffset, inaOffset);
+    if(actOffset < inaOffset) printf("  Act Page: A @ 0x%08x Inact Page: B @ 0x%08x", actOffset, inaOffset);
+    else                      printf("  Act Page: B @ 0x%08x Inact Page: A @ 0x%08x", actOffset, inaOffset);
+    printf("  Shared Mem @ 0x%08x\n", sharedMem);
     printf("-----------------------------------------------------------------------------------\n");
-    
+
 }
 
 int main(int argc, char** argv) {

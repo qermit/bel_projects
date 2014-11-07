@@ -120,12 +120,15 @@ void main(void) {
    int j;
 
    init();
+
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    mprintf("\n");
 
    while (1) {
       cmdEval();
       processFtm();
+     // mprintf("stat 0x%08x def 0x%08x CluShared 0x%08x def 0x%08x val 0x%08x \n", &pFtmIf->status, FTM_STAT_OFFSET, &pFtmIf->pSharedMem, pFtmIf->pSharedMem, FTM_SHARED_PTR_OFFSET);
+      //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    }
 
 }

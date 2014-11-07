@@ -143,11 +143,11 @@ typedef struct {
    t_ftmPage*  pAct;
    t_ftmPage*  pIna;
    t_ftmChain* pNewBp;
+   t_shared*   pSharedMem;
    uint64_t    tPrep;
    uint64_t    tDue;
    uint64_t    tTrn;
    t_ftmChain  idle;
-   t_shared*   pSharedMem;
    t_semaphore sema;
    uint16_t    sctr;
 } t_ftmIf;

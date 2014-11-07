@@ -13,11 +13,16 @@
 #define FTM_SHARED_OFFSET   0xC000
 #define FTM_CMD_OFFSET      (FTM_SHARED_OFFSET  + 2*FTM_PAGESIZE)
 
-#define FTM_STAT_OFFSET     (FTM_CMD_OFFSET     + 4)
-#define FTM_PACT_OFFSET     (FTM_STAT_OFFSET    + 4)
-#define FTM_PINA_OFFSET     (FTM_PACT_OFFSET    + 4)
-#define FTM_TPREP_OFFSET    (FTM_PINA_OFFSET    + 4)
-#define FTM_IDLE_OFFSET     (FTM_TPREP_OFFSET   + 8)
+#define FTM_STAT_OFFSET       (FTM_CMD_OFFSET      + 4) //9c    uint32_t    status;
+#define FTM_PACT_OFFSET       (FTM_STAT_OFFSET     + 4) //a0    t_ftmPage*  pAct;
+#define FTM_PINA_OFFSET       (FTM_PACT_OFFSET     + 4) //a4    t_ftmPage*  pIna;
+#define FTM_NEW_BP_OFFSET     (FTM_PINA_OFFSET     + 4) //a8    t_ftmChain* pNewBp;
+#define FTM_SHARED_PTR_OFFSET (FTM_NEW_BP_OFFSET   + 4) //ac    t_shared*   pSharedMem;
+#define FTM_TPREP_OFFSET      (FTM_SHARED_PTR_OFFSET + 4) //b0    int64_t    tPrep;
+#define FTM_TDUE_OFFSET       (FTM_TPREP_OFFSET    + 8) //b8    uint64_t    tDue;
+#define FTM_TTRN_OFFSET       (FTM_TDUE_OFFSET     + 8) //c0    uint64_t    tTrn;
+#define FTM_IDLE_OFFSET       (FTM_TTRN_OFFSET + 8)     //c8
+
 
 //masks & constants
 #define CMD_RST           		0x0001	//Reset FTM status and counters
