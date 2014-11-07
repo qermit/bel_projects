@@ -1,0 +1,101 @@
+FAIR Data Master Control Tool - ftm-ctl
+
+checkout from SVN:
+
+
+
+run
+   make all
+   
+All necessary files are now in <checkout_dir>/ftm-tools   
+
+
+FTM Console Output:
+You can connect to the console of the FTM via <bel_projects_path>/tools/eb-console <device> to see local status prints
+Make sure you deactivate WR GUI by pressing 'Esc' once
+
+ftm-ctl:
+Connection works over Etherbone USB, PCIe or UDP to FTM device (dev/ttyUSB0, dev/wbm0, udp/192.168.191.74, etc)
+
+1 Most Important commands
+
+FTM Cores are selected with '-c <n>' parameter. You can apply a command to all cores with n = -1.
+
+1.1   load firmware to all cores (ftm.bin)
+      
+      ftm-ctl <device> loadfw -c -1 <myfirmware.bin>
+      
+1.2   load control xml to core
+      
+      ftm-ctl <device> put -c <n> <mycontrol.xml>
+
+1.3   Start all cores 
+      
+      ftm-ctl <device> -c -1 run
+
+1.4   Softly stop all cores 
+      
+      ftm-ctl <device> -c -1 idle
+      ftm-ctl <device> -c -1 stop
+
+1.5   Forcefully stop all cores immediately
+      
+      ftm-ctl <device> -c -1 fstop
+      
+1.6   Show FTM status. It will show current flags for each core (like running, idle etc),
+      a message counter showing the sent msgs for this plan and the active page
+      
+      ftm-ctl <device>
+            
+
+2.    Swapping
+
+      ftm-ctl put will only ever write to the inactive memorey page of a core.
+      To make the new data take effect, you must issue a 'swap' command after the 'put'.
+      
+      ftm-ctl <device> -c <n> swap
+
+3. EXAMPLES
+
+3.1 double heartbeat example
+   3.1.1 load accelerator control data to all cores
+         
+         ftm-ctl <device> put -c -1 heartbeat.xml
+         ftm-ctl <device> put -c -1 swap
+   
+   3.1.2 start all cores
+         
+         ftm-ctl <device> run -c -1
+   
+   3.1.3 to conclude, set all cores to idle and stop
+         
+         ftm-ctl <device> -c -1 idle
+         ftm-ctl <device> -c -1 stop
+
+3.2 linac-to-ring example
+   
+   3.2.1 load accelerator control data for linac to core 0
+         
+         ftm-ctl <device> put -c 0 sourcelinac.xml
+         ftm-ctl <device> put -c 0 swap
+   
+   3.2.1 load accelerator control data for ring to core 1
+         
+         ftm-ctl <device> put -c 1 ring.xml
+         ftm-ctl <device> put -c 1 swap
+   
+   3.2.3 start all cores
+         
+         ftm-ctl <device> run -c -1
+   
+   3.2.4 write initial condition to shared mem of core 0
+         (each core occupies 12byte shared mem, so core 1 would be at 0x8100C)
+         
+         eb-write <device> 0x81000/4 0x4712      
+   
+   3.2.5 to conclude, set all cores to idle and stop
+         
+         ftm-ctl <device> -c -1 idle
+         ftm-ctl <device> -c -1 stop               
+
+
