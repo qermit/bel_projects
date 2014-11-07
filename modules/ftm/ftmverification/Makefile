@@ -4,7 +4,7 @@ TARGET    = verifyftm
 MYPATH    = .
 DEBUGLVL  = 0
 
-CHECKOUT  = /home/mkreider/hdlprojects/new_bel_projects
+CHECKOUT  = ../../..
 INCPATH   = $(CHECKOUT)/modules/lm32-include
 W1        = $(CHECKOUT)/ip_cores/wrpc-sw
 FTMPATH   = $(CHECKOUT)/modules/ftm/ftmfw
