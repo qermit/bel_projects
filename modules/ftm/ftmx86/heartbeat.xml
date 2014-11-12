@@ -13,8 +13,8 @@
       <chain>
          <!-- Cycle A0, entry -->
          <meta>
-            <rep>5000</rep>
-            <period>100000</period>
+            <rep>-1</rep>
+            <period>5000000000</period>
             <branchpoint>yes</branchpoint>
          </meta>
 

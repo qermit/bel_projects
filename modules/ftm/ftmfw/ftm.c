@@ -65,7 +65,7 @@ void ftmInit()
    pFtmIf->sema.cond    = 1;
    pCurrentChain        = (t_ftmChain*)&pFtmIf->idle;
    pFtmIf->tPrep        = 0x0000000000017A12;
-   pFtmIf->tTrn         = 0x0000000000107A12;
+   pFtmIf->tTrn         = 0x0000000000007A12;
    pFtmIf->tDue         = 0x0000000000003A12;
    prioQueueInit();
    

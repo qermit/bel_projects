@@ -1,6 +1,6 @@
 LD        := lm32-elf-ld
 CC        := lm32-elf-gcc
-DEBUGLVL  = 3
+DEBUGLVL  = 0
 TARGET    = ftm
 MYPATH    = .
 CHECKOUT  = ../../..
@@ -13,7 +13,7 @@ all: $(TARGET).bin $(TARGET).elf
 $(TARGET).bin: $(TARGET).elf
 	lm32-elf-objcopy -O binary $< $@
 
-$(TARGET).elf:	$(INCPATH)/dbg.c $(INCPATH)/aux.c $(INCPATH)/ebm.c $(INCPATH)/timer.c $(INCPATH)/irq.c \
+$(TARGET).elf:	$(INCPATH)/dbg.c $(INCPATH)/aux.c $(INCPATH)/ebm.c $(INCPATH)/irq.c \
 		$(INCPATH)/mini_sdb.c $(MYPATH)/main.c $(INCPATH)/crt0.S $(INCPATH)/mprintf.c \
 		$(W1)/dev/uart.c $(MYPATH)/ftm.c
 		$(CC) $(CFLAGS) -o $@ -nostdlib -T linker.ld $^ 

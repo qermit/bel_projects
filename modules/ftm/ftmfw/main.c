@@ -6,7 +6,6 @@
 #include "mini_sdb.h"
 #include "irq.h"
 #include "ftm.h"
-#include "timer.h"
 #include "ebm.h"
 #include "aux.h"
 #include "dbg.h"
@@ -125,11 +124,14 @@ void main(void) {
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    mprintf("\n");
 
+   //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
    while (1) {
       cmdEval();
       processFtm();
-      //mprintf("ebm 0x%08x ebml 0x%08x msk 0x%08x dat 0x%08x wr 0x%08x\n", pEbm, pEbmLast, EBM_ADR_MASK, EBM_OFFS_DAT, EBM_OFFS_WR);
-      for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+      
+      //mprintf("pAct 0x%08x, Qty 0x%08x, pStart 0x%08x, lans[0] 0x%08x,\n", pFtmIf->pAct, pFtmIf->pAct->planQty, pFtmIf->pAct->pStart, pFtmIf->pAct->plans[0]);
+      
+      //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
       /*
       ebm_hi(0x0);
       atomic_on();

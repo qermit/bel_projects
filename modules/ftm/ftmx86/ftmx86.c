@@ -111,10 +111,10 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    for(j=pPage->planQty;j<FTM_PLAN_MAX;    j++)
       uint32ToBytes(&pBufStart[FTM_PAGE_PLANPTRS + j*FTM_WORD_SIZE], FTM_NULL);
    
-   if( pPage->idxBp == 0xdeadbeef)    pPage->pBp = FTM_IDLE_OFFSET;
+   if( pPage->idxBp == 0xdeadbeef)    pPage->pBp = FTM_SHARED_OFFSET + FTM_IDLE_OFFSET;
    else pPage->pBp     = pBufPlans[pPage->idxBp];
    
-   if( pPage->idxStart == 0xdeadbeef) pPage->pStart = FTM_IDLE_OFFSET;
+   if( pPage->idxStart == 0xdeadbeef) pPage->pStart = FTM_SHARED_OFFSET + FTM_IDLE_OFFSET;
    else pPage->pStart  = pBufPlans[pPage->idxStart];
    
    printf("BP: %08x, Start: %08x\n", pPage->pBp, pPage->pStart);
@@ -218,7 +218,7 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
       //deserialise (pBufStart +  offset) to pChain and fix pChains next ptr
       pBuf = deserChain(pChain, pNext, pBufPlans[j], pBufStart, embeddedOffs);
       printf("PChain %p Start %p offs %08x\n", pChain, pBufStart, embeddedOffs);
-      printf("Plan %u Chain 0 @ %08x\n", j, pBufStart-pBuf);
+      //printf("Plan %u Chain 0 @ %08x\n", j, pBufStart-pBuf);
       //deserialise chains until we reached the end or we reached max
       
       while(!(pChain->flags & FLAGS_IS_END) && chainQty < 10)
@@ -226,7 +226,7 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
          pChain   = pNext;
          pNext    = calloc(1, sizeof(t_ftmChain));
          pBuf     = deserChain(pChain, pNext, pBuf, pBufStart, embeddedOffs);
-         printf("Plan %u Chain %u @ %08x\n", j, chainQty, pBufStart-pBuf);
+         //printf("Plan %u Chain %u @ %08x\n", j, chainQty, pBufStart-pBuf);
          
       } 
       //no next after the end, free this one
@@ -240,14 +240,14 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
    pPage->pStart     = bytesToUint32(&pBufStart[FTM_PAGE_PTR_START]);
    
    if       (pPage->pBp    == FTM_NULL)         {pPage->idxBp  = 0xcafebabe;}
-   else if  (pPage->pBp    == FTM_IDLE_OFFSET)  {pPage->idxBp  = 0xdeadbeef;}
+   else if  (pPage->pBp    == FTM_SHARED_OFFSET + FTM_IDLE_OFFSET)  {pPage->idxBp  = 0xdeadbeef;}
    else for (j=0; j<pPage->planQty; j++)      
    {
       if(pBufPlans[j]-pBufStart == ((uintptr_t)pPage->pBp - (uintptr_t)embeddedOffs)) {pPage->idxBp = j;}
    }  
       
    if       (pPage->pStart == FTM_NULL)           {pPage->idxStart = 0xcafebabe;}
-   else if  (pPage->pStart == FTM_IDLE_OFFSET)    {pPage->idxStart = 0xdeadbeef;}
+   else if  (pPage->pStart == FTM_SHARED_OFFSET + FTM_IDLE_OFFSET)    {pPage->idxStart = 0xdeadbeef;}
    else for(j=0; j<pPage->planQty; j++) 
    {
       if(pBufPlans[j]-pBufStart == ((uintptr_t)pPage->pStart - (uintptr_t)embeddedOffs)) {pPage->idxStart = j;}
