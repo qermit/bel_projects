@@ -35,6 +35,7 @@ void isr1()
 
 void ebmInit()
 {
+   ebm_init();
    ebm_config_if(LOCAL,   "hw/08:00:30:e3:b0:5a/udp/192.168.191.254/port/60368");
    //ebm_config_if(REMOTE,  "hw/00:14:d1:fa:01:aa/udp/192.168.191.131/port/60368");
    //ebm_config_if(REMOTE,  "hw/00:26:7b:00:04:08/udp/192.168.191.72/port/60368");
@@ -127,8 +128,16 @@ void main(void) {
    while (1) {
       cmdEval();
       processFtm();
-     // mprintf("stat 0x%08x def 0x%08x CluShared 0x%08x def 0x%08x val 0x%08x \n", &pFtmIf->status, FTM_STAT_OFFSET, &pFtmIf->pSharedMem, pFtmIf->pSharedMem, FTM_SHARED_PTR_OFFSET);
-      //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+      //mprintf("ebm 0x%08x ebml 0x%08x msk 0x%08x dat 0x%08x wr 0x%08x\n", pEbm, pEbmLast, EBM_ADR_MASK, EBM_OFFS_DAT, EBM_OFFS_WR);
+      for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+      /*
+      ebm_hi(0x0);
+      atomic_on();
+      ebm_op(0x0, 0x0BEEBABE, EBM_WRITE);
+      ebm_op(0x0, 0x1BEEBABE, EBM_WRITE);
+      atomic_off();
+      ebm_flush();
+      */
    }
 
 }

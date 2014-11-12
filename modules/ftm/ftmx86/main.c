@@ -7,7 +7,7 @@
 #include <etherbone.h>
 #include "xmlaux.h"
 #include "ftmx86.h"
-
+//#include "ebm.h"
 
 
 #define MAX_DEVICES  100
@@ -24,7 +24,90 @@ const uint32_t devID_RAM         = 0x66cfeb52;
 const uint64_t vendID_CERN       = 0x000000000000ce42;
 const uint32_t devID_ClusterInfo = 0x10040086;
 const uint32_t devID_ClusterCB   = 0x10041000;
+const uint32_t devID_ebm         = 0x00000815;
+const uint32_t devID_prioq       = 0x10040200;
 const uint64_t vendID_GSI        = 0x0000000000000651;
+
+#define EBM_REG_CLEAR         0                         
+#define EBM_REG_FLUSH         (EBM_REG_CLEAR        +4)        
+#define EBM_REG_STATUS        (EBM_REG_FLUSH        +4)         
+#define EBM_REG_SRC_MAC_HI    (EBM_REG_STATUS       +4)       
+#define EBM_REG_SRC_MAC_LO    (EBM_REG_SRC_MAC_HI   +4)    
+#define EBM_REG_SRC_IPV4      (EBM_REG_SRC_MAC_LO   +4)    
+#define EBM_REG_SRC_UDP_PORT  (EBM_REG_SRC_IPV4     +4)   
+#define EBM_REG_DST_MAC_HI    (EBM_REG_SRC_UDP_PORT +4)  
+#define EBM_REG_DST_MAC_LO    (EBM_REG_DST_MAC_HI   +4)   
+#define EBM_REG_DST_IPV4      (EBM_REG_DST_MAC_LO   +4)  
+#define EBM_REG_DST_UDP_PORT  (EBM_REG_DST_IPV4     +4)   
+#define EBM_REG_MTU           (EBM_REG_DST_UDP_PORT +4)  
+#define EBM_REG_ADR_HI        (EBM_REG_MTU          +4)    
+#define EBM_REG_OPS_MAX       (EBM_REG_ADR_HI       +4) 
+#define EBM_REG_EB_OPT        (EBM_REG_OPS_MAX      +4) 
+#define EBM_REG_LAST          (EBM_REG_EB_OPT)
+
+// Priority Queue RegisterLayout
+static const struct {
+   uint32_t rst;
+   uint32_t force;
+   uint32_t dbgSet;
+   uint32_t dbgGet;
+   uint32_t clear;
+   uint32_t cfgGet;
+   uint32_t cfgSet;
+   uint32_t cfgClr;
+   uint32_t dstAdr;
+   uint32_t heapCnt;
+   uint32_t msgCntO;
+   uint32_t msgCntI;
+   uint32_t tTrnHi;
+   uint32_t tTrnLo;
+   uint32_t tDueHi;
+   uint32_t tDueLo;
+   uint32_t capacity;
+   uint32_t msgMax;
+   uint32_t ebmAdr;
+   uint32_t tsAdr;
+   uint32_t tsCh;
+   uint32_t cfg_ENA;
+   uint32_t cfg_FIFO;    
+   uint32_t cfg_IRQ;
+   uint32_t cfg_AUTOPOP;
+   uint32_t cfg_AUTOFLUSH_TIME;
+   uint32_t cfg_AUTOFLUSH_MSGS;
+   uint32_t cfg_MSG_ARR_TS;
+   uint32_t force_POP;
+   uint32_t force_FLUSH;
+} r_FPQ = {    .rst        =  0x00,
+               .force      =  0x04,
+               .dbgSet     =  0x08,
+               .dbgGet     =  0x0c,
+               .clear      =  0x10,
+               .cfgGet     =  0x14,
+               .cfgSet     =  0x18,
+               .cfgClr     =  0x1C,
+               .dstAdr     =  0x20,
+               .heapCnt    =  0x24,
+               .msgCntO    =  0x28,
+               .msgCntI    =  0x2C,
+               .tTrnHi     =  0x30,
+               .tTrnLo     =  0x34,
+               .tDueHi     =  0x38,
+               .tDueLo     =  0x3C,
+               .capacity   =  0x40,
+               .msgMax     =  0x44,
+               .ebmAdr     =  0x48,
+               .tsAdr      =  0x4C,
+               .tsCh       =  0x50,
+               .cfg_ENA             = 1<<0,
+               .cfg_FIFO            = 1<<1,    
+               .cfg_IRQ             = 1<<2,
+               .cfg_AUTOPOP         = 1<<3,
+               .cfg_AUTOFLUSH_TIME  = 1<<4,
+               .cfg_AUTOFLUSH_MSGS  = 1<<5,
+               .cfg_MSG_ARR_TS      = 1<<6,
+               .force_POP           = 1<<0,
+               .force_FLUSH         = 1<<1
+};
 
 char           devName_RAM_pre[] = "WB4-BlockRAM_";
 
@@ -103,6 +186,131 @@ static int getResetAdr()
 
  return devices[0].sdb_component.addr_first;
 }
+
+static uint32_t bytesToUint32(uint8_t* pBuf)
+{
+   uint8_t i;
+   uint32_t val=0;
+   
+   for(i=0;i<FTM_WORD_SIZE;   i++) val |= (uint32_t)pBuf[i] << (8*i);
+   return val;
+}
+
+void ebPeripheryStatus()
+{
+   eb_cycle_t cycle;
+   eb_status_t status;
+   int idx;
+   int attempts;
+   int num_devices;
+   struct sdb_device devices[MAX_DEVICES];
+   char              devName_RAM_post[4];
+   
+   attempts    = 3;
+   idx         = -1;
+   num_devices = MAX_DEVICES;
+   
+   eb_address_t   adr_ebm,
+                  adr_prioq;
+                  
+   char buff[1024];
+   uint64_t tmp;
+   uint32_t cfg;
+
+   // Get EBM
+   num_devices = MAX_DEVICES;
+   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_ebm, &devices[0], &num_devices)) != EB_OK)
+   die(status, "failed to when searching for device");
+   if (num_devices == 0) {
+      fprintf(stderr, "%s: No Etherbone Master found\n", program);
+      goto error;
+   }
+
+   if (num_devices > MAX_DEVICES) {
+      fprintf(stderr, "%s: Way too many lm32 clusterId roms found, something's wrong\n", program);
+      goto error;
+   }
+
+   if (idx > num_devices) {
+      fprintf(stderr, "%s: device #%d could not be found; only %d present\n", program, idx, num_devices);
+      goto error;
+   }
+   adr_ebm = (eb_address_t)devices[0].sdb_component.addr_first;
+   
+   ebRamRead(adr_ebm + EBM_REG_STATUS, EBM_REG_LAST, &buff[EBM_REG_STATUS]);
+   printf ("EBM********************************************************************************\n");
+   printf ("Status\t\t: 0x%08x\n",  bytesToUint32(&buff[EBM_REG_STATUS]));
+   printf ("Src Mac\t\t: 0x%08x%04x\n", bytesToUint32(&buff[EBM_REG_SRC_MAC_HI]),  bytesToUint32(&buff[EBM_REG_SRC_MAC_LO]));
+   printf ("Src IP\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_SRC_IPV4]));
+   printf ("Src Port\t: 0x%04x\n\n", bytesToUint32(&buff[EBM_REG_SRC_UDP_PORT])); 
+   printf ("Dst Mac\t\t: 0x%08x%04x\n", bytesToUint32(&buff[EBM_REG_DST_MAC_HI]),  bytesToUint32(&buff[EBM_REG_DST_MAC_LO]));
+   printf ("Dst IP\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_DST_IPV4]));
+   printf ("Dst Port\t: 0x%04x\n\n", bytesToUint32(&buff[EBM_REG_DST_UDP_PORT]));
+   printf ("MTU\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_MTU]));
+   printf ("Adr Hi\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_ADR_HI]));
+   printf ("Ops Max\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_OPS_MAX]));
+   printf ("EB Opt\t\t: 0x%08x\n\n", bytesToUint32(&buff[EBM_REG_EB_OPT]));
+   
+    
+   
+   
+   // Get prioq
+   num_devices = MAX_DEVICES;
+   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_prioq, &devices[0], &num_devices)) != EB_OK)
+   die(status, "failed to when searching for device");
+   if (num_devices == 0) {
+      fprintf(stderr, "%s: No Etherbone Master found\n", program);
+      goto error;
+   }
+
+   if (num_devices > MAX_DEVICES) {
+      fprintf(stderr, "%s: Way too many lm32 clusterId roms found, something's wrong\n", program);
+      goto error;
+   }
+
+   if (idx > num_devices) {
+      fprintf(stderr, "%s: device #%d could not be found; only %d present\n", program, idx, num_devices);
+      goto error;
+   }
+   adr_prioq = (eb_address_t)devices[0].sdb_component.addr_first;
+ 
+
+ 
+   ebRamRead(adr_prioq + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
+   ebRamRead(adr_prioq + r_FPQ.dstAdr, r_FPQ.tsCh - r_FPQ.dstAdr, &buff[r_FPQ.dstAdr]);
+   printf ("FPQ********************************************************************************\n");
+   cfg = bytesToUint32(&buff[r_FPQ.cfgGet]);
+   printf("-----------------------------------------------------------------------------------\n");
+    if(cfg & r_FPQ.cfg_ENA)            printf("    ENA   ");  else printf("     -    ");
+    if(cfg & r_FPQ.cfg_FIFO)           printf("   FIFO   ");  else printf("     -    ");
+    if(cfg & r_FPQ.cfg_AUTOPOP)        printf("   APOP   ");  else printf("     -    ");
+    if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) printf(" AFL_TIME ");  else printf("     -    ");
+    if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) printf(" AFL_MSGS ");  else printf("     -    ");
+    if(cfg & r_FPQ.cfg_MSG_ARR_TS)     printf("  TS_ARR  ");  else printf("     -    ");
+   printf("\n");
+   printf("-----------------------------------------------------------------------------------\n");
+   printf ("Dst Adr\t\t: 0x%08x\n\n", bytesToUint32(&buff[r_FPQ.dstAdr]));
+   printf ("Heap Cnt\t: %u\n", bytesToUint32(&buff[r_FPQ.heapCnt]));
+   printf ("msg CntO\t: %u\n", bytesToUint32(&buff[r_FPQ.msgCntO]));
+   printf ("msg CntI\t: %u\n\n", bytesToUint32(&buff[r_FPQ.msgCntI]));  
+   tmp = (((uint64_t)bytesToUint32(&buff[r_FPQ.tTrnHi])) <<32) + ((uint64_t)bytesToUint32(&buff[r_FPQ.tTrnLo]));
+   printf ("TTrn\t\t: %llu\n", tmp);
+   tmp = (((uint64_t)bytesToUint32(&buff[r_FPQ.tDueHi])) <<32) + ((uint64_t)bytesToUint32(&buff[r_FPQ.tDueLo]));
+   printf ("TDue\t\t: %llu\n\n", tmp);
+   printf ("Capacity\t: %u\n", bytesToUint32(&buff[r_FPQ.capacity]));
+   printf ("msg max\t\t: %u\n\n", bytesToUint32(&buff[r_FPQ.msgMax]));
+   printf ("EBM Adr\t\t: 0x%08x\n", bytesToUint32(&buff[r_FPQ.ebmAdr]));
+   printf ("ts Adr\t\t: 0x%08x\n", bytesToUint32(&buff[r_FPQ.tsAdr]));
+   printf ("ts Ch\t\t: 0x%08x\n\n", bytesToUint32(&buff[r_FPQ.tsCh]));
+   
+   
+   return;
+   
+   error:
+   ebRamClose();
+   exit(1);
+}
+
 
 void ebRamOpen(const char* netaddress, uint8_t cpuId)
 {
@@ -486,6 +694,12 @@ int main(int argc, char** argv) {
     
    
    if (!strcasecmp(command, "status")) { printf("#### FTM @ %s ####\n", netaddress); }
+   if (verbose) {
+      ebRamOpen(netaddress, 0);
+      ebPeripheryStatus();
+      ebRamClose();
+   }
+   
    
    uint8_t k;
    for(k = firstCpu; k <= lastCpu; k++)

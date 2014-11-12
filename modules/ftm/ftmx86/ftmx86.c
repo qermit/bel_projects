@@ -117,7 +117,7 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    if( pPage->idxStart == 0xdeadbeef) pPage->pStart = FTM_IDLE_OFFSET;
    else pPage->pStart  = pBufPlans[pPage->idxStart];
    
-   //printf("BP: %08x, Start: %08x\n", pPage->pBp, pPage->pStart);
+   printf("BP: %08x, Start: %08x\n", pPage->pBp, pPage->pStart);
    
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_BP],         pPage->pBp);
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_START],      pPage->pStart);
@@ -173,7 +173,7 @@ static uint8_t* serChain(t_ftmChain* pChain, uint32_t pPlanStart, uint8_t* pBufS
  
    pBuf += FTM_CHAIN_END_;
    for(msgIdx = 0; msgIdx < pChain->msgQty; msgIdx++) pBuf = serMsg(&pMsg[msgIdx], pBuf);   
-   
+   printf("Chain placed @ 0x%08x\n", pBuf-pBufStart);
    return pBuf;   
 
 }
@@ -217,6 +217,8 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
       pPage->plans[j].pStart = pChain;
       //deserialise (pBufStart +  offset) to pChain and fix pChains next ptr
       pBuf = deserChain(pChain, pNext, pBufPlans[j], pBufStart, embeddedOffs);
+      printf("PChain %p Start %p offs %08x\n", pChain, pBufStart, embeddedOffs);
+      printf("Plan %u Chain 0 @ %08x\n", j, pBufStart-pBuf);
       //deserialise chains until we reached the end or we reached max
       
       while(!(pChain->flags & FLAGS_IS_END) && chainQty < 10)
@@ -224,7 +226,7 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
          pChain   = pNext;
          pNext    = calloc(1, sizeof(t_ftmChain));
          pBuf     = deserChain(pChain, pNext, pBuf, pBufStart, embeddedOffs);
-         chainQty++;
+         printf("Plan %u Chain %u @ %08x\n", j, chainQty, pBufStart-pBuf);
          
       } 
       //no next after the end, free this one
