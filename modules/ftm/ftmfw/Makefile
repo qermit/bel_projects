@@ -1,6 +1,7 @@
 LD        := lm32-elf-ld
 CC        := lm32-elf-gcc
 DEBUGLVL  = 0
+DEBUGTIME = 0
 TARGET    = ftm
 MYPATH    = .
 CHECKOUT  = ../../..

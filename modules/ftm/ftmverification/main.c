@@ -2,6 +2,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "mini_sdb.h"
 #include "aux.h"
 #include "ftm.h"
@@ -27,11 +28,46 @@ volatile unsigned int* pEC;
 
 
 char buffer[12];
+ 
+static char* u64toStr(char* s, uint64_t val, uint8_t len)
+{
+   const unsigned long long divStart = 10000000000000000000ULL;
+   memset(s, 0x0, len);
+   char*    p     = s;
+   uint64_t tmp   = val;
+   uint64_t div   = (uint64_t)divStart;
+   uint8_t  idx;
+   
+   for (idx = 0; idx<(len-1); idx++) {
+      p[idx]   = (char)(tmp / div + '0');
+      tmp     %= div;
+      div     /= 10;
+   }
+   return s;
+}
+
+
+static char* i64toStr(char* s, int64_t val, uint8_t len)
+{
+   
+   char*    p  = s;
+   
+   if (val < 0) {
+       *p++ = '-';
+       len--;
+   }    
+   u64toStr(p, (uint64_t)val, 21);     
+   return s;
+}
+
+
 
 void report(uint64_t now, uint32_t actCnt, uint32_t errCnt)
 {
-   //acquire info on offending evt
+   const uint32_t bufSize = 21;
+   char buf[bufSize];
    
+   //acquire info on offending evt
    uint64_t id    = ((uint64_t)*(pEC + (ECA_EVT_ID_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_ID_LO >> 2));
    uint64_t par   = ((uint64_t)*(pEC + (ECA_EVT_PA_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_PA_LO >> 2));
    uint64_t time  = (((uint64_t)*(pEC + (ECA_EVT_TI_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_TI_LO >> 2))) << 3;
@@ -40,17 +76,31 @@ void report(uint64_t now, uint32_t actCnt, uint32_t errCnt)
    if( *(pEC + (ECA_FLAGS  >> 2)) & 0x01 ) mprintf("late ");
    if( *(pEC + (ECA_FLAGS  >> 2)) & 0x02 ) mprintf("conflict ");
    mprintf("\n");
-   mprintf("id:\t%08x%08x\nFID:\t%u\nGID:\t%u\nEVTNO:\t%u\nSID:\t%u\nBPID:\t%u\npar:\t%08x%08x\ntef:\t\t%08x\ntag:\t\t%08x\nts:\t%08x%08x\nnow:\t%08x%08x\ndif:\t%d\n", 
-   (uint32_t)(id>>32), (uint32_t)id, getIdFID(id), getIdGID(id), getIdEVTNO(id), getIdSID(id), getIdBPID(id), 
-   (uint32_t)(par>>32), (uint32_t)par,
-   *(pEC + (ECA_EVT_TEF >> 2)),
-   *(pEC + (ECA_EVT_TAG >> 2)),
-   (uint32_t)(time>>32), (uint32_t)time,
-   (uint32_t)(now>>32), (uint32_t)now,
-   ((int32_t)((int64_t)(time<<3) - (int64_t)(now<<3)))
-   ); 
- 
-}
+   mprintf("id:\t0x%08x%08x\nFID:\t%u\nGID:\t%u\nEVTNO:\t%u\nSID:\t%u\nBPID:\t%u\n", 
+   (uint32_t)(id>>32), (uint32_t)id, getIdFID(id), getIdGID(id), getIdEVTNO(id), getIdSID(id), getIdBPID(id));
+   
+   
+   mprintf("par:\t0x%08x%08x\n", (uint32_t)(par>>32), (uint32_t)par);
+   // does par start with 0xff? if so, then 
+   if((par >> 56) == 0xff) {
+      // this is a debug timestamp
+      // strip the leading 0xff and convert to decimal
+      u64toStr(buf, par & (~(0xffULL<<56)), bufSize);
+      mprintf("tsdgb:\t%s\n",  buf);   
+   }
+   mprintf("tef:\t\t0x%08x\ntag:\t\t0x%08x\n", 
+    *(pEC + (ECA_EVT_TEF >> 2)), *(pEC + (ECA_EVT_TAG >> 2)) );
+   
+   u64toStr(buf, time, bufSize);
+   mprintf("ts:\t%s\n",  buf);
+   
+   u64toStr(buf, now, bufSize);
+   mprintf("now:\t%s\n", buf, (uint32_t)(now>>32), (uint32_t)now);
+   
+   i64toStr(buf, ((int64_t)(now) - (int64_t)(time)), bufSize);
+   mprintf("dif:\t%s\n", buf); 
+   
+ }
 
 void init()
 {
@@ -90,9 +140,5 @@ void main(void) {
         }
         *(pEC + (ECA_ACT_CTL >> 2)) = ECA_CMD_POP; //... pop the element
      }
-  
-  
-  
   }
-
 }

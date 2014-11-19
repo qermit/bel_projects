@@ -257,8 +257,13 @@ int dispatch(t_ftmMsg* pMsg)
       atomic_on();
       *pFpqData = hiW(pMsg->id);
       *pFpqData = loW(pMsg->id);
+      #if DEBUGTIME == 1
+      *pFpqData = hiW(now) | 0xff000000;
+      *pFpqData = loW(now);
+      #else
       *pFpqData = hiW(pMsg->par);
       *pFpqData = loW(pMsg->par);
+      #endif
       *pFpqData = pMsg->tef;
       *pFpqData = pMsg->res;
       *pFpqData = hiW(pMsg->ts);
