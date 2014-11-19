@@ -133,7 +133,8 @@ static void strreverse(char* begin, char* end) {
    char aux;
    while(end>begin) aux=*end, *end--=*begin, *begin++=aux;
 }
-   
+
+ 
 static void itoa(int value, char* str, int base) {
    
    static char num[] = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -243,9 +244,9 @@ static void ebPeripheryStatus()
    printf ("Dst Mac\t\t: 0x%08x%04x\n", bytesToUint32(&buff[EBM_REG_DST_MAC_HI]),  bytesToUint32(&buff[EBM_REG_DST_MAC_LO]));
    printf ("Dst IP\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_DST_IPV4]));
    printf ("Dst Port\t: 0x%04x\n\n", bytesToUint32(&buff[EBM_REG_DST_UDP_PORT]));
-   printf ("MTU\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_MTU]));
+   printf ("MTU\t\t: %u\n", bytesToUint32(&buff[EBM_REG_MTU]));
    printf ("Adr Hi\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_ADR_HI]));
-   printf ("Ops Max\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_OPS_MAX]));
+   printf ("Ops Max\t\t: %u\n", bytesToUint32(&buff[EBM_REG_OPS_MAX]));
    printf ("EB Opt\t\t: 0x%08x\n\n", bytesToUint32(&buff[EBM_REG_EB_OPT]));
    
     
@@ -291,9 +292,9 @@ static void ebPeripheryStatus()
    printf ("msg CntO\t: %u\n", bytesToUint32(&buff[r_FPQ.msgCntO]));
    printf ("msg CntI\t: %u\n\n", bytesToUint32(&buff[r_FPQ.msgCntI]));  
    tmp = (((uint64_t)bytesToUint32(&buff[r_FPQ.tTrnHi])) <<32) + ((uint64_t)bytesToUint32(&buff[r_FPQ.tTrnLo]));
-   printf ("TTrn\t\t: %llu\n", (long long unsigned int)tmp);
+   printf ("TTrn\t\t: %llu\n", (long long unsigned int)tmp<<3);
    tmp = (((uint64_t)bytesToUint32(&buff[r_FPQ.tDueHi])) <<32) + ((uint64_t)bytesToUint32(&buff[r_FPQ.tDueLo]));
-   printf ("TDue\t\t: %llu\n\n", (long long unsigned int)tmp);
+   printf ("TDue\t\t: %llu\n\n", (long long unsigned int)tmp<<3);
    printf ("Capacity\t: %u\n", bytesToUint32(&buff[r_FPQ.capacity]));
    printf ("msg max\t\t: %u\n\n", bytesToUint32(&buff[r_FPQ.msgMax]));
    printf ("EBM Adr\t\t: 0x%08x\n", bytesToUint32(&buff[r_FPQ.ebmAdr]));
