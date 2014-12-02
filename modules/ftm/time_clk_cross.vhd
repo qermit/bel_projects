@@ -55,6 +55,14 @@ signal   s_time_ref,
          s_time_sys_gray,
          s_time_sys_bin    : std_logic_vector(63 downto 0);
 
+signal 	r_time_ref_cor0,
+			r_time_ref_cor1   : unsigned(32 downto 0);
+signal   r_time_ref_diff	: unsigned(31 downto 0);
+			
+signal   r_wrong_time : std_logic;
+attribute preserve: boolean;
+attribute preserve of r_wrong_time: signal is true;
+			
 --debug         
 signal delta : integer; 
 
@@ -72,8 +80,8 @@ begin
       cycles_i => tm_cycles_i,
       time_o   => s_time_ref);
     
-  tm_ref_tai_cycles_o <= s_time_ref;
-
+  tm_ref_tai_cycles_o(62 downto 0) <= s_time_ref(62 downto 0);
+  tm_ref_tai_cycles_o(63) <= s_time_ref(63) or r_wrong_time;
 
    comp_sys_delay : eca_offset
     generic map(
@@ -81,14 +89,41 @@ begin
       g_parts     => 4,
       g_offset    => g_delay_comp)
     port map(
-      clk_i => clk_sys_i,
+      clk_i => clk_ref_i,
       a_i   => s_time_ref,
       c1_o  => open,
       x2_o  => s_time_ref_cor,
       c2_o  => open);
 
  
-        
+	time_check : process(clk_ref_i)
+   begin
+      if(rst_ref_n_i = '0') then
+			r_wrong_time <= '0';
+			r_time_ref_cor0 <= (others => '0');
+			r_time_ref_cor1 <= (others => '0');
+			r_time_ref_diff <= (others => '0');
+		else
+			if rising_edge(clk_ref_i) then
+			  r_time_ref_cor0 <= unsigned(s_time_ref_cor(32 downto 0));
+			  r_time_ref_cor1 <= r_time_ref_cor0;
+			  
+			  if(r_time_ref_cor0(32) = r_time_ref_cor1(32)) then -- no overflow, check
+				  r_time_ref_diff <= r_time_ref_cor0(31 downto 0) -  r_time_ref_cor1(31 downto 0);     
+			  else
+				  r_time_ref_diff <= r_time_ref_cor0(31 downto 0) + (x"ffffffff" - r_time_ref_cor1(31 downto 0));
+			  end if;
+			  
+			  if(r_time_ref_diff = to_unsigned(1, 32)) then
+					r_wrong_time <= '0';
+			  else
+					r_wrong_time <= '1';
+			  end if;
+			end if;
+		end if;
+   end process time_check;   
+
+	
    gray_en : process(clk_ref_i)
    begin
       if rising_edge(clk_ref_i) then
