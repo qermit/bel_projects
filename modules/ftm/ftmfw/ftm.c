@@ -21,7 +21,7 @@ void prioQueueInit()
    *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
    *(pFpqCtrl + r_FPQ.clear)     = 1;
    *(pFpqCtrl + r_FPQ.dstAdr)    = (uint32_t)pEca & ~0x80000000;
-   *(pFpqCtrl + r_FPQ.tsAdr)     = ((uint32_t)pTlu & ~0x80000000);
+   *(pFpqCtrl + r_FPQ.tsAdr)     = (uint32_t)(0x100800+0x100);
    *(pFpqCtrl + r_FPQ.tsCh)      = 0;
    *(pFpqCtrl + r_FPQ.ebmAdr)    = ((uint32_t)pEbm & ~0x80000000);
    *(pFpqCtrl + r_FPQ.msgMax)    = 5;
@@ -30,7 +30,7 @@ void prioQueueInit()
    *(pFpqCtrl + r_FPQ.tDueHi)    = hiW(pFtmIf->tDue);
    *(pFpqCtrl + r_FPQ.tDueLo)    = loW(pFtmIf->tDue);
   
-   *(pFpqCtrl + r_FPQ.cfgSet)    = //r_FPQ.cfg_MSG_ARR_TS |
+   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_MSG_ARR_TS |
                                    r_FPQ.cfg_AUTOFLUSH_TIME | 
                                    r_FPQ.cfg_AUTOFLUSH_MSGS |
                                    r_FPQ.cfg_AUTOPOP | 
@@ -64,9 +64,9 @@ void ftmInit()
    pFtmIf->sema.sig     = 1;
    pFtmIf->sema.cond    = 1;
    pCurrentChain        = (t_ftmChain*)&pFtmIf->idle;
-   pFtmIf->tPrep        = 0x0000000000017A12;
-   pFtmIf->tTrn         = 0x0000000000007A12;
-   pFtmIf->tDue         = 0x0000000000003A12;
+   pFtmIf->tPrep        = 100000/8;
+   pFtmIf->tTrn         = 15000/8;
+   pFtmIf->tDue         = 15000/8;
    prioQueueInit();
    
 }
