@@ -2,5 +2,5 @@
 dev=$1
 img="verifyftm.bin"
 
-./eca-tm-pex-dbg $dev
-./load-verfw $dev $img
+source ./eca-tm-pex-dbg $dev
+source ./load-verfw $dev $img

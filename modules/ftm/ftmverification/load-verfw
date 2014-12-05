@@ -12,7 +12,7 @@ if [ "$3" == "$opt" ] ; then
 	eb-put $dev 0x$adr $img
 	eb-write $dev 0x0/4 0x0
 else
-        eb-write $dev 0x8/4 0xff
+        eb-write $dev 0x8/4 0x1
         eb-put $dev 0x$adr $img
-        eb-write $dev 0xc/4 0xff
+        eb-write $dev 0xc/4 0x1
 fi
