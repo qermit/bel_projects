@@ -9,6 +9,8 @@
 #include "ftmx86.h"
 //#include "ebm.h"
 
+#define FILENAME_LEN 256
+
 
 #define MAX_DEVICES  100
 #define PACKET_SIZE  500
@@ -111,9 +113,9 @@ static const struct {
 
 char           devName_RAM_pre[] = "WB4-BlockRAM_";
 
-eb_data_t tmpRead[2];
+eb_data_t tmpRead[3];
       
-volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset, clusterOffset;
+volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset, clusterOffset, sharedMem;
 uint8_t error, verbose, readonly;
 volatile uint32_t cpuQty;
 
@@ -402,11 +404,13 @@ void ebRamOpen(const char* netaddress, uint8_t cpuId)
    if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
    eb_cycle_read(cycle, (eb_address_t)(embeddedOffset + FTM_SHARED_OFFSET + FTM_PACT_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
    eb_cycle_read(cycle, (eb_address_t)(embeddedOffset + FTM_SHARED_OFFSET + FTM_PINA_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);
+   eb_cycle_read(cycle, (eb_address_t)(embeddedOffset + FTM_SHARED_OFFSET + FTM_SHARED_PTR_OFFSET),   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]); 
+   
    if ((status = eb_cycle_close(cycle)) != EB_OK) die(status, "failed to close read cycle");
    
    actOffset = (uint32_t) tmpRead[0];
    inaOffset = (uint32_t) tmpRead[1];
-   
+   sharedMem = (uint32_t) tmpRead[2]; //convert lm32's view to pcie's view
    
    
    return;
@@ -543,20 +547,39 @@ static void help(void) {
 
 static void status(uint8_t cpuId)
 {
-       uint32_t ftmStatus, sharedMem;
-       eb_status_t status;
-       
-    if ((status = eb_device_read(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_STAT_OFFSET, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0], 0, eb_block)) != EB_OK)
-    die(status, "failed to read");
-    ftmStatus = (uint32_t) tmpRead[0];
-    if ((status = eb_device_read(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_SHARED_PTR_OFFSET, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1], 0, eb_block)) != EB_OK)
-    die(status, "failed to read");   
-    sharedMem = clusterOffset + ((uint32_t) tmpRead[1] & 0x3fffffff); //convert lm32's view to pcie's view
+   uint32_t ftmStatus, mySharedMem;
+   eb_status_t status;
+   eb_data_t tmpRd[1+1+2+2+2];
+   eb_cycle_t cycle;
+   eb_address_t tmpAdr = embeddedOffset + FTM_SHARED_OFFSET;
+   long long unsigned int ftmTPrep, ftmTTrn, ftmTDue;
+   
+   if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_STAT_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[0]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_SHARED_PTR_OFFSET,   EB_BIG_ENDIAN | EB_DATA32, &tmpRd[1]); 
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRd[2]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET+4,      EB_BIG_ENDIAN | EB_DATA32, &tmpRd[3]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TTRN_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[4]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TTRN_OFFSET+4,       EB_BIG_ENDIAN | EB_DATA32, &tmpRd[5]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TDUE_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[6]);
+   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TDUE_OFFSET+4,       EB_BIG_ENDIAN | EB_DATA32, &tmpRd[7]);
+   if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close read cycle");
+   ftmStatus = (uint32_t) tmpRd[0];
+   sharedMem = tmpRd[1]; //convert lm32's view to pcie's view
+   mySharedMem = clusterOffset + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
+   ftmTPrep = (long long unsigned int)(((uint64_t)tmpRd[2]) << 32 | ((uint64_t)tmpRd[3]));
+   ftmTTrn  = (long long unsigned int)(((uint64_t)tmpRd[4]) << 32 | ((uint64_t)tmpRd[5]));
+   ftmTDue  = (long long unsigned int)(((uint64_t)tmpRd[6]) << 32 | ((uint64_t)tmpRd[7]));
     
     printf("**###############################################################################**\n");
     printf("** Core #%02u               |   Status: %08x        MsgCnt: %08u           **\n", cpuId, ftmStatus, (ftmStatus >> 16));
     printf("**------------------------+------------------------------------------------------**\n");
- 
+    if(verbose) {
+    printf("** TPreparation:          |  %20llu                                **\n", ftmTPrep<<3);
+    printf("** TTransmission:         |  %20llu                                **\n", ftmTTrn<<3);
+    printf("** TDue:                  |  %20llu                                **\n", ftmTDue<<3);
+    printf("**------------------------+------------------------------------------------------**\n");
+    }
     printf("** Shared Mem: 0x%08x |", sharedMem + cpuId*0x0C);
     if(actOffset < inaOffset) printf("   Act Page: A 0x%08x  Inact Page: B 0x%08x", actOffset, inaOffset);
     else                      printf("   Act Page: B 0x%08x  Inact Page: A 0x%08x", actOffset, inaOffset);
@@ -583,7 +606,8 @@ int main(int argc, char** argv) {
    
    uint8_t  bufWrite[BUF_SIZE];
    uint8_t  bufRead[BUF_SIZE];
-   char     filename[64];
+   
+   char     filename[FILENAME_LEN];
    char     bpstr[10];
    
    t_ftmPage*  pPage    = NULL;
@@ -652,7 +676,7 @@ int main(int argc, char** argv) {
    if ( (!strcasecmp(command, "put")) || (!strcasecmp(command, "loadfw"))  )
    {
       if (optind+1 < argc) {
-         strncpy(filename, argv[optind+1], 64);
+         strncpy(filename, argv[optind+1], FILENAME_LEN);
          readonly = 0;
       } else {
          fprintf(stderr, "%s: expecting one non-optional argument: <filename>\n", program);
@@ -809,7 +833,7 @@ int main(int argc, char** argv) {
      else if (!strcasecmp(command, "loadfw")) {
 
             char cOffs[11] = "0x00000000";
-            char cmdStr[80];
+            char cmdStr[80 + FILENAME_LEN];
             
             //get embeddedOffset.
             //TODO: replace offset retrieval code with something more elegant 

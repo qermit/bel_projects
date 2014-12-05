@@ -6,7 +6,7 @@
 #include <etherbone.h>
 
 extern uint8_t cpuId;
-
+extern uint32_t sharedMem;
 uint16_t getIdFID(uint64_t id)     {return ((uint16_t)(id >> ID_FID_POS))     & (ID_MSK_B16 >> (16 - ID_FID_LEN));}
 uint16_t getIdGID(uint64_t id)     {return ((uint16_t)(id >> ID_GID_POS))     & (ID_MSK_B16 >> (16 - ID_GID_LEN));}
 uint16_t getIdEVTNO(uint64_t id)   {return ((uint16_t)(id >> ID_EVTNO_POS))   & (ID_MSK_B16 >> (16 - ID_EVTNO_LEN));}
@@ -138,13 +138,13 @@ static uint8_t* serChain(t_ftmChain* pChain, uint32_t pPlanStart, uint8_t* pBufS
    condSrc  = 0;
    
    //FIXME: change to proper sdb find
-   if (pChain->flags & FLAGS_IS_SIG_MSI)           sigDst = 0x40000800 + pChain->sigCpu * 0x100;
-   else if (pChain->flags & FLAGS_IS_SIG_SHARED)   sigDst = 0x40001000 + pChain->sigCpu * 0xC;
+   if (pChain->flags & FLAGS_IS_SIG_MSI)           sigDst = 0x40000800 + pChain->sigCpu * 0x100; //FIXME !!!!
+   else if (pChain->flags & FLAGS_IS_SIG_SHARED)   sigDst = sharedMem  + pChain->sigCpu * 0xC; 
    else if (pChain->flags & FLAGS_IS_SIG_ADR)      sigDst = pChain->sigDst;
    
    //FIXME: change to proper sdb find
    if (pChain->flags & FLAGS_IS_COND_MSI)          condSrc = 0x0;
-   else if (pChain->flags & FLAGS_IS_COND_SHARED)  condSrc = 0x40001000 + cpuId * 0xC;
+   else if (pChain->flags & FLAGS_IS_COND_SHARED)  { condSrc = sharedMem + cpuId * 0xC; printf("SharedCondLoc: 0x%08x\n", condSrc);}
    else if (pChain->flags & FLAGS_IS_COND_ADR)     condSrc = pChain->condSrc;
    
    uint64ToBytes(&pBuf[FTM_CHAIN_TSTART],    pChain->tStart);
