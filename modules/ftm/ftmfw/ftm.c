@@ -21,21 +21,23 @@ void prioQueueInit()
    *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
    *(pFpqCtrl + r_FPQ.clear)     = 1;
    *(pFpqCtrl + r_FPQ.dstAdr)    = (uint32_t)pEca & ~0x80000000;
-   *(pFpqCtrl + r_FPQ.tsAdr)     = (uint32_t)(0x100800+0x100);
-   *(pFpqCtrl + r_FPQ.tsCh)      = 0;
+   *(pFpqCtrl + r_FPQ.tsAdr)     = (uint32_t)(DEBUGPRIOQDST);
    *(pFpqCtrl + r_FPQ.ebmAdr)    = ((uint32_t)pEbm & ~0x80000000);
    *(pFpqCtrl + r_FPQ.msgMax)    = 5;
    *(pFpqCtrl + r_FPQ.tTrnHi)    = hiW(pFtmIf->tTrn);
    *(pFpqCtrl + r_FPQ.tTrnLo)    = loW(pFtmIf->tTrn);
    *(pFpqCtrl + r_FPQ.tDueHi)    = hiW(pFtmIf->tDue);
    *(pFpqCtrl + r_FPQ.tDueLo)    = loW(pFtmIf->tDue);
-  
-   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_MSG_ARR_TS |
-                                   r_FPQ.cfg_AUTOFLUSH_TIME | 
+   
+   *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
+   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_AUTOFLUSH_TIME | 
                                    r_FPQ.cfg_AUTOFLUSH_MSGS |
                                    r_FPQ.cfg_AUTOPOP | 
                                    r_FPQ.cfg_FIFO |
                                    r_FPQ.cfg_ENA;
+#if DEBUGPRIOQ == 1                               
+   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_MSG_ARR_TS;
+#endif                                      
 }
 
 void ftmInit()

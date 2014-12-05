@@ -1,13 +1,16 @@
 LD        := lm32-elf-ld
 CC        := lm32-elf-gcc
-DEBUGLVL  = 0
-DEBUGTIME = 0
+DBGLVL    = 0 #Debug Outputs from LM32 to console, Level 0-3 
+DBGTIME   = 0 #Debug Timestamps at LM32
+DBGPRIOQ  = 0 #Debug Timestamps at Priority Queue
+DBGPRIOQDST = 0x1008900 #Dest Adr for PrioQueue Timstamps at target. Be VERY careful where you point that to!
 TARGET    = ftm
 MYPATH    = .
 CHECKOUT  = ../../..
 INCPATH   = $(CHECKOUT)/modules/lm32-include
 W1        = $(CHECKOUT)/ip_cores/wrpc-sw
-CFLAGS    = -I$(INCPATH) -mmultiply-enabled -mbarrel-shift-enabled -Os -I$(W1)/include -I$(W1)/pp_printf -DDEBUGLEVEL=$(DEBUGLVL)
+CFLAGS    = -I$(INCPATH) -mmultiply-enabled -mbarrel-shift-enabled -Os -I$(W1)/include -I$(W1)/pp_printf \
+      -DDEBUGLEVEL=$(DBGLVL) -DDEBUGTIME=$(DBGTIME) -DDEBUGPRIOQ=$(DBGPRIOQ) -DDEBUGPRIOQDST=$(DBGPRIOQDST)
 
 all: $(TARGET).bin $(TARGET).elf
 

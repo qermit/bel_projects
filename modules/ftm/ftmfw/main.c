@@ -113,15 +113,16 @@ void main(void) {
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    atomic_on(); 
    mprintf("#%02u: Core ready\n", cpuId);
-   mprintf("#%02u: Shared @ 0x%08x.\n", cpuId, (uint32_t)pFtmIf->pSharedMem);
    #if DEBUGLEVEL != 0
       mprintf("#%02u: Debuglevel %u. Don't expect timeley delivery with console outputs on!\n", cpuId, DEBUGLEVEL);
    #endif   
    #if DEBUGTIME == 1
       mprintf("#%02u: Debugtime mode ON. Par Field of Msgs will be overwritten be dispatch time at lm32\n", cpuId);
    #endif
+   #if DEBUGPRIOQ == 1
+      mprintf("#%02u: Priority Queue Debugmode ON, timestamps will be written to 0x%08x on receivers", cpuId, DEBUGPRIOQDST);
+   #endif   
    atomic_off();
-   *((uint32_t*)pFtmIf->pSharedMem + cpuId) = 0xDEAD0000 | cpuId;
    //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
    /*
    t_time now, later;
