@@ -87,7 +87,7 @@ architecture behavioral of ftm_priority_queue is
 
 -- memory map for ctrl wb
      
-   type t_state is (e_IDLE, e_SET_ADHI_TLU, e_DATA0_TLU, e_DATA1_TLU, e_SET_ADHI_ECA, e_DATA_ECA, e_END_CYC_WAIT, e_EBM_FLUSH, e_ERROR); 
+   type t_state is (e_IDLE, e_SET_ADHI_TS, e_DATA0_TS, e_DATA1_TS, e_SET_ADHI_ECA, e_DATA_ECA, e_END_CYC_WAIT, e_EBM_FLUSH, e_ERROR); 
   
    constant c_RST        : natural := 0;                 --00 wo, reset. writing 1 will reset the core
    constant c_FORCE      : natural := c_RST        +4;   --04 wo, pops one element from the heap if heap is not empty
@@ -146,8 +146,8 @@ architecture behavioral of ftm_priority_queue is
    constant c_EBM_ADR_CNT      : unsigned(31 downto 0) := x"00000008";
    constant c_EBM_ADR_MSK      : unsigned(31 downto 0) := to_unsigned(0, c_ebm_adr_bits_hi) & unsigned(to_signed(-1, t_wishbone_address'length-c_ebm_adr_bits_hi));
    constant c_ECA_ADR          : unsigned(31 downto 0) := x"7FFFFFFF";
-	constant c_TLU_ADR_CHSEL    : unsigned(31 downto 0) := x"00000058";
-	constant c_TLU_CH_TEST      : unsigned(31 downto 0) := x"00000060";
+	constant c_TS_ADR_CHSEL    : unsigned(31 downto 0) := x"00000058";
+	constant c_TS_CH_TEST      : unsigned(31 downto 0) := x"00000060";
 ------------------------------------------------------------------------------
 
    attribute syn_keep: boolean;
@@ -260,7 +260,8 @@ architecture behavioral of ftm_priority_queue is
    
    signal r_earliest_key      : std_logic_vector(g_key_width -1 downto 0);
    signal r_packet_not_empty  : std_logic;
-   signal s_deadline          : unsigned(g_key_width -1 downto 0);       
+   signal s_deadline          : unsigned(g_key_width -1 downto 0);
+   signal r_ts 					: std_logic_vector(63 downto 0);	
    ------------------------------------------------------------------------------
    
 begin
@@ -545,6 +546,7 @@ begin
             
             r_ackerr_in       <= (others => '0');
             r_stb_out         <= (others => '0');
+				r_ts              <= (others => '0');
          else
             if(s_data_out_rdy = '1') then
                r_reg_out <= s_data_out;
@@ -579,41 +581,51 @@ begin
                when e_IDLE       => s_src_o.cyc <= '0';
                                     s_src_o.stb <= '0';
                                     if(r_send = '1') then
-                                         s_src_o.adr   <= std_logic_vector(unsigned(r_ebm_adr) + c_EBM_ADR_FLUSH);
-                                         r_command_out <= x"00000001";
-                                         v_state_out := e_EBM_FLUSH;
+                                       s_src_o.adr   <= std_logic_vector(unsigned(r_ebm_adr) + c_EBM_ADR_FLUSH);
+                                       r_command_out <= x"00000001";
+											      if(r_cfg(c_CFG_BIT_MSG_ARR_TS) = '1') then 
+                                          v_state_out := e_SET_ADHI_TS;
+                                       else
+                                          v_state_out := e_EBM_FLUSH;
+                                       end if;
                                     elsif((s_pop and not s_busy) = '1') then
                                           r_sreg_out(r_sreg_out'left downto r_sreg_out'length - s_data_out'length) <= r_reg_out;
-                                          if(r_cfg(c_CFG_BIT_MSG_ARR_TS) = '1' and s_packet_not_empty = '0') then 
-                                             v_state_out := e_SET_ADHI_TLU;
+                                          if(r_cfg(c_CFG_BIT_MSG_ARR_TS) = '1') then 
+                                             v_state_out := e_SET_ADHI_TS;
                                           else
                                              v_state_out := e_SET_ADHI_ECA;
                                           end if;
                                     end if;
                
-               when e_SET_ADHI_TLU  => s_src_o.cyc       <= '1';
+               when e_SET_ADHI_TS  =>  s_src_o.cyc       <= '1';
                                        s_src_o.stb       <= '1';
                                        s_src_o.adr       <= std_logic_vector(unsigned(r_ebm_adr) + c_EBM_ADR_OPA_HI);
                                        r_command_out     <= std_logic_vector(r_ts_adr);
-                                       r_state_out_next  <= e_DATA0_TLU;
+													--capture time
+													r_ts <= time_sys_i;
+                                       r_state_out_next  <= e_DATA0_TS;
                                        v_state_out       := e_END_CYC_WAIT;
                                        
-               when e_DATA0_TLU     => s_src_o.cyc <= '1';
+               when e_DATA0_TS     =>  s_src_o.cyc <= '1';
                                        s_src_o.stb <= '1';
                                        s_src_o.adr    <= std_logic_vector(unsigned(r_ebm_adr) or c_EBM_DAT_OFFS 
-                                                         or c_EBM_RW_OFFS or ((unsigned(r_ts_adr) + c_TLU_ADR_CHSEL) and c_EBM_ADR_MSK));
-                                       r_command_out  <= std_logic_vector(to_unsigned(0,(32 - r_ts_ch'length))) & r_ts_ch;
-                                       v_state_out    := e_DATA1_TLU;
+                                                         or c_EBM_RW_OFFS or ((unsigned(r_ts_adr) + 0) and c_EBM_ADR_MSK));
+                                       r_command_out  <= r_ts(63 downto 32);
+                                       v_state_out    := e_DATA1_TS;
                                         
                
-               when e_DATA1_TLU     => s_src_o.cyc <= '1';
+               when e_DATA1_TS     =>  s_src_o.cyc <= '1';
                                        s_src_o.stb <= '1';
                                        if((s_src_o.cyc and s_src_o.stb and not src_i.stall) = '1') then
                                           s_src_o.adr       <= std_logic_vector(unsigned(r_ebm_adr) or c_EBM_DAT_OFFS 
-                                                               or c_EBM_RW_OFFS or ((unsigned(r_ts_adr)+c_TLU_CH_TEST) and c_EBM_ADR_MSK));
-                                          r_command_out     <= x"ffffffff";      
-                                          r_state_out_next  <= e_SET_ADHI_ECA;
-                                          v_state_out       := e_END_CYC_WAIT;
+                                                               or c_EBM_RW_OFFS or ((unsigned(r_ts_adr)+4) and c_EBM_ADR_MSK));
+                                          r_command_out     <= r_ts(31 downto 0);
+														if(r_send = '1') then
+                                             r_state_out_next <= e_EBM_FLUSH;
+                                          else
+                                             r_state_out_next <= e_SET_ADHI_ECA;
+                                          end if;
+														v_state_out       := e_END_CYC_WAIT;
                                        end if; 
                                         
                
@@ -643,7 +655,11 @@ begin
                                              r_msg_cnt_packet     <= std_logic_vector(unsigned(r_msg_cnt_packet) +1);
                                              r_pop_req_dec  <= to_unsigned(1, r_pop_req_dec'length);
                                              if(r_send = '1') then
-                                               r_state_out_next   <= e_EBM_FLUSH;
+															  if(r_cfg(c_CFG_BIT_MSG_ARR_TS) = '1') then 
+                                                 r_state_out_next   <= e_SET_ADHI_TS;
+                                               else
+                                                 r_state_out_next   <= e_EBM_FLUSH;
+                                               end if;
                                              else
                                                r_state_out_next   <= e_IDLE;
                                              end if;
