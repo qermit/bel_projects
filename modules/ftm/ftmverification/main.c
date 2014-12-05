@@ -191,7 +191,7 @@ void main(void) {
      now = getSysTime(); 
      if( *(pEC + (ECA_QUEACT >> 2))) { // if there is stuff in the action queue ...
         actCnt++;
-        if( *(pEC + (ECA_FLAGS  >> 2)) ) {    // check for errors, if so, gather info on offending event and printf preport
+        if( *(pEC + (ECA_FLAGS  >> 2)) & 0x03 ) {    //  check for errors, if so, gather info on offending event and printf preport
           errCnt++;
           report(now<<3, actCnt, errCnt);
         }
