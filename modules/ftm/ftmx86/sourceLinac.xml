@@ -7,7 +7,7 @@
    <plan>
       <!-- Plan A, normal operation -->
       <meta>
-         <starttime>9999999</starttime>
+         <starttime>0</starttime>
          <lastjump>self</lastjump>
       </meta>  
       

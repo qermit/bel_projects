@@ -7,7 +7,7 @@
    <plan>
       <!-- Plan A, normal operation -->
       <meta>
-         <starttime>1000</starttime>
+         <starttime>0</starttime>
          <lastjump>idle</lastjump>
       </meta>  
       <chain>
