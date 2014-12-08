@@ -9,8 +9,8 @@
 #include "ftmx86.h"
 //#include "ebm.h"
 
-#define FILENAME_LEN 256
-
+#define FILENAME_LEN   256
+#define UINT64_STR_LEN 24
 
 #define MAX_DEVICES  100
 #define PACKET_SIZE  500
@@ -115,7 +115,7 @@ char           devName_RAM_pre[] = "WB4-BlockRAM_";
 
 eb_data_t tmpRead[3];
       
-volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset, clusterOffset, sharedMem;
+volatile uint32_t embeddedOffset, resetOffset, inaOffset, actOffset, targetOffset, clusterOffset, sharedMem, prioQ;
 uint8_t error, verbose, readonly;
 volatile uint32_t cpuQty;
 
@@ -210,8 +210,7 @@ static void ebPeripheryStatus()
    idx         = -1;
    num_devices = MAX_DEVICES;
    
-   eb_address_t   adr_ebm,
-                  adr_prioq;
+   eb_address_t   adr_ebm;
                   
    uint8_t buff[1024];
    uint64_t tmp;
@@ -251,33 +250,8 @@ static void ebPeripheryStatus()
    printf ("Ops Max\t\t: %u\n", bytesToUint32(&buff[EBM_REG_OPS_MAX]));
    printf ("EB Opt\t\t: 0x%08x\n\n", bytesToUint32(&buff[EBM_REG_EB_OPT]));
    
-    
-   
-   
-   // Get prioq
-   num_devices = MAX_DEVICES;
-   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_prioq, &devices[0], &num_devices)) != EB_OK)
-   die(status, "failed to when searching for device");
-   if (num_devices == 0) {
-      fprintf(stderr, "%s: No Etherbone Master found\n", program);
-      goto error;
-   }
-
-   if (num_devices > MAX_DEVICES) {
-      fprintf(stderr, "%s: Way too many lm32 clusterId roms found, something's wrong\n", program);
-      goto error;
-   }
-
-   if (idx > num_devices) {
-      fprintf(stderr, "%s: device #%d could not be found; only %d present\n", program, idx, num_devices);
-      goto error;
-   }
-   adr_prioq = (eb_address_t)devices[0].sdb_component.addr_first;
- 
-
- 
-   ebRamRead(adr_prioq + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
-   ebRamRead(adr_prioq + r_FPQ.dstAdr, r_FPQ.tsCh - r_FPQ.dstAdr, &buff[r_FPQ.dstAdr]);
+   ebRamRead(prioQ + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
+   ebRamRead(prioQ + r_FPQ.dstAdr, r_FPQ.tsCh - r_FPQ.dstAdr, &buff[r_FPQ.dstAdr]);
    printf ("FPQ********************************************************************************\n");
    cfg = bytesToUint32(&buff[r_FPQ.cfgGet]);
    printf("-----------------------------------------------------------------------------------\n");
@@ -413,6 +387,27 @@ void ebRamOpen(const char* netaddress, uint8_t cpuId)
    sharedMem = (uint32_t) tmpRead[2]; //convert lm32's view to pcie's view
    
    
+   // Get prioq
+   idx        = -1;
+   num_devices = MAX_DEVICES;
+   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_prioq, &devices[0], &num_devices)) != EB_OK)
+   die(status, "failed to when searching for Priority Queue ");
+   if (num_devices == 0) {
+      fprintf(stderr, "%s: No Priority Queue found\n", program);
+      goto error;
+   }
+
+   if (num_devices > MAX_DEVICES) {
+      fprintf(stderr, "%s: Way too many Priority Queue  found, something's wrong\n", program);
+      goto error;
+   }
+
+   if (idx > num_devices) {
+      fprintf(stderr, "%s: device #%d could not be found; only %d present\n", program, idx, num_devices);
+      goto error;
+   }
+   prioQ = (eb_address_t)devices[0].sdb_component.addr_first;
+   
    return;
    
    error:
@@ -469,7 +464,6 @@ const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len)
    uint32_t* writeout = (uint32_t*)buf;   
    
    //wrap frame buffer in EB packet
-   printf("I'm ebRamWrite, going to write %u bytes to 0x%08x\n", len, address);
    parts = (len/PACKET_SIZE)+1;
    start = 0;
    
@@ -488,7 +482,6 @@ const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len)
       start = start + partLen;
    }
    
-   printf("ebRamWrite out\n");
    return buf;
 }
 
@@ -521,6 +514,9 @@ static void ebRamClear(uint32_t address, uint32_t len)
 static void help(void) {
   fprintf(stderr, "\nUsage: %s [OPTION] <etherbone-device> [command]\n", program);
   fprintf(stderr, "\n");
+  fprintf(stderr, "  duetime <Time / ns>       Set due time for priority queue\n");
+  fprintf(stderr, "  trntime <Time / ns>       Set transmission delay for priority queue\n");
+  fprintf(stderr, "  maxmsg <Message Quantity> Set maximum messages in a packet for priority queue\n\n");
   fprintf(stderr, "  -c <core-idx>             select a core by index, -1 selects all\n");
   fprintf(stderr, "  -v                        verbose operation, print more details\n");
   fprintf(stderr, "  -h                        display this help and exit\n");
@@ -537,8 +533,10 @@ static void help(void) {
   fprintf(stderr, "  get                       gets ftm data from inactive page and displays it\n");
   fprintf(stderr, "  dump                      gets ftm data from active page and displays it\n");
   fprintf(stderr, "  loadfw <filename>         puts firmware from bin file to core\n");
-  fprintf(stderr, "\n");
   fprintf(stderr, "  condump                   debug feature. make this core output its data to console\n");
+  fprintf(stderr, "  preptime <Time / ns>      Set preparation time on this core\n");
+  fprintf(stderr, "\n");
+  
   //fprintf(stderr, "  condget                   debug feature. if this core is wating for a condition value, ask what it is\n");
   //fprintf(stderr, "  condset                   debug feature. set condition value in shared mem for this core\n");
   fprintf(stderr, "\n");
@@ -549,37 +547,26 @@ static void status(uint8_t cpuId)
 {
    uint32_t ftmStatus, mySharedMem;
    eb_status_t status;
-   eb_data_t tmpRd[1+1+2+2+2];
+   eb_data_t tmpRd[4];
    eb_cycle_t cycle;
    eb_address_t tmpAdr = embeddedOffset + FTM_SHARED_OFFSET;
-   long long unsigned int ftmTPrep, ftmTTrn, ftmTDue;
+   long long unsigned int ftmTPrep;
    
    if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
    eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_STAT_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[0]);
    eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_SHARED_PTR_OFFSET,   EB_BIG_ENDIAN | EB_DATA32, &tmpRd[1]); 
    eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRd[2]);
    eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET+4,      EB_BIG_ENDIAN | EB_DATA32, &tmpRd[3]);
-   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TTRN_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[4]);
-   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TTRN_OFFSET+4,       EB_BIG_ENDIAN | EB_DATA32, &tmpRd[5]);
-   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TDUE_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRd[6]);
-   eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TDUE_OFFSET+4,       EB_BIG_ENDIAN | EB_DATA32, &tmpRd[7]);
    if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close read cycle");
    ftmStatus = (uint32_t) tmpRd[0];
    sharedMem = tmpRd[1]; //convert lm32's view to pcie's view
    mySharedMem = clusterOffset + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
    ftmTPrep = (long long unsigned int)(((uint64_t)tmpRd[2]) << 32 | ((uint64_t)tmpRd[3]));
-   ftmTTrn  = (long long unsigned int)(((uint64_t)tmpRd[4]) << 32 | ((uint64_t)tmpRd[5]));
-   ftmTDue  = (long long unsigned int)(((uint64_t)tmpRd[6]) << 32 | ((uint64_t)tmpRd[7]));
+
     
     printf("**###############################################################################**\n");
-    printf("** Core #%02u               |   Status: %08x        MsgCnt: %08u           **\n", cpuId, ftmStatus, (ftmStatus >> 16));
+    printf("** Core #%02u  Status: %04x |   MsgCnt: %9u       TPrep: %13llu ns    **\n", cpuId, (uint16_t)ftmStatus, (ftmStatus >> 16), ftmTPrep<<3);
     printf("**------------------------+------------------------------------------------------**\n");
-    if(verbose) {
-    printf("** TPreparation:          |  %20llu                                **\n", ftmTPrep<<3);
-    printf("** TTransmission:         |  %20llu                                **\n", ftmTTrn<<3);
-    printf("** TDue:                  |  %20llu                                **\n", ftmTDue<<3);
-    printf("**------------------------+------------------------------------------------------**\n");
-    }
     printf("** Shared Mem: 0x%08x |", mySharedMem + cpuId*0x0C);
     if(actOffset < inaOffset) printf("   Act Page: A 0x%08x  Inact Page: B 0x%08x", actOffset, inaOffset);
     else                      printf("   Act Page: B 0x%08x  Inact Page: A 0x%08x", actOffset, inaOffset);
@@ -609,6 +596,7 @@ int main(int argc, char** argv) {
    
    char     filename[FILENAME_LEN];
    char     bpstr[10];
+   uint64_t uint64val = 0;
    
    t_ftmPage*  pPage    = NULL;
    t_ftmPage*  pNewPage = NULL;
@@ -622,6 +610,7 @@ int main(int argc, char** argv) {
    uint8_t firstCpu, lastCpu;
    
    eb_status_t ebstatus;
+   eb_cycle_t  cycle;
    
    cpuId    = 0;
    error    = 0;
@@ -684,8 +673,19 @@ int main(int argc, char** argv) {
       }
    }
    
-   if (!strcasecmp(command, "setbp")) 
-   {
+   if ( (!strcasecmp(command, "preptime")) || (!strcasecmp(command, "duetime")) || (!strcasecmp(command, "trntime")) || (!strcasecmp(command, "maxmsg"))) { 
+      if (optind+1 < argc) {
+         long long unsigned int tmp = strtoll(argv[optind+1], NULL, 10);
+         if(!strcasecmp(command, "maxmsg"))  uint64val = (uint64_t)tmp;
+         else                                uint64val = (uint64_t)(tmp>>3);
+      } else {
+         if(!strcasecmp(command, "maxmsg")) fprintf(stderr, "%s: expecting one non-optional argument: <Message Quantity>\n", program);
+         else fprintf(stderr, "%s: expecting one non-optional argument: <Time / ns>\n", program);
+         return 1;
+      }
+   }
+   
+   if (!strcasecmp(command, "setbp")) {
       if (optind+1 < argc) {
          bpstr[9] = 0;
          strncpy(bpstr, argv[optind+1], 8);
@@ -710,6 +710,32 @@ int main(int argc, char** argv) {
          resetBits = 1 << cpuId;
       }
    
+   if(!strcasecmp(command, "duetime")) {
+         printf("Trying to open prioq\n");
+         
+         if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
+         eb_cycle_write(cycle, (eb_address_t)(prioQ + r_FPQ.tDueHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(uint64val>>32)));
+         eb_cycle_write(cycle, (eb_address_t)(prioQ + r_FPQ.tDueLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val));
+         if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
+         return 0;
+   }
+   
+   
+   if(!strcasecmp(command, "trntime")) 
+   {
+         if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
+         eb_cycle_write(cycle, (eb_address_t)(prioQ + r_FPQ.tTrnHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(uint64val>>32)));
+         eb_cycle_write(cycle, (eb_address_t)(prioQ + r_FPQ.tTrnLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val));
+         if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
+         return 0;
+   }
+   
+   if(!strcasecmp(command, "maxmsg")) 
+   {
+         ebstatus = eb_device_write(device, (eb_address_t)(prioQ + r_FPQ.msgMax), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val), 0, eb_block);
+         return 0;
+   }
+   
    if (!strcasecmp(command, "loadfw")) {
       resetOffset = getResetAdr();
       printf("Putting CPU into Reset for FW load\n");
@@ -728,6 +754,8 @@ int main(int argc, char** argv) {
    }
    
    
+  
+   
    uint8_t k;
    for(k = firstCpu; k <= lastCpu; k++)
    {
@@ -744,56 +772,64 @@ int main(int argc, char** argv) {
        
       
       /* -------------------------------------------------------------------- */
-     if (!strcasecmp(command, "status")) {
-       status(k);
-     }
+      if (!strcasecmp(command, "status")) {
+         status(k);
+      }
 
-     /* -------------------------------------------------------------------- */
-     else if (!strcasecmp(command, "run")) {
+      /* -------------------------------------------------------------------- */
+      else if (!strcasecmp(command, "run")) {
        
-       if (verbose) {
-         printf("Starting FTM Core %u\n", k);
-       }
-       ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_START, 0, eb_block);
-       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+         if (verbose) {
+            printf("Starting FTM Core %u\n", k);
+         }
+         ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_START, 0, eb_block);
+         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
 
-     }
+      }
      
-     else if (!strcasecmp(command, "stop")) {
-       
-       if (verbose) {
-         printf("Requesting FTM Core %u to stop\n", k);
-       }
-       ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_REQ, 0, eb_block);
-       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-     }
-     
-     else if (!strcasecmp(command, "idle")) {
-       
-       if (verbose) {
-         printf("Setting BP of FTM COre %u to idle\n", k);
-       }
-       ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_IDLE, 0, eb_block);
-       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+      else if (!strcasecmp(command, "stop")) {
+         if (verbose) {
+            printf("Requesting FTM Core %u to stop\n", k);
+         }
+         ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_REQ, 0, eb_block);
+         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+      }
 
-     }
-     
-     else if (!strcasecmp(command, "fstop")) {
+      else if (!strcasecmp(command, "idle")) {
        
-       if (verbose) {
-         printf("Forcing FTM Core %u to stop\n", k);
-       }
-       ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_NOW, 0, eb_block);
-       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-     } 
+         if (verbose) {
+            printf("Setting BP of FTM COre %u to idle\n", k);
+         }
+         ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_IDLE, 0, eb_block);
+         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+
+      }
+
+      else if (!strcasecmp(command, "fstop")) {
+       
+         if (verbose) {
+            printf("Forcing FTM Core %u to stop\n", k);
+         }
+         ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_NOW, 0, eb_block);
+         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+      } 
+
+      else if (!strcasecmp(command, "reset")) {
+         if (verbose) {
+            printf("Resetting FTM Core %u\n", k);
+         }
+         ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_RST, 0, eb_block);
+         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
+      }
      
-     else if (!strcasecmp(command, "reset")) {
-       if (verbose) {
-         printf("Resetting FTM Core %u\n", k);
-       }
-       ebstatus = eb_device_write(device, embeddedOffset + FTM_SHARED_OFFSET + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_RST, 0, eb_block);
-       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
-     }
+      else if (!strcasecmp(command, "preptime")) {
+         
+   
+         if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
+         eb_cycle_write(cycle, (eb_address_t)(embeddedOffset + FTM_SHARED_OFFSET + FTM_TPREP_OFFSET +0), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(uint64val>>32));
+         eb_cycle_write(cycle, (eb_address_t)(embeddedOffset + FTM_SHARED_OFFSET + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)uint64val);
+         if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
+    }
      
      else if (!strcasecmp(command, "setbp")) {
        int planIdx, planQty;
