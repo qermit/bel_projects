@@ -580,7 +580,7 @@ static void status(uint8_t cpuId)
     printf("** TDue:                  |  %20llu                                **\n", ftmTDue<<3);
     printf("**------------------------+------------------------------------------------------**\n");
     }
-    printf("** Shared Mem: 0x%08x |", sharedMem + cpuId*0x0C);
+    printf("** Shared Mem: 0x%08x |", mySharedMem + cpuId*0x0C);
     if(actOffset < inaOffset) printf("   Act Page: A 0x%08x  Inact Page: B 0x%08x", actOffset, inaOffset);
     else                      printf("   Act Page: B 0x%08x  Inact Page: A 0x%08x", actOffset, inaOffset);
     printf("   **\n");
