@@ -2,20 +2,23 @@ DESTPATH = .
 FWPATH   = ../ftmfw
 TESTPATH = ../ftmverification
 TOOLPATH = ../ftmx86
+LN       = ln -s 
   
 all:	tool firmware testfw
+	echo off
 	#if test -d $(DESTPATH); \
      	#then echo exists; \
      	#else mkdir $(DESTPATH); \
      	#fi	
-	cp $(TOOLPATH)/ftm-ctl $(DESTPATH) 
-	cp $(TOOLPATH)/*.xml   $(DESTPATH)
-	cp $(TOOLPATH)/*manual*.txt   $(DESTPATH)
-	cp $(TESTPATH)/*.elf $(DESTPATH) 
-	cp $(TESTPATH)/*.bin $(DESTPATH) 
-	cp $(TESTPATH)/ecaconf $(DESTPATH) 
-	cp $(FWPATH)/*.elf $(DESTPATH) 
-	cp $(FWPATH)/*.bin $(DESTPATH)
+	$(LN) $(TOOLPATH)/ftm-ctl $(DESTPATH)/ftm-ctl
+	$(LN) $(TOOLPATH)/heartbeat.xml   $(DESTPATH)/heartbeat.xml
+	$(LN) $(TOOLPATH)/sourceLinac.xml   $(DESTPATH)/sourceLinac.xml
+	$(LN) $(TOOLPATH)/ring.xml   $(DESTPATH)/ring.xml
+	cp    $(TOOLPATH)/*manual*.txt   $(DESTPATH)
+	$(LN) $(TESTPATH)/verifyftm.bin $(DESTPATH)/ftm-ver.bin 
+	$(LN) $(TESTPATH)/load-verfw $(DESTPATH)/load-verfw
+	$(LN) $(TESTPATH)/eca-tm-pex-dbg $(DESTPATH)/eca-tm-dbg 
+	$(LN) $(FWPATH)/ftm.bin $(DESTPATH)/ftm.bin
 	echo
 	echo All files are ready in $(DESTPATH) 
 
@@ -27,7 +30,10 @@ testfw:
 	$(MAKE) -C $(TESTPATH)
          
 clean:
-	rm -f $(TOOLPATH)/*.o $(TOOLPATH)/*.elf $(TOOLPATH)/*.bin $(TOOLPATH)/ftm-ctl
-	rm -f $(FWPATH)/*.o $(FWPATH)/*.elf $(FWPATH)/*.bin
-	rm -f $(TESTPATH)/*.o $(TESTPATH)/*.elf $(TESTPATH)/*.bin
-	rm -f $(DESTPATH)/*.o $(DESTPATH)/*.elf $(DESTPATH)/*.bin $(DESTPATH)/*.xml $(DESTPATH)/ftm-ctl
+	$(MAKE) clean -C $(TOOLPATH)
+	$(MAKE) clean -C $(FWPATH)
+	$(MAKE) clean -C $(TESTPATH)
+	rm -f $(DESTPATH)/*.o $(DESTPATH)/*.elf $(DESTPATH)/*.bin $(DESTPATH)/ftm-ctl
+	rm -f $(DESTPATH)/heartbeat.xml $(DESTPATH)/sourceLinac.xml $(DESTPATH)/ring.xml
+	rm -f $(DESTPATH)/load-verfw $(DESTPATH)/eca-tm-dbg
+	rm -f $(DESTPATH)/*manual*.txt
