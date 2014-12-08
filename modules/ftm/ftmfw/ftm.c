@@ -21,6 +21,9 @@ void prioQueueInit()
    *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
    *(pFpqCtrl + r_FPQ.clear)     = 1;
    *(pFpqCtrl + r_FPQ.dstAdr)    = (uint32_t)pEca & ~0x80000000;
+#ifndef DEBUGPRIOQDST
+#define DEBUGPRIOQDST 0
+#endif
    *(pFpqCtrl + r_FPQ.tsAdr)     = (uint32_t)(DEBUGPRIOQDST);
    *(pFpqCtrl + r_FPQ.ebmAdr)    = ((uint32_t)pEbm & ~0x80000000);
    *(pFpqCtrl + r_FPQ.msgMax)    = 5;
