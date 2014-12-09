@@ -7,6 +7,7 @@
 #include <etherbone.h>
 #include "xmlaux.h"
 #include "ftmx86.h"
+#include "fancy.h"
 //#include "ebm.h"
 
 #define FILENAME_LEN   256
@@ -15,7 +16,6 @@
 #define MAX_DEVICES  100
 #define PACKET_SIZE  500
 #define CMD_LM32_RST 0x2
-
 
 const char* program;
 eb_device_t device;
@@ -237,7 +237,7 @@ static void ebPeripheryStatus()
    adr_ebm = (eb_address_t)devices[0].sdb_component.addr_first;
    
    ebRamRead(adr_ebm + EBM_REG_STATUS, EBM_REG_LAST, &buff[EBM_REG_STATUS]);
-   printf ("EBM********************************************************************************\n");
+   printf ("EBM||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
    printf ("Status\t\t: 0x%08x\n",  bytesToUint32(&buff[EBM_REG_STATUS]));
    printf ("Src Mac\t\t: 0x%08x%04x\n", bytesToUint32(&buff[EBM_REG_SRC_MAC_HI]),  bytesToUint32(&buff[EBM_REG_SRC_MAC_LO]));
    printf ("Src IP\t\t: 0x%08x\n", bytesToUint32(&buff[EBM_REG_SRC_IPV4]));
@@ -252,7 +252,7 @@ static void ebPeripheryStatus()
    
    ebRamRead(prioQ + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
    ebRamRead(prioQ + r_FPQ.dstAdr, r_FPQ.tsCh - r_FPQ.dstAdr, &buff[r_FPQ.dstAdr]);
-   printf ("FPQ********************************************************************************\n");
+   printf ("FPQ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
    cfg = bytesToUint32(&buff[r_FPQ.cfgGet]);
    printf("-----------------------------------------------------------------------------------\n");
     if(cfg & r_FPQ.cfg_ENA)            printf("    ENA   ");  else printf("     -    ");
@@ -563,23 +563,28 @@ static void status(uint8_t cpuId)
    mySharedMem = clusterOffset + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
    ftmTPrep = (long long unsigned int)(((uint64_t)tmpRd[2]) << 32 | ((uint64_t)tmpRd[3]));
 
-    
-    printf("**###############################################################################**\n");
-    printf("** Core #%02u  Status: %04x |   MsgCnt: %9u       TPrep: %13llu ns    **\n", cpuId, (uint16_t)ftmStatus, (ftmStatus >> 16), ftmTPrep<<3);
-    printf("**------------------------+------------------------------------------------------**\n");
-    printf("** Shared Mem: 0x%08x |", mySharedMem + cpuId*0x0C);
+    uint8_t i;
+     
+    printf("\u2552"); for(i=0;i<79;i++) printf("\u2550"); printf("\u2555\n");
+    printf("\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuId, KNRM);
+    printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u252C"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
+    printf("\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
+     (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), (uint16_t)(ftmStatus >> 16), ftmTPrep<<3);
+    printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u253C"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
+    printf("\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuId*0x0C);
     if(actOffset < inaOffset) printf("   Act Page: A 0x%08x  Inact Page: B 0x%08x", actOffset, inaOffset);
     else                      printf("   Act Page: B 0x%08x  Inact Page: A 0x%08x", actOffset, inaOffset);
-    printf("   **\n");
-    printf("**------------------------+------------------------------------------------------**\n");
-    printf("**       ");
-    if(ftmStatus & STAT_RUNNING)    printf("   RUNNING   ");  else printf("      -      ");
-    if(ftmStatus & STAT_IDLE)       printf("     IDLE    ");  else printf("      -      ");
+    printf("   \u2502\n");
+     printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u2534"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
+    printf("\u2502       ");
+    
+    if(ftmStatus & STAT_RUNNING)    printf("   %sRUNNING%s   ", KGRN, KNRM);  else printf("   %sSTOPPED%s   ", KRED, KNRM);
+    if(ftmStatus & STAT_IDLE)       printf("     %sIDLE%s    ", KYEL, KNRM);  else printf("     %sBUSY%s    ", KGRN, KNRM);
     if(ftmStatus & STAT_STOP_REQ)   printf("   STOP_REQ  ");  else printf("      -      ");
-    if(ftmStatus & STAT_ERROR)      printf("     ERROR   ");  else printf("      -      ");
+    if(ftmStatus & STAT_ERROR)      printf("     %sERROR%s   ", KRED, KNRM);  else printf("     %sOK%s      ", KGRN, KNRM);
     if(ftmStatus & STAT_WAIT)       printf("  WAIT_COND  ");  else printf("      -      ");
-    printf("       **\n");
-    printf("***********************************************************************************\n\n");
+    printf("       \u2502\n");
+    printf("\u2514"); for(i=0;i<79;i++) printf("\u2500"); printf("\u2518\n");
 
 }
 
@@ -746,7 +751,7 @@ int main(int argc, char** argv) {
    
     
    
-   if (!strcasecmp(command, "status")) { printf("#### FTM @ %s ####\n", netaddress); }
+   if (!strcasecmp(command, "status")) { printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM); }
    if (verbose) {
       ebRamOpen(netaddress, 0);
       ebPeripheryStatus();
@@ -979,6 +984,8 @@ int main(int argc, char** argv) {
       if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
       ebRamClose(); 
     }
+   
+  
    return 0;
 }
 

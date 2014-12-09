@@ -1,5 +1,5 @@
 FLAGS   = -fPIC -Wall -O2 -g -I/usr/include/libxml2
-CFLAGS  = $(FLAGS) -Wmissing-declarations -Wmissing-prototypes -DPLATFORM=$(BUILD)
+CFLAGS  = $(FLAGS) -Wmissing-declarations -Wmissing-prototypes -DPLATFORM=$(BUILD) -std=gnu99
 SOURCES	= main.c ftmx86.c xmlaux.c
 LIBS    = -Wl,-rpath,/usr/local/lib -letherbone -lxml2
 LIBRARY = libetherbone.so libxml2.so
