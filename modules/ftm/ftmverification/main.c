@@ -4,12 +4,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "mini_sdb.h"
+#include "mprintf.h"
 #include "aux.h"
 #include "ftm.h"
 #include "dbg.h"
 
 volatile unsigned int* pEC;
-
+volatile unsigned int* pFlush = (volatile unsigned int*)0x40000900;
 
 #define ECA_ACTION      0x9bfa4560
 
@@ -25,6 +26,12 @@ volatile unsigned int* pEC;
 #define ECA_EVT_TEF     0x34
 #define ECA_EVT_TI_HI   0x38
 #define ECA_EVT_TI_LO   0x3C
+
+#if CONCLICTS == 1
+  #define MSK 0x3
+#else
+  #define MSK 0x1
+#endif
 
 
 char buffer[12];
@@ -111,12 +118,14 @@ void report(uint64_t now, uint32_t actCnt, uint32_t errCnt)
 {
    const uint32_t bufSize = 24;
    char buf[bufSize];
-   
+      
+ 
    //acquire info on offending evt
    uint64_t id    = ((uint64_t)*(pEC + (ECA_EVT_ID_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_ID_LO >> 2));
    uint64_t par   = ((uint64_t)*(pEC + (ECA_EVT_PA_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_PA_LO >> 2));
    uint64_t time  = (((uint64_t)*(pEC + (ECA_EVT_TI_HI >> 2))) << 32 | (uint64_t)*(pEC + (ECA_EVT_TI_LO >> 2))) << 3;
-    
+   uint64_t flush = (((uint64_t)*(pFlush + (0 >> 2))) << 32 | (uint64_t)*(pFlush + (4 >> 2))) << 3;
+ 
    mprintf("################## %u/%u ##################", errCnt, actCnt);
    if( *(pEC + (ECA_FLAGS  >> 2)) & 0x01 ) mprintf("late ");
    if( *(pEC + (ECA_FLAGS  >> 2)) & 0x02 ) mprintf("conflict ");
@@ -144,11 +153,16 @@ void report(uint64_t now, uint32_t actCnt, uint32_t errCnt)
       //u64toStr(buf, tsdbg, bufSize);
       remLz(milPt(buf, tsdbg));
       mprintf("tsdsp:   %s\n",  buf);
+//      mprintf("flushptr: %08x val %8x%08x\n", pFlush, *(pFlush+1), *pFlush);	i
+//      remLz(milPt(buf, flush));
+//      mprintf("flush:   %s\n",  buf); 	
       //i64toStr(buf, ((int64_t)(now) - (int64_t)(tsdbg)), bufSize);
       remLz(milPt(buf, ((int64_t)(now) - (int64_t)(tsdbg))));
       mprintf("now-dsp: %s\n", buf);
       remLz(milPt(buf, ((int64_t)(time) - (int64_t)(tsdbg))));
-      mprintf("ts-dsp:  %s\n", buf);    
+      mprintf("ts-dsp:  %s\n", buf);
+      remLz(milPt(buf, ((int64_t)(time) - (int64_t)(flush))));
+      mprintf("ts-flush:  %s\n", buf);	    
    }
   
    
@@ -168,7 +182,12 @@ void init()
    uart_init_hw();
    uart_write_string("\nDebug Port\n");
  
-   mprintf("\fCore #%u scanning ECA @ 0x%08x for late arrivals / conflicts\n", getCpuIdx(), (uint32_t)pEC); 
+   mprintf("\fCore #%u scanning ECA @ 0x%08x for late arrivals" , getCpuIdx(), (uint32_t)pEC);
+#if CONFLICTS == 1
+   mprintf("/ conflicts\n");
+#else
+   mprintf("\n");
+#endif	
 }
 
 void main(void) {
@@ -191,7 +210,7 @@ void main(void) {
      now = getSysTime(); 
      if( *(pEC + (ECA_QUEACT >> 2))) { // if there is stuff in the action queue ...
         actCnt++;
-        if( *(pEC + (ECA_FLAGS  >> 2)) & 0x03 ) {    //  check for errors, if so, gather info on offending event and printf preport
+        if( *(pEC + (ECA_FLAGS  >> 2)) & MSK ) {    //  check for errors, if so, gather info on offending event and printf preport
           errCnt++;
           report(now<<3, actCnt, errCnt);
         }

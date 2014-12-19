@@ -3,12 +3,13 @@ CC      := lm32-elf-gcc
 TARGET    = verifyftm
 MYPATH    = .
 DEBUGLVL  = 0
+CONFLICTS = 0
 
 CHECKOUT  = ../../..
 INCPATH   = $(CHECKOUT)/modules/lm32-include
 W1        = $(CHECKOUT)/ip_cores/wrpc-sw
 FTMPATH   = $(CHECKOUT)/modules/ftm/ftmfw
-CFLAGS    = -I$(INCPATH) -mmultiply-enabled -mbarrel-shift-enabled -Os -I$(W1)/include -I$(W1)/pp_printf -I$(FTMPATH) -DDEBUGLEVEL=$(DEBUGLVL)
+CFLAGS    = -std=gnu99 -I$(INCPATH) -mmultiply-enabled -mbarrel-shift-enabled -Os -I$(W1)/include -I$(W1)/pp_printf -I$(FTMPATH) -DDEBUGLEVEL=$(DEBUGLVL) -DCONFLICTS=$(CONFLICTS)
 
 all: $(TARGET).bin $(TARGET).elf
 
