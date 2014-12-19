@@ -23,6 +23,11 @@
 #define FTM_TDUE_OFFSET       (FTM_TPREP_OFFSET    + 8) //b8    
 #define FTM_TTRN_OFFSET       (FTM_TDUE_OFFSET     + 8) //c0    
 #define FTM_IDLE_OFFSET       (FTM_TTRN_OFFSET + 8)     //c8
+#define FTM_DEBUG_DATA        (FTM_IDLE_OFFSET + 4)     //c8
+
+#define DBG_DISP_DUR_MIN      0
+#define DBG_DISP_DUR_MAX      DBG_DISP_DUR_MIN+1
+#define DBG_DISP_DUR_AVG      DBG_DISP_DUR_MAX+1
 
 
 //masks & constants

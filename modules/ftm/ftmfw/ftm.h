@@ -15,8 +15,7 @@ uint32_t cmdCnt;
 #define MSI_SIG             0
 #define TLU_CH_TEST         0x60
 
-// Priority Queue RegisterLayout
-static const struct {
+struct t_FPQ {
    uint32_t rst;
    uint32_t force;
    uint32_t dbgSet;
@@ -47,37 +46,12 @@ static const struct {
    uint32_t cfg_MSG_ARR_TS;
    uint32_t force_POP;
    uint32_t force_FLUSH;
-} r_FPQ = {    .rst        =  0x00 >> 2,
-               .force      =  0x04 >> 2,
-               .dbgSet     =  0x08 >> 2,
-               .dbgGet     =  0x0c >> 2,
-               .clear      =  0x10 >> 2,
-               .cfgGet     =  0x14 >> 2,
-               .cfgSet     =  0x18 >> 2,
-               .cfgClr     =  0x1C >> 2,
-               .dstAdr     =  0x20 >> 2,
-               .heapCnt    =  0x24 >> 2,
-               .msgCntO    =  0x28 >> 2,
-               .msgCntI    =  0x2C >> 2,
-               .tTrnHi     =  0x30 >> 2,
-               .tTrnLo     =  0x34 >> 2,
-               .tDueHi     =  0x38 >> 2,
-               .tDueLo     =  0x3C >> 2,
-               .capacity   =  0x40 >> 2,
-               .msgMax     =  0x44 >> 2,
-               .ebmAdr     =  0x48 >> 2,
-               .tsAdr      =  0x4C >> 2,
-               .tsCh       =  0x50 >> 2,
-               .cfg_ENA             = 1<<0,
-               .cfg_FIFO            = 1<<1,    
-               .cfg_IRQ             = 1<<2,
-               .cfg_AUTOPOP         = 1<<3,
-               .cfg_AUTOFLUSH_TIME  = 1<<4,
-               .cfg_AUTOFLUSH_MSGS  = 1<<5,
-               .cfg_MSG_ARR_TS      = 1<<6,
-               .force_POP           = 1<<0,
-               .force_FLUSH         = 1<<1
 };
+
+extern const struct t_FPQ r_FPQ;
+
+uint32_t prioQcapacity;
+
 
 typedef struct {
    uint8_t sig;
@@ -149,7 +123,8 @@ typedef struct {
    uint64_t    tTrn;
    t_ftmChain  idle;
    t_semaphore sema;
-   uint16_t    sctr;
+   uint32_t    sctr;
+   uint32_t    debug[32];
 } t_ftmIf;
 
 volatile t_ftmIf* pFtmIf;
@@ -157,26 +132,24 @@ t_ftmChain* pCurrentChain;
 
 void              prioQueueInit();
 void              ftmInit(void);
-void              sigSend(t_ftmChain* c);
-uint8_t           condValid(t_ftmChain* c);
-
 void              processFtm();
-t_ftmChain*       processChain(t_ftmChain* c);    //checks for condition and if chain is to be processed ( repQty != 0 )
-t_ftmChain*       processChainAux(t_ftmChain* c); //does the actual work
-int               dispatch(t_ftmMsg* pMsg);  //dispatch a message to prio queue
+
 void              cmdEval();
 void showFtmPage(t_ftmPage* pPage);
 void showStatus();
 
-extern unsigned int * pEcaAdr;
-extern unsigned int * pEbmAdr;
-extern unsigned int * pFPQctrl;
+extern uint32_t * pEcaAdr;
+extern uint32_t * pEbmAdr;
+extern uint32_t * pFPQctrl;
 
-uint16_t    getIdFID(uint64_t id);
-uint16_t    getIdGID(uint64_t id);
-uint16_t    getIdEVTNO(uint64_t id);
-uint16_t    getIdSID(uint64_t id);
-uint16_t    getIdBPID(uint64_t id);
-uint16_t    getIdSCTR(uint64_t id);
-void incIdSCTR(uint64_t* id, volatile uint16_t* sctr); 
+inline uint16_t getIdFID(uint64_t id)     {return ((uint16_t)(id >> ID_FID_POS))     & (ID_MSK_B16 >> (16 - ID_FID_LEN));}
+inline uint16_t getIdGID(uint64_t id)     {return ((uint16_t)(id >> ID_GID_POS))     & (ID_MSK_B16 >> (16 - ID_GID_LEN));}
+inline uint16_t getIdEVTNO(uint64_t id)   {return ((uint16_t)(id >> ID_EVTNO_POS))   & (ID_MSK_B16 >> (16 - ID_EVTNO_LEN));}
+inline uint16_t getIdSID(uint64_t id)     {return ((uint16_t)(id >> ID_SID_POS))     & (ID_MSK_B16 >> (16 - ID_SID_LEN));}
+inline uint16_t getIdBPID(uint64_t id)    {return ((uint16_t)(id >> ID_BPID_POS))    & (ID_MSK_B16 >> (16 - ID_BPID_LEN));}
+inline uint16_t getIdSCTR(uint64_t id)    {return ((uint16_t)(id >> ID_SCTR_POS))    & (ID_MSK_B16 >> (16 - ID_SCTR_LEN));}
+inline void incIdSCTR(uint64_t* id, volatile uint16_t* sctr)   {*id = ( *id & 0xfffffffffffffc00) | *sctr; *sctr = (*sctr+1) & ~0xfc00; DBPRINT3("id: %x sctr: %x\n", *id, *sctr);}
+inline uint32_t hiW(uint64_t dword) {return (uint32_t)(dword >> 32);}
+inline uint32_t loW(uint64_t dword) {return (uint32_t)dword;}
+
 #endif

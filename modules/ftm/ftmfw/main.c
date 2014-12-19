@@ -2,7 +2,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdint.h>
-
+#include "mprintf.h"
 #include "mini_sdb.h"
 #include "irq.h"
 #include "ftm.h"
@@ -107,12 +107,14 @@ int insertFpqEntry()
 void main(void) {
    
    int j;
-
+   
    init();
-
+   uint32_t test = &pFtmIf->tPrep;
+   
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
-   atomic_on(); 
-   mprintf("#%02u: Core ready\n", cpuId);
+   atomic_on();
+      
+   mprintf("#%02u: Core ready \n", cpuId);
    #if DEBUGLEVEL != 0
       mprintf("#%02u: Debuglevel %u. Don't expect timeley delivery with console outputs on!\n", cpuId, DEBUGLEVEL);
    #endif   
@@ -121,8 +123,10 @@ void main(void) {
    #endif
    #if DEBUGPRIOQ == 1
       mprintf("#%02u: Priority Queue Debugmode ON, timestamps will be written to 0x%08x on receivers", cpuId, DEBUGPRIOQDST);
-   #endif   
+   #endif
+    
    atomic_off();
+   mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
    //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
    /*
    t_time now, later;
