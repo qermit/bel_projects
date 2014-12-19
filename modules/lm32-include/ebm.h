@@ -26,8 +26,10 @@
 #ifndef EBM_H
 #define EBM_H
 #include <inttypes.h>
-extern volatile unsigned int* pEbm;
-extern volatile unsigned int* pEbmLast;
+#include <stdint.h>
+
+extern volatile uint32_t* pEbm;
+extern volatile uint32_t* pEbmLast;
 
 
 volatile uintptr_t EBM_OFFS_DAT;
@@ -72,7 +74,7 @@ typedef struct {
   unsigned char ipv4[4];
   unsigned short port;		
 } eb_lm32_udp_link;
-typedef unsigned int adress_type_t;
+typedef uint32_t adress_type_t;
 typedef unsigned char target_t;
 
 static const target_t       LOCAL   = 0;
@@ -82,11 +84,11 @@ static const adress_type_t  IP      = 2;
 static const adress_type_t  PORT    = 3;
 static const unsigned short myPort  = 0xEBD0;
 
-
+void ebm_init();
 void ebm_config_if(target_t conf, const char* con_info);
-void ebm_config_meta(unsigned int mtu, unsigned int hi_bits, unsigned int max_ops, unsigned int eb_ops);
-void ebm_hi(unsigned int address);
-void ebm_op(unsigned int address, unsigned int value, unsigned int optype);
+void ebm_config_meta(uint32_t mtu, uint32_t hi_bits, uint32_t max_ops, uint32_t eb_ops);
+void ebm_hi(uint32_t address);
+void ebm_op(uint32_t address, uint32_t value, uint32_t optype);
 void ebm_flush(void);
 
 
