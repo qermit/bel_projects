@@ -181,7 +181,7 @@ begin
 -- TIMER IRQ 
 --------------------------------------------------------------------------------
    TIMER_IRQ: wb_irq_timer
-   generic map(g_timers    => 3)
+   generic map(g_timers    => 1)
    port map(clk_sys_i      => clk_sys_i,            
             rst_sys_n_i    => rst_n_i,             
 
