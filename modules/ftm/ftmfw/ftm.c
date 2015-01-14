@@ -98,9 +98,9 @@ void ftmInit()
    pFtmIf->tDue         = 15000/8;
    prioQueueInit();
    
-   pFtmIf->debug[DBG_DISP_DUR_MIN] = 0xffffffff;
-   pFtmIf->debug[DBG_DISP_DUR_MAX] = 0x0;
-   pFtmIf->debug[DBG_DISP_DUR_AVG] = 0x0;
+   pDebug[DBG_DISP_DUR_MIN] = 0xffffffff;
+   pDebug[DBG_DISP_DUR_MAX] = 0x0;
+   pDebug[DBG_DISP_DUR_AVG] = 0x0;
 }
 
 inline void showId()
@@ -259,37 +259,34 @@ void showStatus()
    
 }
 
-inline int dispatch(t_ftmMsg* pMsg)
+inline int dispatch(void* pMsg)
 {
-  
+   
    unsigned int diff;
    int ret = 1;
 
-   
-   uint32_t msgCnt, stat; 
-   stat = pFtmIf->status;
-   
    diff = ( *(pFpqCtrl + r_FPQ.capacity) - *(pFpqCtrl + r_FPQ.heapCnt));
    if(diff > 1)
    {  
       //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
       atomic_on();
-      *pFpqData = hiW(pMsg->id);
-      *pFpqData = loW(pMsg->id);
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_ID_HI];
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_ID_LO];
       #if DEBUGTIME == 1
       *pFpqData = hiW(then) | 0xff000000;
       *pFpqData = loW(then);
       #else
-      *pFpqData = hiW(pMsg->par);
-      *pFpqData = loW(pMsg->par);
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_PAR_HI];
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_PAR_LO];
       #endif
-      *pFpqData = pMsg->tef;
-      *pFpqData = pMsg->res;
-      *pFpqData = hiW(pMsg->ts);
-      *pFpqData = loW(pMsg->ts);
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_TEF];
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_RES];
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_TS_HI];
+      *pFpqData = (uint32_t)pMsg[FTM_MSG_TS_LO];
       atomic_off();
-      msgCnt = (stat >> 16); 
-      pFtmIf->status = (stat & 0x0000ffff) | ((msgCnt+1) << 16);
+      
+      *(uint32_t*)&pFtmIf[FTM_MIF_MSGCNT]++;
+      
    } else {
       ret = 0;
       DBPRINT1("Queue full, waiting\n");
@@ -299,15 +296,20 @@ inline int dispatch(t_ftmMsg* pMsg)
 
 }
 
-inline uint8_t condValid(t_ftmChain* c)
+inline uint8_t condValid(void* c)
 {
-   uint8_t ret = 0;
-   t_time time;
-   t_ftmChain* tmp; 
+   uint32_t  cCondMsk   = (uin32_t)c[FTM_CHAIN_CONDMSK];
+   uint32_t  cCondVal   = (uin32_t)c[FTM_CHAIN_CONDVAL] & cCondMsk; // mask right now
+   uint64_t  TPrep      = (uin64_t)pFtmIf[FTM_MIF_TPREP];
+   uint32_t* pcFlags    = (uin32_t*)&c[FTM_CHAIN_FLAGS];
+   uint32_t* pcCondSrc  = (uin32_t*)c[FTM_CHAIN_PCONDSRC];
+   uint64_t* pcTStart   = (uin64_t*)&c[FTM_CHAIN_TSTART];
    
-   if(c->flags & (FLAGS_IS_COND_MSI | FLAGS_IS_COND_SHARED | FLAGS_IS_COND_ADR) )
+   uint8_t ret = 0;
+   
+   if(*pcFlags & (FLAGS_IS_COND_MSI | FLAGS_IS_COND_SHARED | FLAGS_IS_COND_ADR) )
    {
-      if(c->flags & FLAGS_IS_COND_MSI)
+      if(*pcFlags & FLAGS_IS_COND_MSI)
       {
          uint32_t  ip, msg;
          irq_disable();
@@ -319,58 +321,47 @@ inline uint8_t condValid(t_ftmChain* c)
             irq_clear(1<<MSI_SIG);     //clear pending bit
          }      
          irq_enable();
-         if((c->condVal & c->condMsk) == (msg & c->condMsk)) ret = 1;   
+         if(cCondVal == (msg & cCondMsk)) ret = 1;   
       }
       else
       {
-         tmp = (t_ftmChain*)c->pNext;
-            
-         DBPRINT3("CPU %u Val: %08x Con: %08x Adr: %08x\n", getCpuID() , (c->condVal & c->condMsk),  (*c->condSrc), c->condSrc );
-         if((c->condVal & c->condMsk) == ((*c->condSrc) & c->condMsk) ) 
+         DBPRINT3("CPU %u Val: %08x Con: %08x Adr: %08x\n", getCpuID() , cCondVal,  *pcCondSrc, pcCondSrc );
+         if(cCondVal == (*pcCondSrc & cCondMsk)) 
          {
-            if(c->flags & FLAGS_IS_COND_TIME)
-            {
-               time  =  (uint64_t)(*c->condSrc+1);
-               time |= ((uint64_t)(*c->condSrc+2))<<32;
-               c->tStart = time;
-            }   
-            else c->tStart = getSysTime()+ pFtmIf->tPrep;
-            tmp = (t_ftmChain*)c->pNext;
-                 
-            ret = 1;
-            DBPRINT1("Val: %08x Src: %08x Adr: %08x\n", (c->condVal & c->condMsk),  (*c->condSrc), c->condSrc );
-            (*c->condSrc) = 0x0;
+            if(*pcFlags & FLAGS_IS_COND_TIME)   *pcTStart = *(uint64_t*)(pcCondSrc+1);
+            else                                *pcTStart = getSysTime() + TPrep;
+            *pcCondSrc  = 0;         
+            ret         = 1;
+            DBPRINT1("Val: %08x Src: %08x Adr: %08x\n", cCondVal,  *pcCondSrc, pcCondSrc );
          }
       }
    }
    else ret = 1;
    
-   if(ret) {pFtmIf->status &= ~STAT_WAIT; pFtmIf->sema.cond = 0;}    
-   else    {pFtmIf->status |=  STAT_WAIT; }
+   if(ret) {*(uint32_t*)&pFtmIf[FTM_MIF_STAT] &= ~STAT_WAIT; *pcFlags &= ~FLAGS_SEMA_CON;}    
+   else    {*(uint32_t*)&pFtmIf[FTM_MIF_STAT] |=  STAT_WAIT; }
    
    return ret; 
 } 
 
-inline void sigSend(t_ftmChain* c)
+inline void sigSend(void* c)
 {
-   t_time time;
+   uint64_t  cTStart    =   (uin64_t)c[FTM_CHAIN_TSTART];
+   uint64_t  cTPeriod   =   (uin64_t)c[FTM_CHAIN_TPERIOD];
+   uint32_t* pcFlags    = (uin32_t*)&c[FTM_CHAIN_FLAGS];
+   uint32_t* pcSigDst   = (uin32_t*)&c[FTM_CHAIN_SIGDST];
+   uint32_t  cSigVal    =  (uin32_t)&c[FTM_CHAIN_SIGDST];
    
-   //DBPRINT1("Sig Val: %08x Dst: %08x\n", c->sigVal,  c->sigDst );
-   time = c->tStart + c->tPeriod;
+   *pcFlags &= ~FLAGS_SEMA_SIG; 
+   *pcSigDst = cSigVal;
+   if(*pcFlags & FLAGS_IS_SIG_TIME) *(uint64_t*)(pcSigDst+1) = cTStart + cTPeriod;
    
-   *(c->sigDst) = c->sigVal;
-   if(c->flags & FLAGS_IS_SIG_TIME)
-   {
-      *(c->sigDst+1) = hiW(time);
-      *(c->sigDst+2) = loW(time);
-   }
-   pFtmIf->sema.sig = 0; 
 }
 
-inline t_ftmChain* processChainAux(t_ftmChain* c)
+inline t_ftmChain* processChainAux(void* c)
 {
-   t_ftmChain* pCur;
-   t_ftmMsg*   pCurMsg;
+   void* pCur, pCurMsg;
+   
    uint64_t tMsgExec, now;
 
    uint64_t dbg_now, dbg_then; 
@@ -380,97 +371,92 @@ inline t_ftmChain* processChainAux(t_ftmChain* c)
    pCur  = c; 
    now   = getSysTime();
    
-   if( now + pFtmIf->tPrep >= c->tStart) {
-      //DBPRINT3("now+tp\t: x%08x%08x\ncstart\t: x%08x%08x\n", hiW(now + pFtmIf->tPrep), loW(now + pFtmIf->tPrep), hiW(c->tStart), loW(c->tStart)    ); 
-      //signal to send ?
-      if(pFtmIf->sema.sig &&  (c->flags & (FLAGS_IS_SIG_MSI | FLAGS_IS_SIG_SHARED))) {
-          
-         sigSend(c);
-      }
-      
-      DBPRINT3("repcnt %04x repqty %04x\n", c->repCnt, c->repQty);
-      if( c->repCnt < c->repQty || c->repQty == -1) //reps left ?  
-      {
-         DBPRINT3("repcnt %u repqty %u", c->repCnt, c->repQty);
-         if(c->msgIdx < c->msgQty) //msgs left to process?
-         {
-            pCurMsg = c->pMsg + c->msgIdx;
-            pCurMsg->ts = c->tStart + pCurMsg->offs; //set execution time for msg 
-            if( now + pFtmIf->tPrep >= pCurMsg->ts)  //### time to hand it over to prio queue ? ###
-            {
-
-               
+   //get everything that's constant to us by value
+   uint64_t  TPrep      = (uin64_t)pFtmIf[FTM_MIF_TPREP];
+   uint64_t  cTPeriod   = (uin64_t)c[FTM_CHAIN_TPERIOD];
+   uint32_t  cMsgQty    = (uin32_t)c[FTM_CHAIN_MSGQTY];
+   uint32_t  cRepQty    = (uin32_t)c[FTM_CHAIN_REPQTY];
    
-               
-               uint32_t msgCnt = (pFtmIf->status >> 16); 
-               
+   //everything else will be pointers if we use it often
+   uint64_t* pcTStart   = (uin64_t*)&c[FTM_CHAIN_TSTART];
+   uint32_t* pcMsgIdx   = (uin32_t*)&c[FTM_CHAIN_MSGIDX];
+   uint32_t* pcRepCnt   = (uin32_t*)&c[FTM_CHAIN_REPCNT];
+   uint32_t* pcFlags    = (uin32_t*)&c[FTM_CHAIN_FLAGS];
+   uint32_t* pDebug     = (uin32_t*)&pFtmIf[FTM_MIF_DEBUG_DATA];
+   
+   //pointers to pointers
+   void*     pcNext    = (void*)c[FTM_CHAIN_PNEXT];
+   void*     pcMsg     = (void*)c[FTM_CHAIN_PMSG];
+   void*     pIdle     = (void*)pFtmIf[FTM_MIF_PIDLE];
+   void*     pBP       = (void*)(((void*)pFtmIf[FTM_MIF_PACT])[FTM_MIF_PBP]);
+   
+   
+   if( now + TPrep >= *pcTStart) { // are we in the preparation phase for this chain's start time?
+      //signal to send ?
+      if((*pcFlags & FLAGS_SEMA_SIG) &&  (*pcFlags & (FLAGS_IS_SIG_MSI | FLAGS_IS_SIG_SHARED))) sigSend(c);
+
+      if( *pcRepCnt < cRepQty || cRepQty == -1) //reps left ?  
+      {
+         if(*pcMsgIdx < cMsgQty) //msgs left to process?
+         {
+            pCurMsg = pcMsg + (*pcMsgIdx * FTM_CHAIN_END_); // create pointer to current message
+            *(uint64_t*)&pCurMsg[FTM_MSG_TS] = *pcTstart + (uint64_t)pCurMsg[FTM_MSG_OFFS]; //set execution time for current msg 
+            if( now + TPrep >= (uint64_t)pCurMsg[FTM_MSG_TS])  //### time to hand it over to prio queue ? ###
+            {
                dbg_then = getSysTime();
-               if(dispatch(pCurMsg)) c->msgIdx++;
+               if(dispatch(pCurMsg)) *pcMsgIdx++;
                dbg_now = getSysTime();
       
-                  //Debug Stuff
-                  
                dbg_dur = (uint32_t)(dbg_now-dbg_then);
                if(msgCnt == 0) dbg_sum = 0;
                else dbg_sum += (uint64_t)dbg_dur;
-               if(pFtmIf->debug[DBG_DISP_DUR_MIN] > dbg_dur) pFtmIf->debug[DBG_DISP_DUR_MIN] = dbg_dur; //min
-               if(pFtmIf->debug[DBG_DISP_DUR_MAX] < dbg_dur) pFtmIf->debug[DBG_DISP_DUR_MAX] = dbg_dur; //max
-               pFtmIf->debug[DBG_DISP_DUR_AVG] = dbg_sum/(msgCnt+1);
+               if(pDebug[DBG_DISP_DUR_MIN] > dbg_dur) pDebug[DBG_DISP_DUR_MIN] = dbg_dur; //min
+               if(pDebug[DBG_DISP_DUR_MAX] < dbg_dur) pDebug[DBG_DISP_DUR_MAX] = dbg_dur; //max
+               pDebug[DBG_DISP_DUR_AVG] = dbg_sum/(msgCnt+1);
                
-            } else DBPRINT3("Too early for Msg %u", c->msgIdx);
-            
-            
-            
+            } else DBPRINT3("Too early for Msg %u", *pcMsgIdx);
          } 
-         else
+         else // no msgs left. was this the last rep?
          {
-           
-      
-            c->msgIdx = 0; c->repCnt++; //repetions left, stay with this chain
-                 
-            if( (c->flags & FLAGS_IS_END) && (c->flags & FLAGS_IS_ENDLOOP)) 
+//FIXME what the fuck... this is highly suspicious !!!
+            if( (*pcFlags & FLAGS_IS_END) && (*pcFlags & FLAGS_IS_ENDLOOP)) 
             { 
-               pCur = (t_ftmChain*)c->pNext;
-               pFtmIf->sema.sig  = 1;
-               pFtmIf->sema.cond = 1;
+               pCur        = pcNext;
+               pcFlags*   |= (FLAGS_SEMA_SIG | FLAGS_SEMA_CON);
                DBPRINT1("Chain Loop to 0x%08x\n", pCur); 
             }
             else pCur = c;
-            
-            pCur->tStart = c->tStart + c->tPeriod; 
-            if(c->flags & FLAGS_IS_SIG_ALL)  pFtmIf->sema.sig  = 1;
-            if(c->flags & FLAGS_IS_COND_ALL) pFtmIf->sema.cond = 1;
-
+//FIXME
+            //this is fine
+            *pcMsgIdx = 0; *pcRepCnt++; //repetions left, stay with this chain
+            *(uin64_t*)&pCur[FTM_CHAIN_TSTART]         = *pcTStart + cTPeriod; 
+            if(*pcFlags & FLAGS_IS_SIG_ALL)  pcFlags* |= FLAGS_SEMA_SIG;
+            if(*pcFlags & FLAGS_IS_COND_ALL) pcFlags* |= FLAGS_SEMA_CON;
          }
       } 
       else
       {
          //done, go to next chain
-         DBPRINT3("RepCnt: %u RepQty: %u\n", c->repCnt, c->repQty);
-         c->msgIdx = 0; c->repCnt = 0;
-         if( ((c->flags & FLAGS_IS_END) && (c->flags & FLAGS_IS_ENDLOOP)) || (c->pNext == NULL) ) pCur = (t_ftmChain*)&pFtmIf->idle;
-         else pCur = (t_ftmChain*)c->pNext;
-         
-         pCur->tStart = c->tStart + c->tPeriod;
-         pFtmIf->sema.sig  = 1;
-         pFtmIf->sema.cond = 1;
-         DBPRINT3("NC SemaCond: %u\n", pFtmIf->sema.cond);
-        
+//FIXME what the fuck... this is highly suspicious !!!         
+         *pcMsgIdx = 0; *pcRepCnt = 0;
+         //end of sequence? go to idle, else go to next
+         if( ((*pcFlags & FLAGS_IS_END) && (*pcFlags & FLAGS_IS_ENDLOOP)) || (pcNext == NULL) ) pCur = pIdle;
+         else                                                                                   pCur = pcNext;
+//FIXME
+         *(uin64_t*)&pCur[FTM_CHAIN_TSTART]   = *pcTStart + cTPeriod;   //next chain begins at current start plus current period
+         pcFlags*                            |= (FLAGS_SEMA_SIG | FLAGS_SEMA_CON); //reset semaphores
       }
       
    }
    
    //is c a branchpoint? if so, jump, reset sequence counter (sctr), semaphores and BP
-   if((c->flags & FLAGS_IS_BP) && (pFtmIf->pAct->pBp != NULL))       
+   if((*pcFlags & FLAGS_IS_BP) && (pBP != NULL))       
    { 
-      pCur = pFtmIf->pAct->pBp;  //BP? go to alt chain
+      pCur = pBP;  //BP? go to alt chain
+      pBP  = NULL;
       
-      pFtmIf->sctr      = 0;
-      pFtmIf->pAct->pBp = NULL;
-      pFtmIf->sema.sig  = 1;
-      pFtmIf->sema.cond = 1;
-      
-      DBPRINT3("BP SemaCond: %u\n", pFtmIf->sema.cond);
+      *(uin32_t*)&pFtmIf[FTM_MIF_SCTR] = 0;
+      pcFlags*    |= ( FLAGS_SEMA_SIG | FLAGS_SEMA_CON);
    }
     
    return pCur;    
@@ -487,17 +473,17 @@ inline t_ftmChain* processChain(t_ftmChain* c)
    if ( !c->tStart ) {c->tStart = now + pFtmIf->tPrep; DBPRINT2("Adjust time\n#ST: %08x %08x \n TS: %08x %08x\n", now, c->tStart);}
    
    
-   if(pFtmIf->sema.cond) condValid(c);
+   if( pcFlags* & FLAGS_SEMA_CON ) condValid(c);
    
    if(!pFtmIf->sema.cond) pCur = processChainAux(c); 
    else 
    {
-      if((c->flags & FLAGS_IS_BP) && pFtmIf->pAct->pBp != NULL)
+      if((c->flags & FLAGS_IS_BP) && pBP != NULL)
       { 
          pCur = pFtmIf->pAct->pBp; 
          
          pFtmIf->sctr      = 0;
-         pFtmIf->pAct->pBp = NULL;
+         pBP = NULL;
       } 
    }
       

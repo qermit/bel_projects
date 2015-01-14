@@ -110,24 +110,9 @@ typedef struct {
    
 } t_ftmPage;
 
-typedef struct {
-   t_ftmPage   pPages[2];
-   uint32_t    cmd;
-   uint32_t    status;
-   t_ftmPage*  pAct;
-   t_ftmPage*  pIna;
-   t_ftmChain* pNewBp;
-   t_shared*   pSharedMem;
-   uint64_t    tPrep;
-   uint64_t    tDue;
-   uint64_t    tTrn;
-   t_ftmChain  idle;
-   t_semaphore sema;
-   uint32_t    sctr;
-   uint32_t    debug[32];
-} t_ftmIf;
 
-volatile t_ftmIf* pFtmIf;
+
+volatile void* pFtmIf;
 t_ftmChain* pCurrentChain;
 
 void              prioQueueInit();
