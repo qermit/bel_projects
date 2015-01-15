@@ -25,15 +25,41 @@
 #define FTM_MIF_MSGCNT     (FTM_MIF_STAT       + 4) //     
 #define FTM_MIF_PACT       (FTM_MIF_MSGCNT     + 4) //    
 #define FTM_MIF_PINA       (FTM_MIF_PACT       + 4) //    
-#define FTM_MIF_NEW_BP     (FTM_MIF_PINA       + 4) //    
-#define FTM_MIF_PSHARED    (FTM_MIF_NEW_BP     + 4) //    
-#define FTM_MIF_TPREP      (FTM_MIF_PSHARED    + 4) //  
-#define FTM_MIF_TDUE       (FTM_MIF_TPREP      + 8) //    
-#define FTM_MIF_TTRN       (FTM_MIF_TDUE       + 8) //    
+#define FTM_MIF_PBP        (FTM_MIF_PINA       + 4) //    
+#define FTM_MIF_PSHARED    (FTM_MIF_PBP        + 4) //    
+#define FTM_MIF_TPREP      (FTM_MIF_PSHARED    + 4) //
+#define FTM_MIF_TPREP_LO    FTM_MIF_TPREP
+#define FTM_MIF_TPREP_HI   (FTM_MIF_TPREP_LO   + 4)  
+#define FTM_MIF_TDUE       (FTM_MIF_TPREP      + 8) //
+#define FTM_MIF_TDUE_LO     FTM_MIF_TDUE
+#define FTM_MIF_TDUE_HI    (FTM_MIF_TDUE_LO    + 4)    
+#define FTM_MIF_TTRN       (FTM_MIF_TDUE       + 8) //
+#define FTM_MIF_TTRN_LO     FTM_MIF_TTRN
+#define FTM_MIF_TTRN_HI    (FTM_MIF_TTRN_LO    + 4)    
 #define FTM_MIF_PIDLE      (FTM_MIF_TTRN       + 8) //
 #define FTM_MIF_SCTR       (FTM_MIF_PIDLE      + 4) //
 #define FTM_MIF_DEBUG_DATA (FTM_MIF_SCTR       + 4) //
 #define FTM_MIF_END_       (FTM_MIF_DEBUG_DATA + 8*32) //
+
+
+#define FTM_CON_PSRC       0
+#define FTM_CON_CMP        (FTM_CON_PSRC    + 4)
+#define FTM_CON_CMP_LO     FTM_CON_CMP
+#define FTM_CON_CMP_HI     (FTM_CON_CMP_LO  + 4)
+#define FTM_CON_MSK        (FTM_CON_CMP     + 8)
+#define FTM_CON_MSK_LO     FTM_CON_MSK
+#define FTM_CON_MSK_HI     (FTM_CON_MSK_LO  + 4)
+#define FTM_CON_PJMP       (FTM_CON_MSK     + 8)
+#define FTM_CON_PNEXT      (FTM_CON_PJMP    + 4)
+#define FTM_CON_END_       (FTM_CON_PNEXT   + 4)
+
+#define FTM_SIG_PDST       0
+#define FTM_SIG_VAL        (FTM_SIG_PDST    + 4)
+#define FTM_SIG_VAL_LO     FTM_SIG_VAL
+#define FTM_SIG_VAL_HI     (FTM_SIG_VAL_LO  + 4)
+#define FTM_SIG_PNEXT      (FTM_SIG_VAL     + 8)
+#define FTM_SIG_END_       (FTM_SIG_PNEXT   + 4)
+
 
 #define FTM_MSG_ID         0
 #define FTM_MSG_ID_LO      FTM_MSG_ID
@@ -49,22 +75,19 @@
 #define FTM_MSG_OFFS       (FTM_MSG_TS    + 8)
 #define FTM_MSG_END_       (FTM_MSG_OFFS  + 8)
 
-#define FTM_CHAIN_TTRN     0
-#define FTM_CHAIN_TSTART   0
+#define FTM_CHAIN_ID       0
+#define FTM_CHAIN_TSTART   (FTM_CHAIN_ID             + 4)
 #define FTM_CHAIN_TPERIOD  (FTM_CHAIN_TSTART         + 8)
 #define FTM_CHAIN_TEXEC    (FTM_CHAIN_TPERIOD        + 8)
 #define FTM_CHAIN_FLAGS    (FTM_CHAIN_TEXEC          + 8)
-#define FTM_CHAIN_CONDSRC  (FTM_CHAIN_FLAGS          + 4)
-#define FTM_CHAIN_CONDVAL  (FTM_CHAIN_CONDSRC        + 4)
-#define FTM_CHAIN_CONDMSK  (FTM_CHAIN_CONDVAL        + 4)
-#define FTM_CHAIN_SIGDST   (FTM_CHAIN_CONDMSK        + 4)
-#define FTM_CHAIN_SIGVAL   (FTM_CHAIN_SIGDST         + 4)
-#define FTM_CHAIN_REPQTY   (FTM_CHAIN_SIGVAL         + 4)
+#define FTM_CHAIN_REPQTY   (FTM_CHAIN_FLAGS          + 4)
 #define FTM_CHAIN_REPCNT   (FTM_CHAIN_REPQTY         + 4)
 #define FTM_CHAIN_MSGQTY   (FTM_CHAIN_REPCNT         + 4)
 #define FTM_CHAIN_MSGIDX   (FTM_CHAIN_MSGQTY         + 4)
 #define FTM_CHAIN_PMSG     (FTM_CHAIN_MSGIDX         + 4)
-#define FTM_CHAIN_PNEXT    (FTM_CHAIN_PMSG           + 4)
+#define FTM_CHAIN_PCON     (FTM_CHAIN_PMSG           + 4)
+#define FTM_CHAIN_PSIG     (FTM_CHAIN_PCON           + 4)
+#define FTM_CHAIN_PNEXT    (FTM_CHAIN_PSIG           + 4)
 #define FTM_CHAIN_END_     (FTM_CHAIN_PNEXT          + 4)
 
 #define DBG_DISP_DUR_MIN   0
@@ -111,9 +134,8 @@
 
 #define FLAGS_IS_BP           (1<<0)
 
-#define FLAGS_IS_COND_MSI     (1<<4)
-#define FLAGS_IS_COND_SHARED  (1<<5)
-#define FLAGS_IS_COND_ADR     (1<<6)
+#define FLAGS_IS_COND         (1<<3)
+#define FLAGS_IS_COND_CLR     (1<<4)
 #define FLAGS_IS_COND_TIME    (1<<7)
 #define FLAGS_IS_COND_ALL     (1<<8)
 
@@ -125,6 +147,7 @@
 #define FLAGS_IS_SIG_FIRST    (1<<16)
 #define FLAGS_IS_SIG_LAST     (1<<17)
 #define FLAGS_IS_SIG_ALL      (1<<18)
+#define FLAGS_IS_SIG_64       (1<<19)
 
 #define FLAGS_IS_START        (1<<20) 
 #define FLAGS_IS_END          (1<<21) 

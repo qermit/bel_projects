@@ -109,7 +109,6 @@ void main(void) {
    int j;
    
    init();
-   uint32_t test = &pFtmIf->tPrep;
    
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    atomic_on();
@@ -126,17 +125,6 @@ void main(void) {
    #endif
     
    atomic_off();
-   mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
-   //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
-   /*
-   t_time now, later;
-   int64_t diff, diffSum;
-   int64_t diffMin, diffMax, diffAvg;
-   int64_t div = 1000000;
-   diffMin =  0x7fffffff;
-   diffMax =  0xffffffff;
-   diffAvg =  0;
-   */
    
    while (1) {
       cmdEval();
