@@ -1,7 +1,6 @@
 #include "ftm.h"
 #include "dbg.h"
 
-const uint8_t Idle[FTM_CHAIN_END_];
 const uint8_t IdleCon[FTM_CON_END_];
 
 const struct t_FPQ r_FPQ = {    .rst        =  0x00 >> 2,
@@ -76,7 +75,8 @@ void ftmInit()
    pFtmIf = (uint8_t*)_startshared;
    
    volatile uint8_t* pIf   = pFtmIf;
-   uint8_t* pIdle = (uint8_t*)&Idle;
+   uint8_t* pIdle    = (uint8_t*)&pIf[FTM_MIF_IDLE];
+   uint8_t* pIdleCon = (uint8_t*)&pIf[FTM_MIF_IDLE_CON]; 
    
    uint32_t* pDebug = (uint32_t*)&pIf[FTM_MIF_DEBUG_DATA];
    pDebug[DBG_DISP_DUR_MIN] = 0xffffffff;
@@ -96,19 +96,17 @@ void ftmInit()
    *(uint32_t*)&pIdle[FTM_CHAIN_ID]       = 0xDEADBEEF;
    *(uint32_t*)&pIdle[FTM_CHAIN_TSTART]   = 0;
    *(uint32_t*)&pIdle[FTM_CHAIN_TPERIOD]  = 1000/8;
-   *(uint32_t*)&pIdle[FTM_CHAIN_ID]       = 0xDEADBEEF;
    *(uint32_t*)&pIdle[FTM_CHAIN_FLAGS]    = 0;
    *(uint32_t*)&pIdle[FTM_CHAIN_REPQTY]   = -1;
    *(uint32_t*)&pIdle[FTM_CHAIN_REPCNT]   = 0;
    *(uint32_t*)&pIdle[FTM_CHAIN_MSGQTY]   = 0;
    *(uint32_t*)&pIdle[FTM_CHAIN_MSGIDX]   = 0;
+   *(uint8_t**)&pIdle[FTM_CHAIN_PMSG]     = (uint8_t*)NULL;
+   *(uint8_t**)&pIdle[FTM_CHAIN_PCON]     = (uint8_t*)NULL;
+   *(uint8_t**)&pIdle[FTM_CHAIN_PSIG]     = (uint8_t*)NULL;
+   *(uint8_t**)&pIdle[FTM_CHAIN_PNEXT]    = (uint8_t*)NULL;     
    
-      *(uint8_t**)&pIdle[FTM_CHAIN_PMSG]     = (uint8_t*)NULL;
-      *(uint8_t**)&pIdle[FTM_CHAIN_PCON]     = (uint8_t*)&IdleCon;
-      *(uint8_t**)&pIdle[FTM_CHAIN_PSIG]     = (uint8_t*)NULL;
-      *(uint8_t**)&pIdle[FTM_CHAIN_PNEXT]    = (uint8_t*)NULL;     
-   
-   pCurrentChain        = (uint8_t*)&Idle;
+   pCurrentChain        = pIdle;
    prioQueueInit();
    
    

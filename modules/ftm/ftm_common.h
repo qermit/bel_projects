@@ -25,8 +25,8 @@
 #define FTM_MIF_MSGCNT     (FTM_MIF_STAT       + 4) //     
 #define FTM_MIF_PACT       (FTM_MIF_MSGCNT     + 4) //    
 #define FTM_MIF_PINA       (FTM_MIF_PACT       + 4) //    
-#define FTM_MIF_PBP        (FTM_MIF_PINA       + 4) //    
-#define FTM_MIF_PSHARED    (FTM_MIF_PBP        + 4) //    
+#define FTM_MIF_IDBP       (FTM_MIF_PINA       + 4) //    
+#define FTM_MIF_PSHARED    (FTM_MIF_IDBP       + 4) //    
 #define FTM_MIF_TPREP      (FTM_MIF_PSHARED    + 4) //
 #define FTM_MIF_TPREP_LO    FTM_MIF_TPREP
 #define FTM_MIF_TPREP_HI   (FTM_MIF_TPREP_LO   + 4)  
@@ -39,7 +39,9 @@
 #define FTM_MIF_PIDLE      (FTM_MIF_TTRN       + 8) //
 #define FTM_MIF_SCTR       (FTM_MIF_PIDLE      + 4) //
 #define FTM_MIF_DEBUG_DATA (FTM_MIF_SCTR       + 4) //
-#define FTM_MIF_END_       (FTM_MIF_DEBUG_DATA + 8*32) //
+#define FTM_MIF_IDLE       (FTM_MIF_DEBUG_DATA + 8*32) //
+#define FTM_MIF_IDLE_CON   (FTM_MIF_IDLE + FTM_CHAIN_END_) //
+#define FTM_MIF_END_       (FTM_MIF_IDLE_CON + FTM_CON_END_ ) //
 
 
 #define FTM_CON_PSRC       0
@@ -49,7 +51,8 @@
 #define FTM_CON_MSK        (FTM_CON_CMP     + 8)
 #define FTM_CON_MSK_LO     FTM_CON_MSK
 #define FTM_CON_MSK_HI     (FTM_CON_MSK_LO  + 4)
-#define FTM_CON_PJMP       (FTM_CON_MSK     + 8)
+#define FTM_CON_IDJMP      (FTM_CON_MSK     + 8)
+#define FTM_CON_PJMP       (FTM_CON_IDJMP   + 4)
 #define FTM_CON_PNEXT      (FTM_CON_PJMP    + 4)
 #define FTM_CON_END_       (FTM_CON_PNEXT   + 4)
 
@@ -164,8 +167,14 @@
 #define FTM_PTR_SIZE          4
 #define FTM_NULL              0x0
 
-
-
+#define CHAIN_ID_PROC_POS     28
+#define CHAIN_ID_PROC_MSK     0xf0000000
+#define CHAIN_ID_PLAN_POS     24
+#define CHAIN_ID_PLAN_MSK     0x0f000000 
+#define CHAIN_ID_CHAIN_POS    12    
+#define CHAIN_ID_CHAIN_MSK    0x00fff000
+#define CHAIN_ID_TOKEN_POS    0    
+#define CHAIN_ID_TOKEN_MSK    0x00000fff
 
 extern uint32_t*       _startshared[];
 extern uint32_t*       _endshared[];

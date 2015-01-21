@@ -72,12 +72,16 @@ extern uint32_t * pEbmAdr;
 extern uint32_t * pFPQctrl;
 extern volatile uint32_t * pSharedRam;
 
-inline uint16_t getIdFID(uint64_t id)     {return ((uint16_t)(id >> ID_FID_POS))     & (ID_MSK_B16 >> (16 - ID_FID_LEN));}
-inline uint16_t getIdGID(uint64_t id)     {return ((uint16_t)(id >> ID_GID_POS))     & (ID_MSK_B16 >> (16 - ID_GID_LEN));}
-inline uint16_t getIdEVTNO(uint64_t id)   {return ((uint16_t)(id >> ID_EVTNO_POS))   & (ID_MSK_B16 >> (16 - ID_EVTNO_LEN));}
-inline uint16_t getIdSID(uint64_t id)     {return ((uint16_t)(id >> ID_SID_POS))     & (ID_MSK_B16 >> (16 - ID_SID_LEN));}
-inline uint16_t getIdBPID(uint64_t id)    {return ((uint16_t)(id >> ID_BPID_POS))    & (ID_MSK_B16 >> (16 - ID_BPID_LEN));}
-inline uint16_t getIdSCTR(uint64_t id)    {return ((uint16_t)(id >> ID_SCTR_POS))    & (ID_MSK_B16 >> (16 - ID_SCTR_LEN));}
+inline uint64_t setEvtId()     {return ();}
+inline uint32_t setChId(uint32_t proc, uint32_t plan, uint32_t chain, uint32_t token) {
+   return ( (uint32_t)  ((uint64_t)proc << CHAIN_ID_PROC_POS)     |
+                        ((uint64_t)plan << CHAIN_ID_PLAN_POS)     |
+                        ((uint64_t)chain << CHAIN_ID_CHAIN_POS)   |
+                        ((uint64_t)token << CHAIN_ID_TOKEN_POS));}
+
+inline uint32_t getBitSlice(uint32_t val, uint32_t msk, uint8_t pos) {return (val & msk)>>pos);}
+
+
 inline void incIdSCTR(uint64_t* id, volatile uint16_t* sctr)   {*id = ( *id & 0xfffffffffffffc00) | *sctr; *sctr = (*sctr+1) & ~0xfc00; DBPRINT3("id: %x sctr: %x\n", *id, *sctr);}
 inline uint32_t hiW(uint64_t dword) {return (uint32_t)(dword >> 32);}
 inline uint32_t loW(uint64_t dword) {return (uint32_t)dword;}
