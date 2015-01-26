@@ -107,7 +107,11 @@ int insertFpqEntry()
 void main(void) {
    
    int j;
-   
+   uint8_t** pCurProc;
+   uint8_t** pPageAct;
+   uint8_t** pCurChain;
+   uint32_t  flagRun, procQty;
+   uint32_t* procIdx;
    init();
    
    for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
@@ -128,31 +132,20 @@ void main(void) {
    
    while (1) {
       cmdEval();
-      processFtm();
+      //round robin
+      //execute process <procIdx> if run flagbit is HI and procQty not 0
+      procIdx  =  (uint32_t*)&pFtmIf[FTM_MIF_PROCIDX];
+      procQty  = *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY];
+      flagRun  = *(uint32_t*)&pFtmIf[FTM_MIF_STAT_RUN];
       
-      //mprintf("pAct 0x%08x, Qty 0x%08x, pStart 0x%08x, lans[0] 0x%08x,\n", pFtmIf->pAct, pFtmIf->pAct->planQty, pFtmIf->pAct->pStart, pFtmIf->pAct->plans[0]);
-      
-      //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
-      /*
-      ebm_hi(0x0);
-      atomic_on();
-      ebm_op(0x0, 0x0BEEBABE, EBM_WRITE);
-      ebm_op(0x0, 0x1BEEBABE, EBM_WRITE);
-      atomic_off();
-      ebm_flush();
-      
-      for (j = 0; j < div; ++j) {
-         now   = getSysTime();
-         later = getSysTime();
-         diff  = (int64_t) later - (int64_t) now;
-         //mprintf("Min: %d Max: %d\n", (int32_t)diffMin, (int32_t)diffMax);
-         if(diffMin > diff) diffMin = diff;
-         if(diffMax < diff) diffMax = diff;
-         diffSum += diff;
-      }
-      mprintf("Min: %d Max: %d Avg: %d\n", (int32_t)diffMin, (int32_t)diffMax, ((int32_t)(diffSum / div)));
-      diffSum = 0;
-      */
-   }
+      for(*procIdx = 0; *procIdx < procQty; *procIdx++) {
+         if( flagRun & (1<<*procIdx) ) {
+            pCurProc    = (uint8_t**)&pFtmIf[FTM_MIF_PROCS + *procIdx * FTM_PROC_END_];
+            pPageAct    = (uint8_t**)&((*pCurProc)[FTM_PROC_PACT]); 
+            pCurChain   = (uint8_t**)&((*pPageAct)[FTM_PAGE_PCUR]); 
+            if(*pCurChain != NULL) *pCurChain  = processChain(*pCurChain);
+         }// if flagrun  
+      }// for procIdx
+   }// while 1
 
 }

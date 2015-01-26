@@ -1,7 +1,7 @@
 #include "ftm.h"
 #include "dbg.h"
 
-const uint8_t IdleCon[FTM_CON_END_];
+
 
 const struct t_FPQ r_FPQ = {    .rst        =  0x00 >> 2,
                .force      =  0x04 >> 2,
@@ -72,44 +72,42 @@ void prioQueueInit()
 
 void ftmInit()
 {
-   pFtmIf = (uint8_t*)_startshared;
+  
    
-   volatile uint8_t* pIf   = pFtmIf;
-   uint8_t* pIdle    = (uint8_t*)&pIf[FTM_MIF_IDLE];
-   uint8_t* pIdleCon = (uint8_t*)&pIf[FTM_MIF_IDLE_CON]; 
+   pFtmIf   = (uint8_t*)_startshared;
+
+   *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY] = FTM_PROC_MAX;
    
-   uint32_t* pDebug = (uint32_t*)&pIf[FTM_MIF_DEBUG_DATA];
+   *(volatile uint32_t**)&pFtmIf[FTM_MIF_PSHARED]  = pSharedRam;
+   *(uint32_t*)&pFtmIf[FTM_MIF_CMD]                = 0;
+   *(uint32_t*)&pFtmIf[FTM_MIF_STAT_RUN]           = 0;
+    *(uint32_t*)&pFtmIf[FTM_MIF_STAT_IDLE]         = 0;
+   *(uint32_t*)&pFtmIf[FTM_MIF_STAT_WAIT]          = 0;
+   *(uint32_t*)&pFtmIf[FTM_MIF_STAT_ERR]           = 0;
+   *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY]            = 0;
+   *(uint64_t*)&pFtmIf[FTM_MIF_TTRN]               = 150000/8;
+   *(uint64_t*)&pFtmIf[FTM_MIF_TDUE]               = 150000/8;
+   
+
+   uint32_t* pDebug = (uint32_t*)&pFtmIf[FTM_PROC_DEBUG_DATA];
    pDebug[DBG_DISP_DUR_MIN] = 0xffffffff;
    pDebug[DBG_DISP_DUR_MAX] = 0x0;
    pDebug[DBG_DISP_DUR_AVG] = 0x0;
+
+   // init all proc page ptrs and sensible default values   
+   uint8_t* pCurProc;
+   uint32_t procQty  =  *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY];
+   int i;
+   for(i = 0; i < procQty; pCurProc = pProc[i++])
+   {
+      *(uint32_t*)&pCurProc[FTM_PROC_MSGCNT]    = 0;
+      *(uint64_t*)&pCurProc[FTM_PROC_TPREP]     = 100000/8;
+      *(uint8_t**)&pCurProc[FTM_PROC_PACT]      = (uint8_t*)&pCurProc[FTM_PROC_PAGES + 0*FTM_PAGESIZE];
+      *(uint8_t**)&pCurProc[FTM_PROC_PINA]      = (uint8_t*)&pCurProc[FTM_PROC_PAGES + 1*FTM_PAGESIZE];
+   }
    
-   *(uint32_t*)&pIf[FTM_MIF_CMD]       = 0x0;
-   *(uint32_t*)&pIf[FTM_MIF_STAT]      = 0x0;
-   *(volatile uint32_t**)&pIf[FTM_MIF_PSHARED]  = pSharedRam;
-   *(uint64_t*)&pIf[FTM_MIF_TPREP]     = 100000/8;
-   *(uint64_t*)&pIf[FTM_MIF_TTRN]      = 150000/8;
-   *(uint64_t*)&pIf[FTM_MIF_TDUE]      = 150000/8;
-      *(uint8_t**)&pIf[FTM_MIF_PACT]      = (uint8_t*)&pIf[FTM_MIF_PAGES + 0*FTM_PAGESIZE];
-      *(uint8_t**)&pIf[FTM_MIF_PINA]      = (uint8_t*)&pIf[FTM_MIF_PAGES + 1*FTM_PAGESIZE];
-      *(uint8_t**)&pIf[FTM_MIF_PIDLE]     = (uint8_t*)&Idle;
-   
-   *(uint32_t*)&pIdle[FTM_CHAIN_ID]       = 0xDEADBEEF;
-   *(uint32_t*)&pIdle[FTM_CHAIN_TSTART]   = 0;
-   *(uint32_t*)&pIdle[FTM_CHAIN_TPERIOD]  = 1000/8;
-   *(uint32_t*)&pIdle[FTM_CHAIN_FLAGS]    = 0;
-   *(uint32_t*)&pIdle[FTM_CHAIN_REPQTY]   = -1;
-   *(uint32_t*)&pIdle[FTM_CHAIN_REPCNT]   = 0;
-   *(uint32_t*)&pIdle[FTM_CHAIN_MSGQTY]   = 0;
-   *(uint32_t*)&pIdle[FTM_CHAIN_MSGIDX]   = 0;
-   *(uint8_t**)&pIdle[FTM_CHAIN_PMSG]     = (uint8_t*)NULL;
-   *(uint8_t**)&pIdle[FTM_CHAIN_PCON]     = (uint8_t*)NULL;
-   *(uint8_t**)&pIdle[FTM_CHAIN_PSIG]     = (uint8_t*)NULL;
-   *(uint8_t**)&pIdle[FTM_CHAIN_PNEXT]    = (uint8_t*)NULL;     
-   
-   pCurrentChain        = pIdle;
-   prioQueueInit();
-   
-   
+  prioQueueInit();
+  
 }
 
 inline void showId()
@@ -119,53 +117,60 @@ inline void showId()
 
 void cmdEval()
 {
-   volatile uint8_t* pIf = pFtmIf;
-   uint32_t* pCmd    = (uint32_t*)&pIf[FTM_MIF_CMD];  
-   uint32_t* pStat   = (uint32_t*)&pIf[FTM_MIF_STAT];
+   uint32_t* pCmd    = (uint32_t*)&pFtmIf[FTM_MIF_CMD];
+   uint8_t* pCurProc;
+   uint32_t procIdx, procQty, idStart;
    
-   uint8_t** pAct       = (uint8_t**)&pIf[FTM_MIF_PACT]; 
-   uint8_t** pIna       = (uint8_t**)&pIf[FTM_MIF_PINA];
-   uint8_t*  pActBP     = (uint8_t*)&((*pAct)[FTM_PAGE_PBP]);
    
-   uint8_t* pIdle       = (uint8_t*)&pIf[FTM_MIF_PIDLE];
-   uint8_t* pActStart   = (uint8_t*)&((*pAct)[FTM_PAGE_PSTART]);
+   uint8_t** pAct;
+   uint8_t** pIna;
    uint8_t* pTmp;
-   
-   uint32_t stat = *pStat;
+   uint32_t* pStatRun   = (uint32_t*)&pFtmIf[FTM_MIF_STAT_RUN];
+   uint32_t* pStatIdle  = (uint32_t*)&pFtmIf[FTM_MIF_STAT_IDLE];
+   uint32_t* pStatWait  = (uint32_t*)&pFtmIf[FTM_MIF_STAT_WAIT];
+   uint32_t* pStatErr   = (uint32_t*)&pFtmIf[FTM_MIF_STAT_ERR];
    
    if(*pCmd)
    {
-      if(*pCmd & CMD_RST)          { showId(); mprintf("Ftm Init done\n"); stat = 0; ftmInit(); }
-      if(*pCmd & CMD_START)        { showId(); mprintf("Starting, IP: 0x%08x, SP: 0x%08x\n", pIdle, pActStart); 
-                                   pActBP = pActStart;
-                                   stat = (stat & STAT_ERROR) | STAT_RUNNING;
-                                 }
-      if(*pCmd & CMD_IDLE)         { pActBP = pIdle; showId(); mprintf("Going to Idle\n");}
-      if(*pCmd & CMD_STOP_REQ)     { stat |= STAT_STOP_REQ; }
-      if(*pCmd & CMD_STOP_NOW)     { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; showId(); mprintf("Stopped (forced)\n");} 
+      if(*pCmd & CMD_PROC_ID_ALL) {procIdx = 0; procQty = *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY];}
+      else                        {procIdx = getBitSlice(*pCmd, CMD_PROC_ID, CMD_PROC_ID_POS); procQty = procIdx+1;}
       
-      if(*pCmd & CMD_COMMIT_PAGE)  { pTmp = *pIna;
-                                     *pIna = *pAct;
-                                     *pAct = pTmp;
-                                     pActBP = pActStart;
-                                    }
-      //if(cmd & CMD_COMMIT_BP)    {pFtmIf->pAct->pBp = pFtmIf->pNewBp;}
-      
-      //if(*pCmd & CMD_DBG_0)        {showStatus();}
-      if(*pCmd & CMD_DBG_1)        {showId(); mprintf("DBG1\n");}
-      
-      //if(*pCmd & CMD_SHOW_ACT)     {  showId(); mprintf("Showing Active\n"); showFtmPage(pAct);}
-      //if(*pCmd & CMD_SHOW_INA)     {  showId(); mprintf("Showing Inactive\n"); showFtmPage(pIna);}
-      
+      while(procIdx < procQty) {
+         pCurProc    = pProc[procIdx * FTM_PROC_END_];
+         pAct        = (uint8_t**)&pCurProc[FTM_PROC_PACT]; 
+         pIna        = (uint8_t**)&pCurProc[FTM_PROC_PINA];
+         
+         idStart     = *(uint32_t*)&((*pAct)[FTM_PAGE_IDSTART]);
+         
+         if(*pCmd & CMD_RST)          { showId(); mprintf("Ftm Init done\n"); ftmInit(); }
+         if(*pCmd & CMD_START)        { showId(); 
+                                        mprintf(" Starting Process %02u, Plan: %02u\n",
+                                        procIdx, getBitSlice(idStart, CH_ID_PLAN_MSK, CH_ID_PLAN_POS));
+                                         
+                                        *pStatIdle &= ~(1<<procIdx);
+                                        *pStatRun  |=  (1<<procIdx);
+                                        *(uint8_t**)&((*pAct)[FTM_PAGE_PCUR]) = getPtrByID(idStart);
+                                      }
+         if(*pCmd & CMD_STOP)       { *pStatIdle |=  (1<<procIdx); }
+         if(*pCmd & CMD_ABORT)      { *pStatIdle &= ~(1<<procIdx);
+                                        *pStatRun  &= ~(1<<procIdx); 
+                                        showId(); mprintf("Aborted Process %02u\n", procIdx);} 
+         
+         if(*pCmd & CMD_COMMIT_PAGE)  { //swap active and inactive pointers. set current plan ptr to plan indicated by start ID
+                                        pTmp = *pIna; *pIna = *pAct; *pAct = pTmp;
+                                        *(uint8_t**)&((*pAct)[FTM_PAGE_PCUR]) = getPtrByID(idStart);
+                                       }
+         if(*pCmd & CMD_DBG_1)        {showId(); mprintf("DBG1\n");}
+         
+         //if(*pCmd & CMD_SHOW_ACT)     {  showId(); mprintf("Showing Active\n"); showFtmPage(pAct);}
+         //if(*pCmd & CMD_SHOW_INA)     {  showId(); mprintf("Showing Inactive\n"); showFtmPage(pIna);}
+         procIdx++;
+      }
+     
       //only zero the command reg if you found a command. otherwise this becomes race-condition-hell!
       *pCmd = 0;                       
    }
    
-   if(pCurrentChain == pIdle)  {stat |=  STAT_IDLE;}
-   else                       {stat &= ~STAT_IDLE;}
-   if(pCurrentChain == pIdle && (stat & STAT_STOP_REQ)) { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; mprintf("Stopped\n");}
-   
-   *pStat = stat;
    
 }
 
@@ -180,14 +185,14 @@ void showFtmPage(t_ftmPage* pPage)
    mprintf("---PAGE %08x\n", pPage);
    mprintf("StartPlan:\t");
    
-   if(pPage->pStart == &(pFtmIf->idle) ) mprintf("idle\n");
+   if(pPage->pStart == &(pActProc->idle) ) mprintf("idle\n");
    else { 
           if(pPage->pStart == NULL) mprintf("NULL\n");
           else mprintf("%08x\n", pPage->pStart);
         } 
    
    mprintf("AltPlan:\t");
-   if(pPage->pBp == &(pFtmIf->idle) ) mprintf("idle\n");
+   if(pPage->pBp == &(pActProc->idle) ) mprintf("idle\n");
    else { 
           if(pPage->pBp == NULL) mprintf("NULL\n");
           else mprintf("%08x\n", pPage->pBp);
@@ -212,13 +217,13 @@ void showFtmPage(t_ftmPage* pPage)
          pChain->msgIdx);
          
          mprintf("\t\tFlags:\t");
-         if(pChain->flags & FLAGS_IS_BP) mprintf("-IS_BP\t");
-         if(pChain->flags & FLAGS_IS_COND_MSI) mprintf("-IS_CMSI\t");
-         if(pChain->flags & FLAGS_IS_COND_SHARED) mprintf("-IS_CSHA\t");
-         if(pChain->flags & FLAGS_IS_SIG_SHARED) mprintf("-IS_SIG_SHARED");
-         if(pChain->flags & FLAGS_IS_SIG_MSI)    mprintf("-IS_SIG_MSI");
-         if(pChain->flags & FLAGS_IS_END) mprintf("-IS_END");
-         if(pChain->flags & FLAGS_IS_ENDLOOP) mprintf("-IS_ENDLOOP");
+         if(pChain->flags & CH_FLAGBIT_BP) mprintf("-IS_BP\t");
+         if(pChain->flags & CH_FLAGBIT_COND_MSI) mprintf("-IS_CMSI\t");
+         if(pChain->flags & CH_FLAGBIT_COND_SHARED) mprintf("-IS_CSHA\t");
+         if(pChain->flags & CH_FLAGBIT_SIG_SHARED) mprintf("-IS_SIG_SHARED");
+         if(pChain->flags & CH_FLAGBIT_SIG_MSI)    mprintf("-IS_SIG_MSI");
+         if(pChain->flags & CH_FLAGBIT_END) mprintf("-IS_END");
+         if(pChain->flags & CH_FLAGBIT_ENDLOOP) mprintf("-IS_ENDLOOP");
          mprintf("\n");
          
          mprintf("\t\tCondSrc:\t%08x\n\t\tCondVal:\t%08x\n\t\tCondMsk:\t%08x\n\t\tSigDst:\t\t\t%08x\n\t\tSigVal:\t\t\t%08x\n", 
@@ -247,7 +252,7 @@ void showFtmPage(t_ftmPage* pPage)
          
    
          
-         if(pChain->flags & FLAGS_IS_END) pChain = NULL;
+         if(pChain->flags & CH_FLAGBIT_END) pChain = NULL;
          else pChain = (t_ftmChain*)pChain->pNext;
       }
            
@@ -262,8 +267,8 @@ void showFtmPage(t_ftmPage* pPage)
 /*
 void showStatus()
 {
-   uint32_t stat = pFtmIf->status;
-   mprintf("\f%08x\tStatus:\t", (uint32_t)(&(pFtmIf->cmd)) );
+   uint32_t stat = pActProc->status;
+   mprintf("\f%08x\tStatus:\t", (uint32_t)(&(pActProc->cmd)) );
    if(stat & STAT_RUNNING) mprintf("\t\t-RUNNING"); else mprintf("\t\t-\t");
    if(stat & STAT_IDLE) mprintf("\t\t-IDLE"); else mprintf("\t\t-\n");
    if(stat & STAT_STOP_REQ) mprintf("\t\t-STOP_REQ"); else mprintf("\t\t-\t");
@@ -282,7 +287,7 @@ inline int dispatch(uint8_t* pMsg)
    diff = ( *(pFpqCtrl + r_FPQ.capacity) - *(pFpqCtrl + r_FPQ.heapCnt));
    if(diff > 1)
    {  
-      //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
+      //incIdSCTR(&pMsg->id, &pActProc->sctr); //copy sequence counter (sctr) into msg id and inc sctr
       atomic_on();
       *pFpqData = *(uint32_t*)&pMsg[FTM_MSG_ID_HI];
       *pFpqData = *(uint32_t*)&pMsg[FTM_MSG_ID_LO];
@@ -299,7 +304,7 @@ inline int dispatch(uint8_t* pMsg)
       *pFpqData = *(uint32_t*)&pMsg[FTM_MSG_TS_LO];
       atomic_off();
       
-      (*(uint32_t*)&pFtmIf[FTM_MIF_MSGCNT])++;
+      
       
    } else {
       ret = 0;
@@ -312,23 +317,35 @@ inline int dispatch(uint8_t* pMsg)
 
 uint8_t* condValid(uint8_t* c)
 {
-   uint8_t** pCon = (uint8_t**)&c[FTM_CHAIN_PCON];
+   uint8_t* pConBase = (uint8_t*)&c[FTM_CH_PCON];
+   uint32_t* flags;
    uint8_t* pJmp;
-   uint64_t val, cmp, msk;
+   uint8_t* pCon;
+   uint64_t val, cmp, msk ;
    uint64_t* pSrc = NULL;
-   uint32_t* pcFlags = (uint32_t*)&c[FTM_CHAIN_FLAGS];
+   uint32_t cpuIdx, procIdx, conIdx, tmpID;
+   uint32_t conQty = *(uint32_t*)&c[FTM_CH_CONQTY];
 
-   *(uint32_t*)&pFtmIf[FTM_MIF_STAT] &= ~STAT_WAIT; 
+    
    
    //1. Is there a condition left to check?
-   while(*pCon != NULL) {
-      pSrc  =  (uint64_t*)&((*pCon)[FTM_CON_PSRC]);
-      pJmp  =      (uint8_t*)&((*pCon)[FTM_CON_PJMP]);
+   while(conIdx < conQty) {
+      pCon     = pConBase + conIdx * FTM_CON_END_;
+      flags    = (uint32_t*)&pCon[FTM_CON_FLAGS];
+      //set pSrc correctly
+      if(*flags & CON_FLAGBIT_SRC_IS_PTR) pSrc  = (uint64_t*)&pCon[FTM_CON_SRC]; 
+      else {
+         if(*flags & CON_FLAGBIT_SRC_IS_ID)  { tmpID = *(uint32_t*)&pCon[FTM_CON_SRC];}                    // get stuff from con ID
+         else                                { tmpID = *(uint32_t*)&c[FTM_CH_ID];}   // get stuff from chain ID
+         procIdx  = getBitSlice(tmpID, CH_ID_PROC_MSK, CH_ID_PROC_POS);
+         cpuIdx   = getBitSlice(tmpID, CH_ID_CPU_MSK,  CH_ID_CPU_POS);
+         pSrc     = (uint64_t*)(pSharedRam + cpuIdx * procIdx * 12); //get the shared region for cpu x, process y         
+      }
       msk   = *(uint64_t*)&pCon[FTM_CON_MSK];
       cmp   = *(uint64_t*)&pCon[FTM_CON_CMP];
-      
-      //2. Get condition source (Address or MSI)
-      if(pSrc != NULL) val = *pSrc;
+         
+      //2. Get value from source (Address or MSI)
+      if(pSrc != NULL) {val = *pSrc; *pSrc = 0;}
       else {
          uint32_t ip;
          irq_disable();
@@ -341,40 +358,53 @@ uint8_t* condValid(uint8_t* c)
          }      
          irq_enable();
       }
-       
+      
       //3. Check condition
       if((cmp & msk) == (val & msk)) {
-         *pcFlags &= ~FLAGS_SEMA_CON;
-         if(*pcFlags & FLAGS_IS_COND_CLR) *pSrc = 0;
-         if(pJmp == NULL) return c;    // no jump, this was a conditional wait
-         else             return pJmp; // jump, this was a conditional branch
+         if(*flags & CON_FLAGBIT_JMP_TO_SRC)  pJmp = (uint8_t*)pSrc;
+         if(*flags & CON_FLAGBIT_JMP_IS_ID)   pJmp = getPtrByID(*(uint32_t*)&pCon[FTM_CON_JMP]);
+         else                                 pJmp = (uint8_t*)&pCon[FTM_CON_JMP];
+         
+         //*(uint64_t*)&pCur[FTM_CH_TSTART] = *pcTStart + cTPeriod;
+         return pJmp;
       }
-      *pCon = *(uint8_t**)&pCon[FTM_CON_PNEXT]; //check next condition
+      conIdx++;
    }
-   //4. conditions present, but none are met. wait
-   *(uint32_t*)&pFtmIf[FTM_MIF_STAT] |=  STAT_WAIT;
+   *(uint32_t*)&pFtmIf[FTM_MIF_STAT_WAIT] |= (1<<getBitSlice(*(uint32_t*)&c[FTM_CH_ID], CH_ID_PROC_MSK, CH_ID_PROC_POS));
    return NULL;
 
 } 
 
 inline void sigSend(uint8_t* c)
 {
-   uint8_t**     pSig       = (uint8_t**)&c[FTM_CHAIN_PSIG];
-   uint32_t* pcFlags    = (uint32_t*)&c[FTM_CHAIN_FLAGS];
+   uint8_t** pSigBase = (uint8_t**)&c[FTM_CH_PSIG];
+   uint8_t** pSig     = (uint8_t**)&((*pSigBase)[FTM_SIG_FLAGS]);
+   
+   uint32_t sigQty = *(uint32_t*)&c[FTM_CH_SIGQTY];
+   uint32_t sigIdx;
+   uint32_t* flags = (uint32_t*)&((*pSig)[FTM_SIG_FLAGS]);
    uint64_t val;
    
-   //1. Is there a signal left to send?
-   while(*pSig != NULL) {
-      *pcFlags &= ~FLAGS_SEMA_SIG; 
-      //write value or current time for debugging
-      if(!(*pcFlags & FLAGS_IS_SIG_TIME)) val = *(uint64_t*)&((*pSig)[FTM_SIG_VAL]);
-      else                                val = getSysTime();
-      //32 or 64 bit write
-      if(*pcFlags & FLAGS_IS_SIG_64) *(uint64_t*)&((*pSig)[FTM_SIG_PDST]) = (uint64_t)val;
-      else                           *(uint32_t*)&((*pSig)[FTM_SIG_PDST]) = (uint32_t)val;
+   while(sigIdx < sigQty) {
+      pSig     = pSigBase + sigIdx * FTM_SIG_END_;
+      flags    = (uint32_t*)&pSig[FTM_SIG_FLAGS];
       
-      *pSig = (uint8_t*)&pSig[FTM_SIG_PNEXT];
-  } 
+      if( 
+         ((*flags & SIG_FLAGBIT_1ST)  && (*(uint32_t*)&c[FTM_CH_REPCNT] == 0)) 
+      || ((*flags & SIG_FLAGBIT_LAST) && (*(uint32_t*)&c[FTM_CH_REPCNT] == *(uint32_t*)&c[FTM_CH_REPQTY] -1) )
+      || (!((*flags & SIG_FLAGBIT_1ST) || (*flags & SIG_FLAGBIT_LAST)))
+        ) {  
+         
+         //32 or 64 bit write
+         if(*flags & SIG_FLAGBIT_64)   *(uint64_t*)&((*pSig)[FTM_SIG_DST]) = (uint64_t)val;
+         else                          *(uint32_t*)&((*pSig)[FTM_SIG_DST]) = (uint32_t)val;
+           
+         if(*flags & SIG_FLAGBIT_ONCE) *flags |= SIG_FLAGBIT_DONE;
+      }
+      
+      sigIdx++; 
+  }
+  
 }
 
 uint8_t* processChain(uint8_t* c)
@@ -391,53 +421,45 @@ uint8_t* processChain(uint8_t* c)
    now   = getSysTime();
    
    //values
-   uint64_t  TPrep      = *(uint64_t*)&pFtmIf[FTM_MIF_TPREP];
-   uint64_t  cTPeriod   = *(uint64_t*)&c[FTM_CHAIN_TPERIOD];
-   uint32_t  cMsgQty    = *(uint32_t*)&c[FTM_CHAIN_MSGQTY];
-   uint32_t  cRepQty    = *(uint32_t*)&c[FTM_CHAIN_REPQTY];
-   uint32_t  stat       = *(uint32_t*)&pFtmIf[FTM_MIF_STAT];
+   uint32_t* procIdx    =  (uint32_t*)&pFtmIf[FTM_MIF_PROCIDX];
+   uint8_t** pActProc   =  (uint8_t**)&pFtmIf[FTM_MIF_PROCS + *procIdx * FTM_PROC_END_];
+   uint64_t  TPrep      = *(uint64_t*)&((*pActProc)[FTM_PROC_TPREP]);
+   uint64_t  cTPeriod   = *(uint64_t*)&c[FTM_CH_TPERIOD];
+   uint32_t  cMsgQty    = *(uint32_t*)&c[FTM_CH_MSGQTY];
+   uint32_t  cRepQty    = *(uint32_t*)&c[FTM_CH_REPQTY];
+   
    
    //pointers
-   uint32_t* pcMsgCnt   =  (uint32_t*)&c[FTM_MIF_MSGCNT];
-   uint64_t* pcTStart   =  (uint64_t*)&c[FTM_CHAIN_TSTART];
-   uint32_t* pcMsgIdx   =  (uint32_t*)&c[FTM_CHAIN_MSGIDX];
-   uint32_t* pcRepCnt   =  (uint32_t*)&c[FTM_CHAIN_REPCNT];
-   uint32_t* pcFlags    =  (uint32_t*)&c[FTM_CHAIN_FLAGS];
-   uint32_t* pDebug     =  (uint32_t*)&pFtmIf[FTM_MIF_DEBUG_DATA];
+   uint32_t* pcMsgCnt   =  (uint32_t*)&c[FTM_PROC_MSGCNT];
+   uint64_t* pcTStart   =  (uint64_t*)&c[FTM_CH_TSTART];
+   uint32_t* pcMsgIdx   =  (uint32_t*)&c[FTM_CH_MSGIDX];
+   uint32_t* pcRepCnt   =  (uint32_t*)&c[FTM_CH_REPCNT];
+   uint32_t* pcFlags    =  (uint32_t*)&c[FTM_CH_FLAGS];
+   uint32_t* pDebug     =  (uint32_t*)&((*pActProc)[FTM_PROC_DEBUG_DATA]);
    
-   uint8_t** pcNext     =  (uint8_t**)&c[FTM_CHAIN_PNEXT];
-   uint8_t** pcMsg      =  (uint8_t**)&c[FTM_CHAIN_PMSG];
-   uint8_t** pcCon      =  (uint8_t**)&c[FTM_CHAIN_PCON];
-   uint8_t** pIdle      =  (uint8_t**)&pFtmIf[FTM_MIF_PIDLE];
+   uint8_t** pcNext     =  (uint8_t**)&c[FTM_CH_PNEXT];
+   uint8_t** pcMsg      =  (uint8_t**)&c[FTM_CH_PMSG];
+   uint8_t** pcCon      =  (uint8_t**)&c[FTM_CH_PCON];
 
    
    //2. Check: Running and Chain PrepTime reached ? 
-   if( (now + TPrep >= *pcTStart) && (stat & STAT_RUNNING) ) { // are we in the preparation phase for this chain's start time?
+   if(now + TPrep >= *pcTStart) { // are we in the preparation phase for this chain's start time?
 
       //1. Is this chain conditional? Condition already fulfilled?
-      if( ( (*pcFlags & FLAGS_IS_COND)  && (*pcFlags & FLAGS_SEMA_CON) ) || (*pcFlags & FLAGS_IS_BP) ) {
-         pCur = condValid(c);
-         if(pCur == NULL) return c; //conditions present but none met, wait
+      pCur = condValid(c);
+      if(pCur == NULL) return c; //conditions present but none met, wait
          
-         //4. Check: signal to send ?
-         if((*pcFlags & FLAGS_SEMA_SIG) &&  (*pcFlags & (FLAGS_IS_SIG_MSI | FLAGS_IS_SIG_SHARED))) sigSend(c);
-         
-         if(pCur != c) { //conditions present and one is met, jump requested
-            *(uint64_t*)&pCur[FTM_CHAIN_TSTART] = *pcTStart + cTPeriod;
-            //4. Check: signal to send ?
-            return pCur;
-         }
-      }   
-      //else: no conditions or conditions present and no jump is requested
+      //4. Check: signal to send ?
+      sigSend(c);
       
       //5. Check: Got Msgs? If so, Msg PrepTime reached ?
       if(cMsgQty != 0) {
       
-         pCurMsg = (uint8_t*)&((*pcMsg)[*pcMsgIdx * FTM_CHAIN_END_]); // create pointer to current message
+         pCurMsg = (uint8_t*)&((*pcMsg)[*pcMsgIdx * FTM_CH_END_]); // create pointer to current message
          *(uint64_t*)&pCurMsg[FTM_MSG_TS] = *pcTStart + *(uint64_t*)&pCurMsg[FTM_MSG_OFFS]; //set execution time for current msg 
          if( now + TPrep >= (uint64_t)pCurMsg[FTM_MSG_TS]) { //### time to hand it over to prio queue ? ###
             dbg_then = getSysTime();
-            if(dispatch(pCurMsg)) {*pcMsgIdx++;}
+            if(dispatch(pCurMsg)) {*pcMsgIdx++; (*(uint32_t*)&((*pActProc)[FTM_PROC_MSGCNT]))++;}
             dbg_now = getSysTime();
    
             dbg_dur = (uint32_t)(dbg_now-dbg_then);
@@ -452,32 +474,49 @@ uint8_t* processChain(uint8_t* c)
       //6. Check: All Msgs processed?
       if(*pcMsgIdx == cMsgQty) {
          *pcMsgIdx = 0;
-         if(*pcFlags & FLAGS_IS_SIG_ALL)  *pcFlags |= FLAGS_SEMA_SIG;
-         if(*pcFlags & FLAGS_IS_COND_ALL) *pcFlags |= FLAGS_SEMA_CON;
+         //a rep is complete, an update of the start time is necessary
+         *(uint64_t*)&pCur[FTM_CH_TSTART] = *pcTStart + cTPeriod;
          if(cRepQty != -1) *pcRepCnt++;
          
          //7. Check: All Reps processed?
          if(*pcRepCnt == cRepQty) {
             *pcRepCnt = 0;
-            *pcFlags |= (FLAGS_SEMA_SIG | FLAGS_SEMA_CON);
-            
             //8. update chain ptr
-            if( (*pcFlags & FLAGS_IS_END) || (pcNext == NULL)) pCur = *pIdle;
-            else                                               pCur = *pcNext;
+            pCur = *pcNext;
          }
          //9. Update Chain (this or next) start time
-         *(uint64_t*)&pCur[FTM_CHAIN_TSTART] = *pcTStart + cTPeriod;                        
+                                 
 
       } // if msgs processed
    } // if chain preptime       
-
+   
+   //if the chain ptr changed, an update of the start time is necessary
+   if(pCur != c) *(uint64_t*)&pCur[FTM_CH_TSTART] = *pcTStart + cTPeriod;
+   
    return pCur;    
 }
 
-
-
-void processFtm()
+uint8_t* getPtrByID(uint32_t ID)
 {
-   if (*(uint32_t*)&pFtmIf[FTM_MIF_STAT] & STAT_RUNNING) { pCurrentChain = processChain(pCurrentChain); execCnt++;} 
+   
+   uint32_t cpu         = (ID & CH_ID_CPU_MSK)   >> CH_ID_CPU_POS;
+   uint32_t proc        = (ID & CH_ID_PROC_MSK)  >> CH_ID_PROC_POS;
+   uint32_t plan        = (ID & CH_ID_PLAN_MSK)  >> CH_ID_PLAN_POS;
+   
+   uint32_t* procIdx    =  (uint32_t*)&pFtmIf[FTM_MIF_PROCIDX];
+   uint32_t  procQty    = *(uint32_t*)&pFtmIf[FTM_MIF_PROCQTY];
+   
+   uint8_t** pActProc   =  (uint8_t**)&pFtmIf[FTM_MIF_PROCS + *procIdx * FTM_PROC_END_];
+   uint8_t** pAct       =  (uint8_t**)&((*pActProc)[FTM_PROC_PACT]); 
+   uint32_t  planQty    = *(uint32_t*)&((*pAct)[FTM_PAGE_PLANQTY]);
+   uint8_t** pPlan      =  (uint8_t**)&((*pAct)[FTM_PAGE_PLANS]);   
+   
+   if(cpu  != getCpuIdx()) return NULL;
+   if(proc >= procQty)     return NULL;
+   if(plan >= planQty)     return NULL;
+   
+   return  (uint8_t*)&((*pPlan)[plan * 4]);  
 }
+
+
 

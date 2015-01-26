@@ -49,14 +49,12 @@ struct t_FPQ {
 };
 
 extern const struct t_FPQ r_FPQ;
-extern const uint8_t Idle[FTM_CHAIN_END_];
-extern const uint8_t IdleCon[FTM_CON_END_];
 
 uint32_t prioQcapacity;
 
 
 volatile uint8_t* pFtmIf;
-uint8_t* pCurrentChain;
+uint8_t** pProc;
 
 
 void              prioQueueInit();
@@ -64,6 +62,7 @@ void              ftmInit(void);
 void              processFtm();
 
 void              cmdEval();
+uint8_t* processChain(uint8_t* c);
 //void showFtmPage(t_ftmPage* pPage);
 //void showStatus();
 
@@ -71,15 +70,16 @@ extern uint32_t * pEcaAdr;
 extern uint32_t * pEbmAdr;
 extern uint32_t * pFPQctrl;
 extern volatile uint32_t * pSharedRam;
-
+/*
 inline uint64_t setEvtId()     {return ();}
 inline uint32_t setChId(uint32_t proc, uint32_t plan, uint32_t chain, uint32_t token) {
-   return ( (uint32_t)  ((uint64_t)proc << CHAIN_ID_PROC_POS)     |
-                        ((uint64_t)plan << CHAIN_ID_PLAN_POS)     |
-                        ((uint64_t)chain << CHAIN_ID_CHAIN_POS)   |
-                        ((uint64_t)token << CHAIN_ID_TOKEN_POS));}
-
-inline uint32_t getBitSlice(uint32_t val, uint32_t msk, uint8_t pos) {return (val & msk)>>pos);}
+   return ( (uint32_t)  ((uint64_t)proc << CH_ID_PROC_POS)     |
+                        ((uint64_t)plan << CH_ID_PLAN_POS)     |
+                        ((uint64_t)chain << CH_ID_CHAIN_POS)   |
+                        ((uint64_t)token << CH_ID_TOKEN_POS));}
+*/
+inline uint32_t getBitSlice(uint32_t val, uint32_t msk, uint8_t pos) {return ((val & msk)>>pos);}
+uint8_t* getPtrByID(uint32_t ID);
 
 
 inline void incIdSCTR(uint64_t* id, volatile uint16_t* sctr)   {*id = ( *id & 0xfffffffffffffc00) | *sctr; *sctr = (*sctr+1) & ~0xfc00; DBPRINT3("id: %x sctr: %x\n", *id, *sctr);}
