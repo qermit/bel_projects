@@ -3,38 +3,44 @@ ENTRY(_start)
 GROUP(-lgcc -lc)
 MEMORY
 {
-    ram :
+    RAM :
  ORIGIN = 0x00000000,
- LENGTH = 65536 - 8192 - 8192
-    stack :
+ LENGTH = 65536 - 8192 - 8192 - 4096
+    STACK :
  ORIGIN = 65536 - 8192,
  LENGTH = 8192
-    shared :
+    SHARED :
  ORIGIN = 65536 - 8192 - 8192,
  LENGTH = 8192
+  BUILDID (r) :
+ ORIGIN = 65536 - 8192 - 8192 - 4096,
+ LENGTH = 4096
 }
 
 SECTIONS
 {
- .boot : { *(.boot) } > ram
- .text : { *(.text .text.*) } > ram =0
- .rodata : { *(.rodata .rodata.*) } > ram
- .data : {
-  *(.data .data.*)
+ .boot : { *(.boot) } > RAM
+ .text : { *(.text .text.*) } > RAM =0
+ .rodata : { *(EXCLUDE_FILE (buildid.o) .rodata*) } > RAM
+ .data : { *(EXCLUDE_FILE (buildid.o) .data*)
   _gp = ALIGN(16) + 0x7ff0;
- } > ram
+ } > RAM
  .bss : {
   _fbss = .;
   *(.bss .bss.*)
   *(COMMON)
   _ebss = .;
- } > ram
- .shared_mem : { *(.shared_mem) } > shared
+ } > RAM
+ .shared_mem : { *(.SHARED .SHARED*) } > SHARED
+ .build_id : { buildid.o(.data* .rodata*) } > BUILDID
 
- PROVIDE(_startshared = ORIGIN(shared));
- PROVIDE(_endshared = ORIGIN(shared) + LENGTH(shared) - 4);
+ PROVIDE(_startshared = ORIGIN(SHARED));
+ PROVIDE(_endshared = ORIGIN(SHARED) + LENGTH(SHARED) - 4);
+ PROVIDE(_buildid = ORIGIN(BUILDID));
 
- PROVIDE(_endram = ORIGIN(stack));
- PROVIDE(_fstack = ORIGIN(stack) + LENGTH(stack) - 4);
+ PROVIDE(_endram = ORIGIN(RAM) + LENGTH(RAM) - 4);
+ PROVIDE(_fstack = ORIGIN(STACK) + LENGTH(STACK) - 4);
 }
 PROVIDE(mprintf = pp_printf);
+
+
