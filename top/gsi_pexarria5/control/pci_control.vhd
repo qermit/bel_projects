@@ -237,7 +237,12 @@ begin
       g_lvds_invert => true,
       g_en_pcie     => true,
       g_en_usb      => true,
-      g_en_lcd      => true)
+      g_en_lcd      => true
+      g_lm32_cores          => 4,
+      g_lm32_MSIs           => 1,
+      g_lm32_ramsizes       => 65536/4,
+      g_lm32_shared_ramsize => 1024/4,
+      g_lm32_are_ftm        => true)
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
       core_clk_125m_pllref_i => clk_125m_pllref_i,

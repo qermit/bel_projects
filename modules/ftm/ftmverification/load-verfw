@@ -1,0 +1,18 @@
+#!/bin/bash
+dev=$1
+adr=`eb-ls $dev | grep -m 1 WB4-BlockRAM_ | grep -oh "\([[:space:]]\+\(0x\)\?[[:xdigit:]]\+[[:space:]]\+\)" | grep -oh "\([[:xdigit:]]\+\)"`
+img=$2
+
+
+opt="-o"
+echo "Loading $img to $dev 0x$adr (Core 0 RAM)"
+if [ "$3" == "$opt" ] ; then
+	echo "using old reset core layout"
+	eb-write $dev 0x0/4 0x2
+	eb-put $dev 0x$adr $img
+	eb-write $dev 0x0/4 0x0
+else
+        eb-write $dev 0x8/4 0x1
+        eb-put $dev 0x$adr $img
+        eb-write $dev 0xc/4 0x1
+fi

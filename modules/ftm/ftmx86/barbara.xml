@@ -1,0 +1,50 @@
+<page>
+   <meta>
+      <startplan>A</startplan>
+      <altplan>B</altplan>
+   </meta>
+   <plan>
+   <!-- Plan A, normal operation -->
+   <meta>
+      <starttime>0</starttime>
+      <lastjump>self</lastjump>
+   </meta>
+   <!--BPC !!!!!!-->
+   <chain>
+      <!-- Cycle A1, ion source and linac -->
+      <meta>
+      <rep>-1</rep>
+         <!--*Wiederholrate**-->
+         <period>250000000</period>
+         <branchpoint>no</branchpoint>
+      </meta>
+      <msg>
+         <id>
+            <FID>0</FID>
+            <GID>100</GID>
+            <EVTNO>256</EVTNO>
+            <!-- BP_START-->
+            <SID>1</SID>
+            <BPID>1</BPID>
+         </id>
+         <par>0x0</par>
+         <!--- ?Jutta klaert-->
+         <tef>0x0</tef>
+         <offs>0</offs>
+      </msg>
+      <msg>
+         <id>
+            <FID>0</FID>
+            <GID>100</GID>
+            <EVTNO>PREP_BI</EVTNO>
+            <SID>1</SID>
+            <BPID>1</BPID>
+         </id>
+         <par>0x0</par>
+         <tef>0x0</tef>
+         <offs>1</offs>
+         <!-- BP_START + 1(Min.EvtAbst)-->
+      </msg>
+      <msg>
+         <id>
+            <FID>0</FID><GID>100</GID><EVTNO>TRIG_BI</EVTNO><SID>1</SID><BPID>1</BPID></id><par>0x0</par><tef>0x0</tef><offs>100000</offs><!-- BP_START+100us--></msg><msg><id><FID>0</FID><GID>100</GID><EVTNO>6</EVTNO><!--BEAM_ON--><SID>1</SID><BPID>1</BPID></id><par>0x0</par><tef>0x0</tef><offs>200000</offs><!-- letzter + XXX--></msg><msg><id><FID>0</FID><GID>100</GID><EVTNO>8</EVTNO><!--BEAM_OFF--><SID>1</SID><BPID>1</BPID></id><par>0x0</par><tef>0x0</tef><offs>120200000</offs><!-- BEAM_ON + Pulslaenge--></msg><msg><id><FID>0</FID><GID>100</GID><EVTNO>READ_BI</EVTNO><SID>1</SID><BPID>1</BPID></id><par>0x0</par><!--- ?Jutta klaert--><tef>0x0</tef><offs>120200000+ 500000</offs>   <!-- readout 500ms nach Strahlende--></msg><!-- mindestens 10ms frei bis Wiederholrate, fuer Nachbearbeitung BI --></chain></plan></page>

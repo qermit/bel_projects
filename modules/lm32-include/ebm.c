@@ -29,49 +29,62 @@
 static inline char* strsplit(const char*  numstr, const char* delimeter);
 static inline unsigned char* numStrToBytes(const char*  numstr, unsigned char* bytes,  unsigned char len,  unsigned char base, const char* delimeter);
 static inline unsigned char* addressStrToBytes(const char* addressStr, unsigned char* addressBytes, adress_type_t addtype);
-static inline unsigned int ebm_parse_adr(eb_lm32_udp_link* link, const char* address);
+static inline uint32_t ebm_parse_adr(eb_lm32_udp_link* link, const char* address);
+
+void ebm_init()
+{
+   uintptr_t ebmMask = (uintptr_t)pEbmLast - (uintptr_t)pEbm;
+   EBM_ADR_MASK  = ebmMask >> 2;
+   EBM_OFFS_DAT  = ebmMask ^ (ebmMask >> 1);
+   EBM_OFFS_WR   = EBM_OFFS_DAT >> 1; 
+   EBM_WRITE     = EBM_OFFS_WR;
+   EBM_READ      = 0;  
+}
 
 void ebm_config_if(target_t conf, const char* con_info)
 {
-  eb_lm32_udp_link* link;
-  unsigned int offset;
+  eb_lm32_udp_link link;
+  uint32_t offset;
   
-  unsigned int tmp;
-  ebm_parse_adr(link, con_info);
+  uint32_t tmp;
+  ebm_parse_adr(&link, con_info);
+  
   
   if(conf == LOCAL) offset = EBM_OFFS_LOCAL;
   if(conf == REMOTE) offset = EBM_OFFS_REMOTE;
   
-  tmp = (link->mac[0] << 24) | (link->mac[1] << 16) | (link->mac[2] << 8) | link->mac[3];
+  tmp = (link.mac[0] << 24) | (link.mac[1] << 16) | (link.mac[2] << 8) | link.mac[3];
   *(pEbm + ((offset + EBM_OFFS_MAC_HI)   >>2)) =  tmp;  
   
-  tmp = (link->mac[4] << 24) | (link->mac[5] << 16);
+  tmp = (link.mac[4] << 8) | (link.mac[5] << 0);
   *(pEbm + ((offset + EBM_OFFS_MAC_LO)   >>2)) = tmp;
   
-  tmp = (link->ipv4[0] << 24) | (link->ipv4[1] << 16) | (link->ipv4[2] << 8) | link->ipv4[3];
+  tmp = (link.ipv4[0] << 24) | (link.ipv4[1] << 16) | (link.ipv4[2] << 8) | link.ipv4[3];
   *(pEbm + ((offset + EBM_OFFS_IPV4)     >>2)) =  tmp;  
   
-  *(pEbm + ((offset + EBM_OFFS_UDP_PORT) >>2)) = (unsigned int)link->port;
+  *(pEbm + ((offset + EBM_OFFS_UDP_PORT) >>2)) = (uint32_t)link.port;
   
 }
 
-void ebm_config_meta(unsigned int pac_len, unsigned int hi_bits, unsigned int max_ops, unsigned int eb_ops)
+void ebm_config_meta(uint32_t mtu, uint32_t hi_bits, uint32_t max_ops, uint32_t eb_ops)
 {
-  *(pEbm + (EBM_REG_PAC_LEN  >>2)) = pac_len;  
-  *(pEbm + (EBM_REG_OPA_HI   >>2)) = hi_bits;
+  *(pEbm + (EBM_REG_MTU      >>2)) = mtu;  
+  *(pEbm + (EBM_REG_ADR_HI   >>2)) = hi_bits;
   *(pEbm + (EBM_REG_OPS_MAX  >>2)) = max_ops;
   *(pEbm + (EBM_REG_EB_OPT   >>2)) = eb_ops;
 }
 
 
-void ebm_op(unsigned int address, unsigned int value, unsigned int optype)
+void ebm_hi(uint32_t address)
 {
-    unsigned int offset = EBM_OFFS_DAT;
-    //set hibits according to desired address
-    //*(pEbm + (EBM_REG_OPA_HI >> 2)) = (address & ~ADR_MASK);
-    
-    offset += optype;
-     offset += (address & ADR_MASK);
+    *(pEbm + (EBM_REG_ADR_HI   >>2)) = address;
+    return;
+}
+
+void ebm_op(uint32_t address, uint32_t value, uint32_t optype)
+{
+    uint32_t offset = EBM_OFFS_DAT;
+    offset += (address & EBM_ADR_MASK) + optype;
     *(pEbm + (offset>>2)) = value;
     return;
 }
@@ -145,11 +158,11 @@ static  unsigned char* addressStrToBytes(const char* addressStr, unsigned char* 
 	
 }
 
-static unsigned int ebm_parse_adr(eb_lm32_udp_link* link, const char* address) {
+static uint32_t ebm_parse_adr(eb_lm32_udp_link* link, const char* address) {
   
 
   char * pch;
-  unsigned int stat = 1;
+  uint32_t stat = 1;
 
 	//a proper address string must contain, MAC, IP and port: "hw/11:22:33:44:55:66/udp/192.168.0.1/port/60368"
 	//parse and fill link struct

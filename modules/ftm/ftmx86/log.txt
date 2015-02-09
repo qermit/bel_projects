@@ -1,0 +1,111 @@
+Connected to uart at address 60500
+[2J[1;1H[1;1f[01;34mWR PTP Core Sync Monitor v 1.0[m[2;1f[02;37mEsc = exit[m[01;34m
+
+TAI Time:                  [m[01;37mMon, Nov 17, 2014, 12:19:08[m[4;1f[01;34m
+
+Link status:[m[6;1f[01;37mwru1: [m[01;32mLink up   [m[02;37m(RX: 2886380, TX: 860850), mode: [m[01;37mWR Slave   [m[01;32mLocked  [m[01;32mCalibrated  [m[01;37m
+IPv4: [m[01;32m192.168.191.72[m[01;34m
+
+PTP status: [m[01;37mslave[m[01;34m
+
+Synchronization status:
+
+[m[02;37mServo state:               [m[01;37mTRACK_PHASE
+[m[02;37mPhase tracking:            [m[01;32mON
+[m[02;37mSynchronization source:    [m[01;37m
+[m[02;37mAux clock status:          [m
+[01;34m
+Timing parameters:
+
+[m[02;37mRound-trip time (mu):    [m[01;37m777884 ps
+[m[02;37mMaster-slave delay:      [m[01;37m371486 ps
+[m[02;37mMaster PHY delays:       [m[01;37mTX: 0 ps, RX: 162800 ps
+[m[02;37mSlave PHY delays:        [m[01;37mTX: 46407 ps, RX: 174243 ps
+[m[02;37mTotal link asymmetry:    [m[01;3[2J[1;1H[1;1f[01;34mWR PTP Core Sync Monitor v 1.0[m[2;1f[02;37mEsc = exit[m[01;34m
+
+TAI Time:                  [m[01;37mMon, Nov 17, 2014, 12:19:16[m[4;1f[01;34m
+
+Link status:[m[6;1f[01;37mwru1: [m[01;32mLink up   [m[02;37m(RX: 2886407, TX: 860858), mode: [m[01;37mWR Slave   [m[01;32mLocked  [m[01;32mCalibrated  [m[01;37m
+IPv4: [m[01;32m192.168.191.72[m[01;34m
+
+PTP status: [m[01;37mslave[m[01;34m
+
+Synchronization status:
+
+[m[02;37mServo state:               [m[01;37mTRACK_PHASE
+[m[02;37mPhase tracking:            [m[01;32mON
+[m[02;37mSynchronization source:    [m[01;37m
+[m[02;37mAux clock status:          [m
+[01;34m
+Timing parameters:
+
+[m[02;37mRound-trip time (mu):    [m[01;37m777885 ps
+[m[02;37mMaster-slave delay:      [m[01;37m371486 ps
+[m[02;37mMaster PHY delays:       [m[01;37mTX: 0 ps, RX: 162800 ps
+[m[02;37mSlave PHY delays:        [m[01;37mTX: 46407 ps, RX: 174243 ps
+[m[02;37mTotal link asymmetry:    [m[01;37m    34913 ps
+[m[02;37mCable rtt delay:         [m[01;37m394435 ps
+[m[02;37mClock offset:            [m[01;37m        6 ps
+[m[02;37mPhase setpoint:          [m[01;37m     2885 ps
+[m[02;37mSkew:                    [m[01;37m        0 ps
+[m[02;37mManual phase adjustment: [m[01;37m        0 ps
+[m[02;37mUpdate counter:          [m[01;37m   756801 
+[m--[2J[1;1H[1;1f[01;34mWR PTP Core Sync Monitor v 1.0[m[2;1f[02;37mEsc = exit[m[01;34m
+
+TAI Time:                  [m[01;37mMon, Nov 17, 2014, 12:19:17[m[4;1f[01;34m
+
+Link status:[m[6;1f[01;37mwru1: [m[01;32mLink up   [m[02;37m(RX: 2886412, TX: 860860), mode: [m[01;37mWR Slave   [m[01;32mLocked  [m[01;32mCalibrated  [m[01;37m
+IPv4: [m[01;32m192.168.191.72[m[01;34m
+
+PTP status: [m[01;37mslave[m[01;34m
+
+Synchronization status:
+
+[m[02;37mServo state:               [m[01;37mTRACK_PHASE
+[m[02;37mPhase tracking:            [m[01;32mON
+[m[02;37mSynchronization source:    [m[01;37m
+[m[02;37mAux clock status:          [m
+[01;34m
+Timing parameters:
+
+[m[02;37mRound-trip time (mu):    [m[01;37m777875 ps
+[m[02;37mMaster-slave delay:      [m[01;37m371481 ps
+[m[02;37mMaster PHY delays:       [m[01;37mTX: 0 ps, RX: 162800 ps
+[m[02;37mSlave PHY delays:        [m[01;37mTX: 46407 ps, RX: 174243 ps
+[m[02;37mTotal link asymmetry:    [m[01;37m    34913 ps
+[m[02;37mCable rtt delay:         [m[01;37m394425 ps
+[m[02;37mClock offset:            [m[01;37m        2 ps
+[m[02;37mPhase setpoint:          [m[01;37m     2885 ps
+[m[02;37mSkew:                    [m[01;37m       -5 ps
+[m[02;37mManual phase adjustment: [m[01;37m        0 ps
+[m[02;37mUpdate counter:          [m[01;37m   756803 
+[m--[2J[1;1H[1;1f[01;34mWR PTP Core Sync Monitor v 1.0[m[2;1f[02;37mEsc = exit[m[01;34m
+
+TAI Time:                  [m[01;37mMon, Nov 17, 2014, 12:19:18[m[4;1f[01;34m
+
+Link status:[m[6;1f[01;37mwru1: [m[01;32mLink up   [m[02;37m(RX: 2886414, TX: 860860), mode: [m[01;37mWR Slave   [m[01;32mLocked  [m[01;32mCalibrated  [m[01;37m
+IPv4: [m[01;32m192.168.191.72[m[01;34m
+
+PTP status: [m[01;37mslave[m[01;34m
+
+Synchronization status:
+
+[m[02;37mServo state:               [m[01;37mTRACK_PHASE
+[m[02;37mPhase tracking:            [m[01;32mON
+[m[02;37mSynchronization source:    [m[01;37m
+[m[02;37mAux clock status:          [m
+[01;34m
+Timing parameters:
+
+[m[02;37mRound-trip time (mu):    [m[01;37m777875 ps
+[m[02;37mMaster-slave delay:      [m[01;37m371481 ps
+[m[02;37mMaster PHY delays:       [m[01;37mTX: 0 ps, RX: 162800 ps
+[m[02;37mSlave PHY delays:        [m[01;37mTX: 46407 ps, RX: 174243 ps
+[m[02;37mTotal link asymmetry:    [m[01;37m    34913 ps
+[m[02;37mCable rtt delay:         [m[01;37m394425 ps
+[m[02;37mClock offset:            [m[01;37m        2 ps
+[m[02;37mPhase setpoint:          [m[01;37m     2885 ps
+[m[02;37mSkew:                    [m[01;37m       -5 ps
+[m[02;37mManual phase adjustment: [m[01;37m        0 ps
+[m[02;37mUpdate counter:          [m[01;37m   756803 
+[m--

@@ -1,0 +1,20 @@
+#! /bin/sh
+
+dev="$1"
+set -e
+
+echo -n "Configuring ECA: "
+
+eca-ctl $dev enable
+eca-ctl $dev idisable # No interrupts, please
+
+eca-table $dev flush
+
+#channel 0 should be lemo out, try 'eca-table -h' for help
+eca-ctl $dev activate -c 0
+eca-table $dev add 0x0fa2020000000000/28 0        0 0x00001 # set bit 0
+eca-table $dev add 0x0fa2020000000000/28 12500000 0 0x10000 # clear bit 0
+
+eca-table $dev flip-active
+
+echo "done."

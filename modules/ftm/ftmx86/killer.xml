@@ -1,0 +1,35 @@
+<page>
+   <meta>
+      <startplan>A</startplan>
+      <altplan>A</altplan>
+   </meta>
+   
+   <plan>
+      <!-- Plan A, normal operation -->
+      <starttime>0</starttime>  
+      <chain>
+         <!-- Cycle A0, entry -->
+         <meta>
+            <rep>2</rep>
+            <period>1000000000</period>
+            <breakpoint>yes</breakpoint>
+         </meta>
+
+	      <msg>
+             <!-- Msg A0A -->
+            <id>
+               <FID>0</FID>
+               <GID>4095</GID>
+               <EVTNO>4095</EVTNO>
+               <SID>0</SID>
+               <BPID>0</BPID>
+            </id>
+            <par>0xdead0561</par>
+            <tef>000</tef>
+            <offs>000000000</offs>
+         </msg>
+      </chain>
+
+      
+   </plan>
+</page>
