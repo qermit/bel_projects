@@ -237,7 +237,7 @@ begin
       g_lvds_invert => true,
       g_en_pcie     => true,
       g_en_usb      => true,
-      g_en_lcd      => true
+      g_en_lcd      => true,
       g_lm32_cores          => 4,
       g_lm32_MSIs           => 1,
       g_lm32_ramsizes       => 65536/4,
