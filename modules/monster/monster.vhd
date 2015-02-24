@@ -175,7 +175,9 @@ entity monster is
     usb_pktendn_o          : out   std_logic := 'Z';
     usb_fd_io              : inout std_logic_vector(7 downto 0);
     -- g_en_scubus
-    scubus_a_a             : out   std_logic_vector(15 downto 0) := (others => 'Z');
+    scubus_a_a             : inout std_logic_vector(15 downto 0);
+    scubus_adr_to_scub     : out   std_logic := 'Z';
+    scubus_nadr_en         : out   std_logic := 'Z';
     scubus_a_d             : inout std_logic_vector(15 downto 0);
     scubus_nsel_data_drv   : out   std_logic := 'Z';
     scubus_a_nds           : out   std_logic := 'Z';
@@ -185,6 +187,7 @@ entity monster is
     scubus_a_nsel          : out   std_logic_vector(12 downto 1) := (others => 'Z');
     scubus_a_ntiming_cycle : out   std_logic := 'Z';
     scubus_a_sysclock      : out   std_logic := 'Z';
+    scubus_a_nreset        : out   std_logic := 'Z';
     -- g_en_mil
     mil_nme_boo_i          : in    std_logic;
     mil_nme_bzo_i          : in    std_logic;
@@ -316,6 +319,8 @@ architecture rtl of monster is
   signal irq_cbar_slave_o  : t_wishbone_slave_out_array (c_irq_masters-1 downto 0);
   signal irq_cbar_master_i : t_wishbone_master_in_array (c_irq_slaves -1 downto 0);
   signal irq_cbar_master_o : t_wishbone_master_out_array(c_irq_slaves -1 downto 0);
+  signal scub_master_i : t_wishbone_master_in;
+  signal scub_master_o : t_wishbone_master_out;
 
   -- END OF MSI IRQ Crossbar
   ----------------------------------------------------------------------------------
@@ -397,8 +402,8 @@ architecture rtl of monster is
     c_tops_oled      => f_sdb_auto_device(c_oled_display,                   g_en_oled),
     c_tops_ssd1325   => f_sdb_auto_device(c_ssd1325_sdb,                    g_en_ssd1325),
     c_tops_nau8811   => f_sdb_auto_device(c_nau8811_sdb,                    g_en_nau8811),
-    c_tops_scubus    => f_sdb_auto_device(c_scu_bus_master,                 g_en_scubus),
-    c_tops_scubirq   => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               g_en_scubus),
+    c_tops_scubus    => f_sdb_auto_bridge(c_wb_master_scu,                  g_en_scubus),
+    c_tops_scubirq   => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               false), -- g_en_scubus),
     c_tops_mil       => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
     c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
     c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
@@ -568,8 +573,12 @@ architecture rtl of monster is
   -- SCU bus signals ---------------------------------------------------------
   ----------------------------------------------------------------------------------
   
-  signal  tag        : std_logic_vector(31 downto 0);
-  signal  tag_valid  : std_logic;
+  signal tag        : std_logic_vector(31 downto 0);
+  signal tag_valid  : std_logic;
+  signal scubus_a_d_o : std_logic_vector(15 downto 0);
+  signal scubus_a_a_o : std_logic_vector(15 downto 0);
+  signal scubus_a_d_dir : std_logic;
+  signal scubus_a_a_dir : std_logic;
   
   -- SCU bus signals
   ----------------------------------------------------------------------------------
@@ -1574,37 +1583,51 @@ c4: eca_ac_wbm
     top_cbar_master_i(c_tops_scubus) <= cc_dummy_slave_out;
     top_cbar_master_i(c_tops_scubirq) <= cc_dummy_slave_out;
     irq_cbar_slave_i (c_irqm_scubus) <= cc_dummy_master_out;
-    scubus_a_d <= (others => 'Z');
   end generate;
   scub_y : if g_en_scubus generate
-    scubus_a_sysclock <= clk_12_5;
-    scub : wb_irq_scu_bus
+    top_cbar_master_i(c_tops_scubirq) <= cc_dummy_slave_out;
+    irq_cbar_slave_i (c_irqm_scubus) <= cc_dummy_master_out;
+    
+    scubus_a_d <= scubus_a_d_o when scubus_a_d_dir='1' else (others => 'Z');
+    scubus_a_a <= scubus_a_a_o when scubus_a_a_dir='1' else (others => 'Z');
+    
+    scubus_a_rnw       <= not scubus_a_d_dir;
+    scubus_adr_to_scub <= scubus_a_a_dir;
+    
+    sys2scu : xwb_clock_crossing
       generic map(
-        g_interface_mode      => PIPELINED,
-        g_address_granularity => BYTE,
-        clk_in_hz             => 62_500_000,
-        Test                  => 0,  
-        Time_Out_in_ns        => 350)
+        g_size => 256)
       port map(
-        clk_i    => clk_sys,
-        rst_n_i  => rstn_sys,
-        tag                => tag,
-        tag_valid          => tag_valid,
-        irq_master_o       => irq_cbar_slave_i (c_irqm_scubus),
-        irq_master_i       => irq_cbar_slave_o (c_irqm_scubus),
-        ctrl_irq_o         => top_cbar_master_i(c_tops_scubirq),
-        ctrl_irq_i         => top_cbar_master_o(c_tops_scubirq),
-        scu_slave_o        => top_cbar_master_i(c_tops_scubus),
-        scu_slave_i        => top_cbar_master_o(c_tops_scubus),
-        scub_data          => scubus_a_d,
-        nscub_ds           => scubus_a_nds,
-        nscub_dtack        => scubus_a_ndtack,
-        scub_addr          => scubus_a_a,
-        scub_rdnwr         => scubus_a_rnw,
-        nscub_srq_slaves   => scubus_a_nsrq,
-        nscub_slave_sel    => scubus_a_nsel,
-        nscub_timing_cycle => scubus_a_ntiming_cycle,
-        nsel_ext_data_drv  => scubus_nsel_data_drv);
+        slave_clk_i    => clk_sys,
+        slave_rst_n_i  => rstn_sys,
+        slave_i        => top_cbar_master_o(c_tops_scubus),
+        slave_o        => top_cbar_master_i(c_tops_scubus),
+        master_clk_i   => clk_12_5,
+        master_rst_n_i => rstn_ref,
+        master_i       => scub_master_i,
+        master_o       => scub_master_o);
+    
+    scub : wb_master_scu
+      port map(
+        clk_i                 => clk_12_5,
+        rstn_i                => rstn_ref,
+        slave_o               => scub_master_i,
+        slave_i               => scub_master_o,
+        scub_clk_o            => scubus_a_sysclock,
+        scub_rstn_o           => scubus_a_nreset,
+        "not"(scub_stb_o)     => scubus_a_nds,
+        scub_ack_i            => "not"(scubus_a_ndtack),
+        scub_data_o           => scubus_a_d_o,
+        scub_data_i           => scubus_a_d,
+        "not"(scub_data_en_o) => scubus_nsel_data_drv,
+        scub_data_dir_o       => scubus_a_d_dir,
+        scub_addr_o           => scubus_a_a_o,
+        scub_addr_i           => scubus_a_a,
+        "not"(scub_addr_en_o) => scubus_nadr_en,
+        scub_addr_dir_o       => scubus_a_a_dir,
+        "not"(scub_sel_o)     => scubus_a_nsel,
+        scub_srq_i            => "not"(scubus_a_nsrq));
+        -- nscub_timing_cycle => scubus_a_ntiming_cycle,
   end generate;
   
   mil_n : if not g_en_mil generate

@@ -152,8 +152,10 @@ package monster_pkg is
       usb_pktendn_o          : out   std_logic;
       usb_fd_io              : inout std_logic_vector(7 downto 0) := (others => 'Z');
       -- g_en_scubus
-      scubus_a_a             : out   std_logic_vector(15 downto 0);
-      scubus_a_d             : inout std_logic_vector(15 downto 0) := (others => 'Z');
+      scubus_a_a             : inout std_logic_vector(15 downto 0) := (others => '0');
+      scubus_adr_to_scub     : out   std_logic;
+      scubus_nadr_en         : out   std_logic;
+      scubus_a_d             : inout std_logic_vector(15 downto 0);
       scubus_nsel_data_drv   : out   std_logic;
       scubus_a_nds           : out   std_logic;
       scubus_a_rnw           : out   std_logic;
@@ -162,6 +164,7 @@ package monster_pkg is
       scubus_a_nsel          : out   std_logic_vector(12 downto 1);
       scubus_a_ntiming_cycle : out   std_logic;
       scubus_a_sysclock      : out   std_logic;
+      scubus_a_nreset        : out   std_logic;
       -- g_en_mil
       mil_nme_boo_i          : in    std_logic := '0';
       mil_nme_bzo_i          : in    std_logic := '0';

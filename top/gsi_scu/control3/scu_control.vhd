@@ -180,7 +180,7 @@ entity scu_control is
     -- SCU Bus
     -----------------------------------------------------------------------
     A_D               : inout std_logic_vector(15 downto 0);
-    A_A               : out   std_logic_vector(15 downto 0);
+    A_A               : inout std_logic_vector(15 downto 0);
     A_nTiming_Cycle   : out   std_logic;
     A_nDS             : out   std_logic;
     A_nReset          : out   std_logic;
@@ -306,6 +306,8 @@ begin
       pcie_rx_i              => pcie_rx_i,
       pcie_tx_o              => pcie_tx_o,
       scubus_a_a             => A_A,
+      scubus_adr_to_scub     => ADR_TO_SCUB,
+      scubus_nadr_en         => nADR_EN,
       scubus_a_d             => A_D,
       scubus_nsel_data_drv   => nSel_Ext_Data_DRV,
       scubus_a_nds           => A_nDS,
@@ -315,6 +317,7 @@ begin
       scubus_a_nsel          => A_nSEL,
       scubus_a_ntiming_cycle => A_nTiming_Cycle,
       scubus_a_sysclock      => A_SysClock,
+      scubus_a_nreset        => A_nReset,
       mil_nme_boo_i          => io_2_5v(11),
       mil_nme_bzo_i          => io_2_5v(12),
       mil_me_sd_i            => io_2_5v(10),
@@ -395,9 +398,6 @@ begin
       seven_seg_H     => open);
 
   -- fixed scubus signals
-  ADR_TO_SCUB <= '1';
-  nADR_EN     <= '0';
-  A_nReset    <= rstn_ref;
   A_Spare     <= (others => 'Z');
   A_OneWire   <= 'Z';
   

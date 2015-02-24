@@ -193,4 +193,62 @@ constant c_scu_irq_ctrl_sdb : t_sdb_device := (
     date          => x"20140528",
     name          => "IRQ_MASTER_CTRL    ")));
 
+  component wb_master_scu is
+    port(
+      clk_i           : in  std_logic;
+      rstn_i          : in  std_logic;
+      slave_i         : in  t_wishbone_slave_in;
+      slave_o         : out t_wishbone_slave_out;
+      
+      scub_clk_o      : out std_logic;
+      scub_rstn_o     : out std_logic;
+      scub_stb_o      : out std_logic; -- DS
+      scub_ack_i      : in  std_logic; -- Dtack
+      scub_data_o     : out std_logic_vector(15 downto 0);
+      scub_data_i     : in  std_logic_vector(15 downto 0);
+      scub_data_en_o  : out std_logic;
+      scub_data_dir_o : out std_logic; -- '1' = from SCU ... not(RDnWR)
+      scub_addr_o     : out std_logic_vector(15 downto 0);
+      scub_addr_i     : in  std_logic_vector(15 downto 0);
+      scub_addr_en_o  : out std_logic;
+      scub_addr_dir_o : out std_logic; -- '1' = from SCU
+      scub_sel_o      : out std_logic_vector(11 downto 0);
+      scub_srq_i      : in  std_logic_vector(11 downto 0));
+  end component;
+
+  constant c_wb_master_scu : t_sdb_bridge := (
+    sdb_child     => x"000000001e000000",
+    sdb_component => (
+    addr_first    => x"0000000000000000",
+    addr_last     => x"000000001fffffff",
+    product => (
+    vendor_id     => x"0000000000000651", -- GSI
+    device_id     => x"c4ecf0a7",
+    version       => x"00000001",
+    date          => x"20150223",
+    name          => "WB-SCU-MasterBridge")));
+
+  component wb_slave_scu is
+    port(
+      clk_i           : in  std_logic;
+      rstn_i          : in  std_logic;
+      master_i        : in  t_wishbone_master_in;
+      master_o        : out t_wishbone_master_out;
+      
+      scub_clk_i      : in  std_logic;
+      scub_rstn_i     : in  std_logic;
+      scub_stb_i      : in  std_logic; -- DS
+      scub_ack_o      : out std_logic; -- Dtack
+      scub_data_o     : out std_logic_vector(15 downto 0);
+      scub_data_i     : in  std_logic_vector(15 downto 0);
+      scub_data_en_o  : out std_logic;
+      scub_data_dir_o : out std_logic; -- '1' = from SCU ... not(RDnWR)
+      scub_addr_o     : out std_logic_vector(15 downto 0);
+      scub_addr_i     : in  std_logic_vector(15 downto 0);
+      scub_addr_en_o  : out std_logic;
+      scub_addr_dir_o : out std_logic; -- '1' = from SCU
+      scub_sel_i      : in  std_logic;
+      scub_srq_o      : out std_logic);
+  end component;
+
 end package;
