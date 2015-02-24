@@ -194,6 +194,8 @@ constant c_scu_irq_ctrl_sdb : t_sdb_device := (
     name          => "IRQ_MASTER_CTRL    ")));
 
   component wb_master_scu is
+    generic(
+      g_slave_powerup : natural := 12500000*2);
     port(
       clk_i           : in  std_logic;
       rstn_i          : in  std_logic;

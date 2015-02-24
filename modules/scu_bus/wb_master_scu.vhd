@@ -26,6 +26,8 @@ use ieee.numeric_std.all;
 use work.wishbone_pkg.all;
 
 entity wb_master_scu is
+  generic(
+    g_slave_powerup : natural);
   port(
     clk_i           : in  std_logic;
     rstn_i          : in  std_logic;
@@ -85,6 +87,9 @@ architecture rtl of wb_master_scu is
   signal r_rom_ack : std_logic;
   signal r_rom_dat : std_logic;
   signal s_rom_dat : std_logic_vector(31 downto 0);
+  
+  -- Stay in reset for slow slaves to power-up
+  signal r_u_there_yet : unsigned(f_ceil_log2(g_slave_powerup) downto 0) := (others => '0');
   
   -- The SDB ROM
   component scu_sdb_rom is
@@ -189,16 +194,22 @@ begin
   fsm : process(clk_i, rstn_i) is
   begin
     if rstn_i = '0' then
-      scub_rstn_o <= '0';
-      r_state <= S_RESET;
-      r_presence <= (others => '0');
+      scub_rstn_o   <= '0';
+      r_state       <= S_RESET;
+      r_presence    <= (others => '0');
+      r_u_there_yet <= (others => '0'); 
     elsif rising_edge(clk_i) then
       scub_rstn_o <= '1';
       case r_state is
         when S_RESET =>
+          -- just awesome.
+          r_u_there_yet <= r_u_there_yet + 1;
+          if r_u_there_yet = g_slave_powerup then
+            r_state <= S_IDLE;
+          end if;
+          
           r_presence <= (others => '0');
           r_presence(scub_srq_i'range) <= scub_srq_i;
-          r_state <= S_IDLE;
           scub_rstn_o <= '0';
         when S_IDLE =>
           if r_ack_i = '1' then -- prior ack?
