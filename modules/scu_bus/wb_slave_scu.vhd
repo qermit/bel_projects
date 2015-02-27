@@ -51,21 +51,21 @@ end wb_slave_scu;
 architecture rtl of wb_slave_scu is
 
   type t_state is (S_IDLE, S_HALF_OUT, S_HALF_IN);
-  signal r_state  : t_state;
+  signal r_state       : t_state;
   
-  signal s_master_o : t_wishbone_master_out;
-  signal s_master_i : t_wishbone_master_in;
+  signal s_master_o    : t_wishbone_master_out;
+  signal s_master_i    : t_wishbone_master_in;
   
-  signal s_ack_err   : std_logic;
-  signal r_ack_err   : std_logic;
-  signal r_dat_again : std_logic;
+  signal s_slave_ready : std_logic;
+  signal r_slave_stall : std_logic;
+  signal r_dat_again   : std_logic;
   
-  signal r_sel_i     : std_logic;
-  signal r_stb_i     : std_logic;
-  signal r_dat_i     : std_logic_vector(15 downto 0);
-  signal r_adr_i     : std_logic_vector(15 downto 0);
-  signal r_dat_demux : std_logic_vector(15 downto 0);
-  signal r_adr_demux : std_logic_vector(15 downto 0);
+  signal r_sel_i       : std_logic;
+  signal r_stb_i       : std_logic;
+  signal r_dat_i       : std_logic_vector(15 downto 0);
+  signal r_adr_i       : std_logic_vector(15 downto 0);
+  signal r_dat_demux   : std_logic_vector(15 downto 0);
+  signal r_adr_demux   : std_logic_vector(15 downto 0);
 
 begin
 
@@ -81,8 +81,8 @@ begin
     master_rst_n_i => rstn_i,
     master_i       => master_i,
     master_o       => master_o,
-    slave_ready_o  => s_ack_err,
-    slave_stall_i  => r_ack_err);
+    slave_ready_o  => s_slave_ready,
+    slave_stall_i  => r_slave_stall);
 
   scu_in : process(scub_clk_i, scub_rstn_i) is
   begin
@@ -102,13 +102,13 @@ begin
   wb_in : process(scub_clk_i, scub_rstn_i) is
   begin
     if scub_rstn_i = '0' then
-      r_ack_err <= '0';
+      r_slave_stall <= '0';
     elsif rising_edge(scub_clk_i) then
-      if s_ack_err = '1' then
-        r_ack_err <= '1';
+      if s_slave_ready = '1' then
+        r_slave_stall <= '1';
       end if;
       if r_state = S_HALF_OUT then
-        r_ack_err <= '0'; -- Successfully sent
+        r_slave_stall <= '0'; -- Successfully sent
       end if;
     end if;
   end process;
@@ -122,7 +122,7 @@ begin
         when S_IDLE =>
           if (r_sel_i and r_stb_i) = '1' then -- prior stb?
             r_state <= S_HALF_IN;
-          elsif (r_ack_err or s_ack_err) = '1' then
+          elsif (r_slave_stall or s_slave_ready) = '1' then
             r_state <= S_HALF_OUT;
           end if;
         when S_HALF_OUT =>
@@ -131,7 +131,7 @@ begin
         when S_HALF_IN =>
           -- r_sel_i and r_stb_i MUST be high here
           -- r_dat_i has HIGH word
-          if (r_ack_err or s_ack_err) = '1' then
+          if (r_slave_stall or s_slave_ready) = '1' then
             r_state <= S_HALF_OUT;
           else
             r_state <= S_IDLE;
@@ -203,13 +203,13 @@ begin
       case r_state is
         when S_IDLE =>
           scub_ack_o  <= not (r_sel_i and r_stb_i) -- don't interrupt in-progress stb
-                         and (r_ack_err or s_ack_err);
+                         and (r_slave_stall or s_slave_ready);
           scub_data_o <= s_master_i.dat(15 downto 0);
         when S_HALF_OUT =>
           scub_ack_o  <= s_master_i.ack;
           scub_data_o <= s_master_i.dat(31 downto 16);
         when S_HALF_IN =>
-          scub_ack_o  <= r_ack_err or s_ack_err;
+          scub_ack_o  <= r_slave_stall or s_slave_ready;
           scub_data_o <= (others => '-');
       end case;
     end if;
