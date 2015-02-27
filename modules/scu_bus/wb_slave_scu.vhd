@@ -58,6 +58,9 @@ architecture rtl of wb_slave_scu is
   
   signal s_slave_ready : std_logic;
   signal r_slave_stall : std_logic;
+  signal r_get_ack_err : std_logic;
+  signal s_ack_err     : std_logic;
+  signal r_ack_err     : std_logic;
   signal r_dat_again   : std_logic;
   
   signal r_sel_i       : std_logic;
@@ -99,13 +102,19 @@ begin
     end if;
   end process;
   
+  s_ack_err <= s_master_i.ack when r_get_ack_err = '1' else r_ack_err;
   wb_in : process(scub_clk_i, scub_rstn_i) is
   begin
     if scub_rstn_i = '0' then
       r_slave_stall <= '0';
+      r_get_ack_err <= '0';
+      r_ack_err     <= '0';
     elsif rising_edge(scub_clk_i) then
+      r_ack_err <= s_ack_err;
+      r_get_ack_err <= '0';
       if s_slave_ready = '1' then
         r_slave_stall <= '1';
+        r_get_ack_err <= '1'; -- next cycle will have ack flag
       end if;
       if r_state = S_HALF_OUT then
         r_slave_stall <= '0'; -- Successfully sent
@@ -206,7 +215,7 @@ begin
                          and (r_slave_stall or s_slave_ready);
           scub_data_o <= s_master_i.dat(15 downto 0);
         when S_HALF_OUT =>
-          scub_ack_o  <= s_master_i.ack;
+          scub_ack_o  <= s_ack_err;
           scub_data_o <= s_master_i.dat(31 downto 16);
         when S_HALF_IN =>
           scub_ack_o  <= r_slave_stall or s_slave_ready;
