@@ -6,4 +6,5 @@ files = [
   "fg_quad/fg_quad_datapath.vhd",
   "fg_quad/wb_fg_quad.vhd",
   "fg_quad/wbmstr_core.vhd",
+  "wb_freq_synth.vhd"
 ]
