@@ -55,10 +55,7 @@ architecture arch of wb_freq_synth is
   --============================================================================
   -- Type declarations
   --============================================================================
-  type t_state is (
-    IDLE,
-    SHIFT
-  );
+  type t_shifter is array(3 downto 0) of std_logic_vector(15 downto 0);
 
   --============================================================================
   -- Constant declarations
@@ -71,79 +68,105 @@ architecture arch of wb_freq_synth is
   --============================================================================
   -- Signal declarations
   --============================================================================
-  signal cnth, cntl  : unsigned(31 downto 0);
-
-  signal hir, lor    : std_logic_vector(31 downto 0);
-  signal fhir, flor  : std_logic_vector(31 downto 0);
-
-  signal obit        : std_logic;
-  signal shr         : std_logic_vector(7 downto 0);
-
-  
 
 
 
-  signal bitcnt      : unsigned( 2 downto 0);
-  signal state       : t_state;
 
 
 
+  -- TODO: remove these effing init values
+
+
+
+
+  signal cnt       : signed(31 downto 0) := (others => '0');
+  signal cnt_sat   : std_logic;
+  signal maskr     : std_logic_vector(31 downto 0);
+  signal shifter   : t_shifter;
+  signal perr      : std_logic_vector(31 downto 0);
+  signal mask      : std_logic_vector( 7 downto 0) := (others => '0');
+  signal outp      : std_logic_vector( 7 downto 0) := (others => '0');
+  signal outp_d0   : std_logic;
 
 --==============================================================================
 --  architecture begin
 --==============================================================================
 begin
 
-  hir <= std_logic_vector(to_unsigned(3, 32));
-  lor <= std_logic_vector(to_unsigned(3, 32));
+  perr <= std_logic_vector(to_signed(8,32));
+  maskr <= x"00008888";
 
-  --============================================================================
-  -- Counters and output shift register
-  --============================================================================
-  p_counters : process(clk_ref_i)
+  -- Count cycles to bit-flip
+  p_cnt : process (clk_ref_i)
+    variable c : signed(31 downto 0);
   begin
     if rising_edge(clk_ref_i) then
       if (rst_ref_n_i = '0') then
-        cnth <= (others => '0');
-        cntl <= (others => '0');
-        obit <= '0';
-      elsif (obit = '1') then
-        cnth <= cnth + 1;
-        if (cnth = unsigned(hir)) then
-          cnth <= (others => '0');
-          obit <= '0';
-        end if;
-      elsif (obit = '0') then
-        cntl <= cntl + 1;
-        if (cntl = unsigned(lor)) then
-          cntl <= (others => '0');
-          obit <= '1';
-        end if;
-      end if;
-    end if;
-  end process p_counters;
-
-  p_shift_reg : process (clk_ref_i)
-  begin
-    if rising_edge(clk_ref_i) then
-      if (rst_ref_n_i = '0') then
-        shr <= (others => '0');
+        c   := (others => '0');
+        cnt <= (others => '0');
       else
-        shr <= obit & shr(7 downto 1);
+        c := c - 8;
+        if (c < 0) then
+          c := c + signed(perr);
+        end if;
+        cnt <= c;
       end if;
     end if;
-  end process p_shift_reg;
+  end process p_cnt;
 
-  p_data_out : process(clk_ref_i)
+  -- Saturated barrel shifter, shifts the mask by the number of bits indicated by
+  -- cnt, or 16 bits if counter saturated from the point of view of the shifter (shift
+  -- value == cnt > 15).
+  cnt_sat <= '1' when ((cnt(31 downto 4)) /= (cnt(31 downto 4)'range => '0')) else
+             '0';
+
+  gen_shifter_lvl_0 : for j in 15 downto 15-((2**3)-1) generate
+    shifter(3)(j) <= '0' when (cnt(3) = '1') else maskr(j);
+  end generate gen_shifter_lvl_0;
+  gen_shifter_lvl_bit : for j in 15-((2**3)-1)-1 downto 0 generate
+    shifter(3)(j) <= maskr(j+2**3) when (cnt(3) = '1') else maskr(j);
+  end generate gen_shifter_lvl_bit;
+
+  gen_shifter : for i in 2 downto 0 generate
+    gen_shifter_lvl_0 : for j in 15 downto 15-((2**i)-1) generate
+      shifter(i)(j) <= '0' when (cnt(i) = '1') else shifter(i+1)(j);
+    end generate gen_shifter_lvl_0;
+    gen_shifter_lvl_bit : for j in 15-((2**i)-1)-1 downto 0 generate
+      shifter(i)(j) <= shifter(i+1)(j+2**i) when (cnt(i) = '1') else shifter(i+1)(j);
+    end generate gen_shifter_lvl_bit;
+  end generate gen_shifter;
+
+  mask <= shifter(0)(7 downto 0) when (cnt_sat = '0') else
+          (others => '0');
+
+  -- Output bit-flip based on mask and value of output on prev. cycle
+  outp(7) <= outp_d0 xor mask(7);
+  gen_outp_bits : for i in 6 downto 0 generate
+    outp(i) <= outp(i+1) xor mask(i);
+  end generate gen_outp_bits;
+
+  p_outp_delay : process (clk_ref_i)
+  begin
+    if rising_edge(clk_ref_i) then
+      if (rst_ref_n_i = '0') then
+        outp_d0 <= '0';
+      else
+        outp_d0 <= outp(0);
+      end if;
+    end if;
+  end process p_outp_delay;
+
+  -- Register the output to the port
+  p_outp_reg : process (clk_ref_i)
   begin
     if rising_edge(clk_ref_i) then
       if (rst_ref_n_i = '0') then
         dat_o <= (others => '0');
       else
-        dat_o <= shr;
+        dat_o <= outp;
       end if;
     end if;
-  end process p_data_out;
+  end process p_outp_reg;
 
 end architecture arch;
 --==============================================================================
