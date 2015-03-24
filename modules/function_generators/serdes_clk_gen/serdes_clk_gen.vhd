@@ -1,19 +1,18 @@
 --==============================================================================
--- CERN (BE-CO-HT)
--- Generic Wishbone-interface frequency synthesizer
+-- GSI Helmholz center for Heavy Ion Research GmbH
+-- SERDES clock generator
 --==============================================================================
 --
 -- author: Theodor Stana (t.stana@gsi.de)
 --
--- date of creation: 2015-03-16
+-- date of creation: 2015-03-24
 --
 -- version: 1.0
 --
 -- description:
---
--- dependencies:
---
--- references:
+--    This module implements a clock generator via a SERDES interface. It drives
+--    the data input of a SERDES transceiver with the necessary bit pattern in
+--    order to generate a clock at the SERDES data rate.
 --
 --==============================================================================
 -- GNU LESSER GENERAL PUBLIC LICENSE
@@ -29,7 +28,7 @@
 -- source; if not, download it from http://www.gnu.org/licenses/lgpl-2.1.html
 --==============================================================================
 -- last changes:
---    2015-03-16   Theodor Stana     File created
+--    2015-03-24   Theodor Stana     File created
 --==============================================================================
 -- TODO: -
 --==============================================================================
@@ -39,31 +38,29 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 
-entity wb_freq_synth is
+entity serdes_clk_gen is
   port
   (
-    -- Reference clock domain signals
+    -- Clock and reset signals
     clk_ref_i   : in  std_logic;
     rst_ref_n_i : in  std_logic;
+
+    -- Period and maks register inputs, synchronous to clk_ref_i
+    hperr_i     : in  std_logic_vector(31 downto 0);
+    maskr_i     : in  std_logic_vector(31 downto 0);
+
+    -- Data output to SERDES, synchronous to clk_ref_i
     dat_o       : out std_logic_vector(7 downto 0)
   );
-end entity wb_freq_synth;
+end entity serdes_clk_gen;
 
 
-architecture arch of wb_freq_synth is
+architecture arch of serdes_clk_gen is
 
   --============================================================================
   -- Type declarations
   --============================================================================
   type t_shifter is array(3 downto 0) of std_logic_vector(15 downto 0);
-
-  --============================================================================
-  -- Constant declarations
-  --============================================================================
-
-  --============================================================================
-  -- Component declarations
-  --============================================================================
 
   --============================================================================
   -- Signal declarations
@@ -78,12 +75,9 @@ architecture arch of wb_freq_synth is
 
 
 
-
   signal cnt       : signed(31 downto 0) := (others => '0');
   signal cnt_sat   : std_logic;
-  signal maskr     : std_logic_vector(31 downto 0);
   signal shifter   : t_shifter;
-  signal perr      : std_logic_vector(31 downto 0);
   signal mask      : std_logic_vector( 7 downto 0) := (others => '0');
   signal outp      : std_logic_vector( 7 downto 0) := (others => '0');
   signal outp_d0   : std_logic;
@@ -92,9 +86,6 @@ architecture arch of wb_freq_synth is
 --  architecture begin
 --==============================================================================
 begin
-
-  perr <= std_logic_vector(to_signed(8,32));
-  maskr <= x"00008888";
 
   -- Count cycles to bit-flip
   p_cnt : process (clk_ref_i)
@@ -107,7 +98,7 @@ begin
       else
         c := c - 8;
         if (c < 0) then
-          c := c + signed(perr);
+          c := c + signed(hperr_i);
         end if;
         cnt <= c;
       end if;
@@ -121,10 +112,10 @@ begin
              '0';
 
   gen_shifter_lvl_0 : for j in 15 downto 15-((2**3)-1) generate
-    shifter(3)(j) <= '0' when (cnt(3) = '1') else maskr(j);
+    shifter(3)(j) <= '0' when (cnt(3) = '1') else maskr_i(j);
   end generate gen_shifter_lvl_0;
   gen_shifter_lvl_bit : for j in 15-((2**3)-1)-1 downto 0 generate
-    shifter(3)(j) <= maskr(j+2**3) when (cnt(3) = '1') else maskr(j);
+    shifter(3)(j) <= maskr_i(j+2**3) when (cnt(3) = '1') else maskr_i(j);
   end generate gen_shifter_lvl_bit;
 
   gen_shifter : for i in 2 downto 0 generate
@@ -167,6 +158,7 @@ begin
       end if;
     end if;
   end process p_outp_reg;
+
 
 end architecture arch;
 --==============================================================================
