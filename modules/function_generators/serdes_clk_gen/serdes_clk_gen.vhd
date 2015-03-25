@@ -42,15 +42,15 @@ entity serdes_clk_gen is
   port
   (
     -- Clock and reset signals
-    clk_ref_i   : in  std_logic;
-    rst_ref_n_i : in  std_logic;
+    clk_i        : in  std_logic;
+    rst_n_i      : in  std_logic;
 
-    -- Period and maks register inputs, synchronous to clk_ref_i
-    hperr_i     : in  std_logic_vector(31 downto 0);
-    maskr_i     : in  std_logic_vector(31 downto 0);
+    -- Period and maks register inputs, synchronous to clk_i
+    hperr_i      : in  std_logic_vector(31 downto 0);
+    maskr_i      : in  std_logic_vector(31 downto 0);
 
-    -- Data output to SERDES, synchronous to clk_ref_i
-    dat_o       : out std_logic_vector(7 downto 0)
+    -- Data output to SERDES, synchronous to clk_i
+    serdes_dat_o : out std_logic_vector(7 downto 0)
   );
 end entity serdes_clk_gen;
 
@@ -88,11 +88,11 @@ architecture arch of serdes_clk_gen is
 begin
 
   -- Count cycles to bit-flip
-  p_cnt : process (clk_ref_i)
+  p_cnt : process (clk_i)
     variable c : signed(31 downto 0);
   begin
-    if rising_edge(clk_ref_i) then
-      if (rst_ref_n_i = '0') then
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
         c   := (others => '0');
         cnt <= (others => '0');
       else
@@ -136,10 +136,10 @@ begin
     outp(i) <= outp(i+1) xor mask(i);
   end generate gen_outp_bits;
 
-  p_outp_delay : process (clk_ref_i)
+  p_outp_delay : process (clk_i)
   begin
-    if rising_edge(clk_ref_i) then
-      if (rst_ref_n_i = '0') then
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
         outp_d0 <= '0';
       else
         outp_d0 <= outp(0);
@@ -148,13 +148,13 @@ begin
   end process p_outp_delay;
 
   -- Register the output to the port
-  p_outp_reg : process (clk_ref_i)
+  p_outp_reg : process (clk_i)
   begin
-    if rising_edge(clk_ref_i) then
-      if (rst_ref_n_i = '0') then
-        dat_o <= (others => '0');
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        serdes_dat_o <= (others => '0');
       else
-        dat_o <= outp;
+        serdes_dat_o <= outp;
       end if;
     end if;
   end process p_outp_reg;
