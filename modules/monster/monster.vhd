@@ -605,7 +605,9 @@ architecture rtl of monster is
 
   signal lvds_dat_fr_eca_chan : t_lvds_byte_array(11 downto 0);
   signal lvds_dat_fr_clk_gen  : t_lvds_byte_array(11 downto 0);
-  signal lvds_dum : t_lvds_byte_array(2 downto 0);
+
+  constant dum : natural := 3;
+  signal lvds_dum : t_lvds_byte_array(dum-1 downto 0);
 
   signal lvds_dat : t_lvds_byte_array(11 downto 0);
   signal lvds_i   : t_lvds_byte_array(15 downto 0);
@@ -1450,7 +1452,7 @@ c4: eca_ac_wbm
   cmp_serdes_clk_gen : xwb_serdes_clk_gen
     generic map
     (
-      g_num_outputs => g_lvds_inout
+      g_num_outputs =>  dum
     )
     port map
     (
@@ -1467,8 +1469,8 @@ c4: eca_ac_wbm
     );
 
   -- LVDS component data input is OR between ECA chan output and SERDES clk. gen.
-  lvds_dat_fr_clk_gen( 2 downto 0) <= lvds_dum;
-  lvds_dat_fr_clk_gen(11 downto 3) <= (others => (others => '0'));
+  lvds_dat_fr_clk_gen( dum-1 downto 0) <= lvds_dum;
+  lvds_dat_fr_clk_gen(11 downto dum) <= (others => (others => '0'));
   gen_lvds_dat : for i in 0 to 11 generate
     lvds_dat(i) <= lvds_dat_fr_eca_chan(i) or lvds_dat_fr_clk_gen(i);
   end generate gen_lvds_dat;
