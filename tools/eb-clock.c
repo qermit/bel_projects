@@ -25,8 +25,32 @@ static void die(const char* msg, eb_status_t status) {
   exit(1);
 }
 
+static void clk(int halfper, int *hperr, int *maskr)
+{
+  int pp, p, i;
+
+  p = halfper;
+  if (p < 1) {
+    fprintf(stderr, "Error: p cannot be less than 1\n");
+    exit(1);
+  }
+
+  // p is the length of HALF the period
+  pp = p;
+  while (pp < 8) pp += p;
+
+  int b = 0;
+  for (i = 15; i >= 0; --i) {
+    // offset = 7-i
+    b |= ((7-i)%p == 0) << i;
+  }
+
+  *hperr = p;
+  *maskr = b;
+}
+
 int main(int argc, char** argv) {
-  int opt, error, c, i;
+  int opt, error, c;
   struct sdb_device sdb;
   eb_status_t status;
   eb_socket_t socket;
@@ -55,8 +79,8 @@ int main(int argc, char** argv) {
 
   if (error) return 1;
 
-  if (optind + 2 != argc) {
-    fprintf(stderr, "%s: expecting two non-optional arguments: <proto/host/port> <num_cycles>\n", program);
+  if (optind + 1 != argc) {
+    fprintf(stderr, "%s: expecting one non-optional arguments: <proto/host/port> <num_cycles>\n", program);
     return 1;
   }
 
@@ -81,80 +105,52 @@ int main(int argc, char** argv) {
   hperr = first + 4;
   maskr = first + 8;
 
-  int pp = 0;
-  int p = 0;
-  p = atol(argv[optind+1]);
-  printf("%d\n", p);
-  if (p < 1) {
-    fprintf(stderr, "Error: p cannot be less than 1\n");
-    return 1;
-  }
+  int p, m;
 
-  // p is the length of HALF the period
-  pp = p;
-  while (pp < 8) pp += p;
-  printf("pp = %d\n", pp);
+  int hp1, hp2, hp3;
 
-  int b = 0;
-  for (i = 15; i >= 0; --i) {
-    // offset = 7-i
-    printf("%d", (7-i)%p == 0);
-    b |= ((7-i)%p == 0) << i;
-  }
-  printf("\n%x\n", b);
+  printf("hp1 = ");
+  scanf("%d", &hp1);
+  printf("hp2 = ");
+  scanf("%d", &hp2);
+  printf("hp3 = ");
+  scanf("%d", &hp3);
 
-  eb_data_t d;
+  /*-------------------------------------------------------------------------*/
+  clk(hp1, &p, &m);
 
   if ((status = eb_device_write(device, selr, EB_DATA32, 0, 0, 0)) != EB_OK)
     die("eb_device_write(selr)", status);
 
-  if ((status = eb_device_write(device, hperr, EB_DATA32, pp, 0, 0)) != EB_OK)
+  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
     die("eb_device_write(hperr)", status);
 
-  if ((status = eb_device_write(device, maskr, EB_DATA32, b, 0, 0)) != EB_OK)
+  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
     die("eb_device_write(maskr)", status);
 
-  if ((status = eb_device_read(device, selr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(selr)", status);
-  printf("selr=%d\n", (int)d);
-
-  if ((status = eb_device_read(device, hperr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(hperr)", status);
-  printf("hperr=%d\n", (int)d);
-
-  if ((status = eb_device_read(device, maskr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(maskr)", status);
-  printf("maskr=%d\n", (int)d);
+  /*-------------------------------------------------------------------------*/
+  clk(hp2, &p, &m);
 
   if ((status = eb_device_write(device, selr, EB_DATA32, 1, 0, 0)) != EB_OK)
     die("eb_device_write(selr)", status);
 
-  if ((status = eb_device_read(device, selr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(selr)", status);
-  printf("selr=%d\n", (int)d);
+  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
+    die("eb_device_write(hperr)", status);
 
-  if ((status = eb_device_read(device, hperr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(hperr)", status);
-  printf("hperr=%d\n", (int)d);
+  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
+    die("eb_device_write(maskr)", status);
 
-  if ((status = eb_device_read(device, maskr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(maskr)", status);
-  printf("maskr=%d\n", (int)d);
+  /*-------------------------------------------------------------------------*/
+  clk(hp3, &p, &m);
 
   if ((status = eb_device_write(device, selr, EB_DATA32, 2, 0, 0)) != EB_OK)
     die("eb_device_write(selr)", status);
 
-  if ((status = eb_device_read(device, selr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(selr)", status);
-  printf("selr=%d\n", (int)d);
+  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
+    die("eb_device_write(hperr)", status);
 
-  if ((status = eb_device_read(device, hperr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(hperr)", status);
-  printf("hperr=%d\n", (int)d);
-
-  if ((status = eb_device_read(device, maskr, EB_DATA32, &d, 0, 0)) != EB_OK)
-    die("eb_device_read(maskr)", status);
-  printf("maskr=%d\n", (int)d);
+  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
+    die("eb_device_write(maskr)", status);
 
   return 0;
 }
