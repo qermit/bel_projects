@@ -39,6 +39,10 @@ use ieee.numeric_std.all;
 
 
 entity serdes_clk_gen is
+  generic
+  (
+    g_serdes_num_bits : natural
+  );
   port
   (
     -- Clock and reset signals
@@ -46,8 +50,9 @@ entity serdes_clk_gen is
     rst_n_i      : in  std_logic;
 
     -- Period and maks register inputs, synchronous to clk_i
-    hperr_i      : in  std_logic_vector(31 downto 0);
-    maskr_i      : in  std_logic_vector(31 downto 0);
+    per_i        : in  std_logic_vector(31 downto 0);
+    frac_i       : in  std_logic_vector(31 downto 0);
+    mask_i       : in  std_logic_vector(31 downto 0);
 
     -- Data output to SERDES, synchronous to clk_i
     serdes_dat_o : out std_logic_vector(7 downto 0)
@@ -61,52 +66,54 @@ architecture arch of serdes_clk_gen is
   -- Signal declarations
   --============================================================================
 
-
-  -- TODO: remove these effing init values
-
-
-
-  signal cnt     : unsigned(31 downto 0) := (others => '0');
-  signal sub     : unsigned(32 downto 0);
-  signal cnt_sat : std_logic;
-  signal mask    : std_logic_vector( 7 downto 0) := (others => '0');
-  signal outp    : std_logic_vector( 7 downto 0) := (others => '0');
-  signal outp_d0 : std_logic;
+  signal percnt  : unsigned(31 downto 0);
+  signal persub  : unsigned(32 downto 0);
+  signal fraccnt : unsigned(31 downto 0);
+  signal fracadd : unsigned(32 downto 0);
 
   signal msk     : unsigned(15 downto 0);
   signal shmsk   : unsigned(15 downto 0);
+  signal mask    : std_logic_vector( 7 downto 0);
+
+  signal outp    : std_logic_vector( 7 downto 0);
+  signal outp_d0 : std_logic;
 
 --==============================================================================
 --  architecture begin
 --==============================================================================
 begin
 
-  -- Count cycles to bit-flip, subtracting 8 (the num. of bits of the SERDES) on
-  -- each cycle
-  sub <= ('0' & cnt) - 8;
+  -- Count cycles to bit-flip, subtracting the num. of bits of the SERDES on
+  -- every cycle
+  persub  <= (('0' & percnt) - g_serdes_num_bits) when (fracadd(fracadd'high) = '0') else
+             (('0' & percnt) - (g_serdes_num_bits-1));
+  fracadd <= ('0' & fraccnt) + unsigned(frac_i);
 
-  p_cnt : process (clk_i, rst_n_i)
+  p_counters : process (clk_i, rst_n_i)
   begin
-    if rst_n_i = '0' then
-      cnt <= (others => '0');
+    if (rst_n_i = '0') then
+      percnt  <= (others => '0');
+      fraccnt <= (others => '0');
     elsif rising_edge(clk_i) then
-      if sub(sub'high) = '1' then
-        cnt <= sub(cnt'range) + unsigned(hperr_i);
+      if (persub(persub'high) = '1') then
+        percnt  <= persub(percnt'range) + unsigned(per_i);
+        fraccnt <= fracadd(fraccnt'range);
       else
-        cnt <= sub(cnt'range);
+        percnt <= persub(percnt'range);
       end if;
     end if;
-  end process p_cnt;
+  end process p_counters;
 
   -- Saturated barrel shifter, shifts the mask by the number of bits indicated by
-  -- cnt, or 16 bits if counter saturated from the point of view of the shifter (shift
-  -- value == cnt > 15).
+  -- percnt, or fully if the counter is saturated from the point of view of the
+  -- shifter (shift value > SERDES number of bits).
   --
-  -- The lower 8 bits of the mask are presented to the XOR chain below prior to
+  -- The lower bits of the bit mask are presented to the XOR chain below prior to
   -- outputting to the SERDES.
-  msk   <= unsigned(maskr_i(15 downto 0));
-  shmsk <= shift_right(msk, to_integer(cnt(3 downto 0)));
-  mask  <= std_logic_vector(shmsk(7 downto 0)) when (cnt < 15) else
+  msk   <= unsigned(mask_i(15 downto 0)) when fracadd(fracadd'high) = '0' else
+           unsigned(mask_i(15 downto 8) & ('0' & mask_i(6 downto 0)));
+  shmsk <= shift_right(msk, to_integer(percnt(3 downto 0)));
+  mask  <= std_logic_vector(shmsk(7 downto 0)) when (percnt < 2*g_serdes_num_bits) else
            (others => '0');
 
   -- Output bit-flip based on mask and value of output on prev. cycle
