@@ -5,7 +5,7 @@ TARGETS := eb-flash eb-info eb-console eb-config-nv eb-clock
 
 EXTRA_FLAGS ?=
 CFLAGS      ?= $(EXTRA_FLAGS) -Wall -O2 -I $(EB)
-LIBS        ?= -L $(EB) -Wl,-rpath,$(PREFIX)/lib -letherbone
+LIBS        ?= -L $(EB) -Wl,-rpath,$(PREFIX)/lib -letherbone -lm
 
 all:	$(TARGETS)
 clean:

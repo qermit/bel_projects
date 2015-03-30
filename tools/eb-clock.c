@@ -6,11 +6,22 @@
 #include <string.h>
 #include <errno.h>
 #include <etherbone.h>
+#include <math.h>
 
 #define GSI_ID	0x651
 #define SERDES_CLK_GEN_ID	0x5f3eaf43
 
+#define BITS 8
+
 const char *program;
+static eb_device_t device;
+static int selr, pr, fracr, maskr;
+
+struct Control {
+  uint32_t period_integer;  // half-period = integer.fraction
+  uint32_t period_fraction;
+  uint16_t bit_pattern;     // size=2*BITS
+};
 
 static void help(void) {
   fprintf(stderr, "Usage: %s [OPTION] <proto/host/port>\n", program);
@@ -25,28 +36,62 @@ static void die(const char* msg, eb_status_t status) {
   exit(1);
 }
 
-static void clk(int halfper, int *hperr, int *maskr)
+static void clk(double hi, double lo, struct Control *control)
 {
-  int pp, p, i;
+  double period, wide_period, cut_period;
+  int i, j, fill_factor, cut_wide_period;
 
-  p = halfper;
-  if (p < 1) {
-    fprintf(stderr, "Error: p cannot be less than 1\n");
-    exit(1);
+  if (hi != floor(hi))
+    fprintf(stderr, "warning: fractional part of hi time ignored; period remains unaffected\n");
+
+  period = hi + lo;
+  fill_factor = ceil(BITS/period);
+  wide_period = period*fill_factor; // >= BITS
+  cut_wide_period = floor(wide_period);
+  cut_period = (double)cut_wide_period / fill_factor;
+  fprintf(stderr, "wide_period     = %f\n", wide_period);
+
+  control->period_integer  = floor(wide_period);
+  control->period_fraction = round((wide_period - control->period_integer) * 4294967296.0);
+  fprintf(stderr, "period_integer  = 0x%x\n", control->period_integer);
+  fprintf(stderr, "period_fraction = 0x%x\n", control->period_fraction);
+
+  control->bit_pattern = 0;
+  for (i = 0; i < fill_factor; ++i) {
+    int offset  = ceil(i*cut_period); // ceil guarantees gap before 7 is small
+    if (BITS-1 >= offset) // future bits
+      control->bit_pattern |= 1 << (BITS-1 - offset);
+    if (cut_wide_period - offset <= BITS) // past bits
+      control->bit_pattern |= 1 << (BITS-1 - offset + cut_wide_period);
+  }
+  fprintf(stderr, "bit_pattern     = ");
+  for (j = 15; j >= 0; --j)
+    fprintf(stderr, "%d", (control->bit_pattern >> j) & 1);
+  fprintf(stderr, "\n");
+}
+
+static void apply(int chan, struct Control *control)
+{
+  eb_status_t status;
+
+  if ((status = eb_device_write(device, selr, EB_DATA32, chan, 0, 0)) != EB_OK)
+    die("eb_device_write(selr)", status);
+
+  if ((status = eb_device_write(device, pr, EB_DATA32,
+                    control->period_integer, 0, 0)) != EB_OK) {
+    die("eb_device_write(hperr)", status);
   }
 
-  // p is the length of HALF the period
-  pp = p;
-  while (pp < 8) pp += p;
-
-  int b = 0;
-  for (i = 15; i >= 0; --i) {
-    // offset = 7-i
-    b |= ((7-i)%p == 0) << i;
+  if ((status = eb_device_write(device, fracr, EB_DATA32,
+                    control->period_fraction, 0, 0)) != EB_OK) {
+    die("eb_device_write(hperr)", status);
   }
 
-  *hperr = p;
-  *maskr = b;
+  if ((status = eb_device_write(device, maskr, EB_DATA32,
+                    control->bit_pattern, 0, 0)) != EB_OK) {
+    die("eb_device_write(maskr)", status);
+  }
+
 }
 
 int main(int argc, char** argv) {
@@ -54,7 +99,10 @@ int main(int argc, char** argv) {
   struct sdb_device sdb;
   eb_status_t status;
   eb_socket_t socket;
-  eb_device_t device;
+
+  double hi1, hi2, hi3;
+  double lo1, lo2, lo3;
+  struct Control control;
 
   /* Default arguments */
   program = argv[0];
@@ -99,58 +147,42 @@ int main(int argc, char** argv) {
   }
 
   /* Clocking paraphernaelia */
-  int first, selr, hperr, maskr;
+  int first;
   first = sdb.sdb_component.addr_first;
   selr = first;
-  hperr = first + 4;
-  maskr = first + 8;
-
-  int p, m;
-
-  int hp1, hp2, hp3;
-
-  printf("hp1 = ");
-  scanf("%d", &hp1);
-  printf("hp2 = ");
-  scanf("%d", &hp2);
-  printf("hp3 = ");
-  scanf("%d", &hp3);
+  pr = first + 4;
+  fracr = first + 8;
+  maskr = first + 12;
 
   /*-------------------------------------------------------------------------*/
-  clk(hp1, &p, &m);
+  printf("hi1 = ");
+  scanf("%lf", &hi1);
+  printf("lo1 = ");
+  scanf("%lf", &lo1);
 
-  if ((status = eb_device_write(device, selr, EB_DATA32, 0, 0, 0)) != EB_OK)
-    die("eb_device_write(selr)", status);
+  clk(hi1, lo1, &control);
 
-  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
-    die("eb_device_write(hperr)", status);
-
-  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
-    die("eb_device_write(maskr)", status);
+  apply(0, &control);
 
   /*-------------------------------------------------------------------------*/
-  clk(hp2, &p, &m);
+  printf("hi2 = ");
+  scanf("%lf", &hi2);
+  printf("lo2 = ");
+  scanf("%lf", &lo2);
 
-  if ((status = eb_device_write(device, selr, EB_DATA32, 1, 0, 0)) != EB_OK)
-    die("eb_device_write(selr)", status);
+  clk(hi2, lo2, &control);
 
-  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
-    die("eb_device_write(hperr)", status);
-
-  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
-    die("eb_device_write(maskr)", status);
+  apply(1, &control);
 
   /*-------------------------------------------------------------------------*/
-  clk(hp3, &p, &m);
+  printf("hi3 = ");
+  scanf("%lf", &hi3);
+  printf("lo3 = ");
+  scanf("%lf", &lo3);
 
-  if ((status = eb_device_write(device, selr, EB_DATA32, 2, 0, 0)) != EB_OK)
-    die("eb_device_write(selr)", status);
+  clk(hi3, lo3, &control);
 
-  if ((status = eb_device_write(device, hperr, EB_DATA32, p, 0, 0)) != EB_OK)
-    die("eb_device_write(hperr)", status);
-
-  if ((status = eb_device_write(device, maskr, EB_DATA32, m, 0, 0)) != EB_OK)
-    die("eb_device_write(maskr)", status);
+  apply(2, &control);
 
   return 0;
 }
