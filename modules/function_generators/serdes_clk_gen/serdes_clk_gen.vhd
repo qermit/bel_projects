@@ -67,15 +67,16 @@ architecture arch of serdes_clk_gen is
   --============================================================================
 
   signal percnt  : unsigned(31 downto 0);
-  signal persub  : unsigned(32 downto 0);
+  signal persub  : unsigned(33 downto 0);
   signal fraccnt : unsigned(31 downto 0);
+  signal fraccry : std_logic;
   signal fracadd : unsigned(32 downto 0);
 
   signal msk     : unsigned(15 downto 0);
   signal shmsk   : unsigned(15 downto 0);
-  signal mask    : std_logic_vector( 7 downto 0);
+  signal mask    : std_logic_vector(7 downto 0);
 
-  signal outp    : std_logic_vector( 7 downto 0);
+  signal outp    : std_logic_vector(7 downto 0);
   signal outp_d0 : std_logic;
 
 --==============================================================================
@@ -85,21 +86,25 @@ begin
 
   -- Count cycles to bit-flip, subtracting the num. of bits of the SERDES on
   -- every cycle
-  persub  <= (('0' & percnt) - g_serdes_num_bits) when (fracadd(fracadd'high) = '0') else
-             (('0' & percnt) - (g_serdes_num_bits-1));
-  fracadd <= ('0' & fraccnt) + unsigned(frac_i);
+--  jersub  <= (('0' & percnt) - g_serdes_num_bits) when (fraccry = '0') else
+--             (('0' & percnt) - (g_serdes_num_bits-1));
+  persub <= ('0' & percnt & '1') + ('1' & unsigned(to_signed(-g_serdes_num_bits, 32)) & fraccry);
+  fracadd <= ('0' & fraccnt) + ('0' & unsigned(frac_i));
 
   p_counters : process (clk_i, rst_n_i)
   begin
     if (rst_n_i = '0') then
       percnt  <= (others => '0');
       fraccnt <= (others => '0');
+      fraccry <= '0';
     elsif rising_edge(clk_i) then
       if (persub(persub'high) = '1') then
-        percnt  <= persub(percnt'range) + unsigned(per_i);
+        percnt  <= persub(32 downto 1) + unsigned(per_i);
         fraccnt <= fracadd(fraccnt'range);
+        fraccry <= fracadd(fracadd'high);
       else
-        percnt <= persub(percnt'range);
+        percnt <= persub(32 downto 1);
+        fraccry <= '0';
       end if;
     end if;
   end process p_counters;
@@ -110,11 +115,11 @@ begin
   --
   -- The lower bits of the bit mask are presented to the XOR chain below prior to
   -- outputting to the SERDES.
-  msk   <= unsigned(mask_i(15 downto 0)) when fracadd(fracadd'high) = '0' else
-           unsigned(mask_i(15 downto 8) & ('0' & mask_i(6 downto 0)));
-  shmsk <= shift_right(msk, to_integer(percnt(3 downto 0)));
-  mask  <= std_logic_vector(shmsk(7 downto 0)) when (percnt < 2*g_serdes_num_bits) else
+  msk   <= unsigned(mask_i(15 downto 0)) when fraccry = '0' else
+           unsigned(mask_i(15 downto 8) & ('0' & mask_i(7 downto 1)));
+  shmsk <= shift_right(msk, to_integer(percnt(3 downto 0))) when (percnt < 2*g_serdes_num_bits) else
            (others => '0');
+  mask  <= std_logic_vector(shmsk(7 downto 0));
 
   -- Output bit-flip based on mask and value of output on prev. cycle
   outp(7) <= outp_d0 xor mask(7);
