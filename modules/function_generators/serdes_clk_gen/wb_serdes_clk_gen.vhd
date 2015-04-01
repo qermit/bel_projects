@@ -90,7 +90,8 @@ architecture arch of wb_serdes_clk_gen is
   component serdes_clk_gen is
     generic
     (
-      g_serdes_num_bits : natural
+      g_num_serdes_bits   : natural;
+      g_with_frac_counter : boolean := false
     );
     port
     (
@@ -238,7 +239,8 @@ begin
     cmp_clk_gen : serdes_clk_gen
       generic map
       (
-        g_serdes_num_bits => 8
+        g_num_serdes_bits   => 8,
+        g_with_frac_counter => true
       )
       port map
       (

@@ -37,11 +37,14 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+use work.genram_pkg.all;
+
 
 entity serdes_clk_gen is
   generic
   (
-    g_serdes_num_bits : natural
+    g_num_serdes_bits   : natural;
+    g_with_frac_counter : boolean := false
   );
   port
   (
@@ -65,65 +68,92 @@ architecture arch of serdes_clk_gen is
   --============================================================================
   -- Signal declarations
   --============================================================================
+  signal per_count  : unsigned(31 downto 0);
+  signal per_add    : unsigned(33 downto 0);
+  signal frac_count : unsigned(31 downto 0);
+  signal frac_add   : unsigned(32 downto 0);
+  signal frac_carry : std_logic;
 
-  signal percnt  : unsigned(31 downto 0);
-  signal persub  : unsigned(33 downto 0);
-  signal fraccnt : unsigned(31 downto 0);
-  signal fraccry : std_logic;
-  signal fracadd : unsigned(32 downto 0);
+  signal msk        : unsigned(31 downto 0);
+  signal shmsk      : unsigned(31 downto 0);
+  signal mask       : std_logic_vector(g_num_serdes_bits-1 downto 0);
 
-  signal msk     : unsigned(15 downto 0);
-  signal shmsk   : unsigned(15 downto 0);
-  signal mask    : std_logic_vector(7 downto 0);
-
-  signal outp    : std_logic_vector(7 downto 0);
-  signal outp_d0 : std_logic;
+  signal outp       : std_logic_vector(g_num_serdes_bits-1 downto 0);
+  signal outp_d0    : std_logic;
 
 --==============================================================================
 --  architecture begin
 --==============================================================================
 begin
 
-  -- Count cycles to bit-flip, subtracting the num. of bits of the SERDES on
-  -- every cycle
---  jersub  <= (('0' & percnt) - g_serdes_num_bits) when (fraccry = '0') else
---             (('0' & percnt) - (g_serdes_num_bits-1));
-  persub <= ('0' & percnt & '1') + ('1' & unsigned(to_signed(-g_serdes_num_bits, 32)) & fraccry);
-  fracadd <= ('0' & fraccnt) + ('0' & unsigned(frac_i));
+--------------------------------------------------------------------------------
+g_frac_y : if (g_with_frac_counter = true) generate
+
+  per_add  <= ('0' & per_count & '1') +
+              ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry);
+  frac_add <= ('0' & frac_count) + ('0' & unsigned(frac_i));
 
   p_counters : process (clk_i, rst_n_i)
   begin
     if (rst_n_i = '0') then
-      percnt  <= (others => '0');
-      fraccnt <= (others => '0');
-      fraccry <= '0';
+      per_count  <= (others => '0');
+      frac_count <= (others => '0');
+      frac_carry <= '0';
     elsif rising_edge(clk_i) then
-      if (persub(persub'high) = '1') then
-        percnt  <= persub(32 downto 1) + unsigned(per_i);
-        fraccnt <= fracadd(fraccnt'range);
-        fraccry <= fracadd(fracadd'high);
+      if (per_add(per_add'high) = '1') then
+        per_count  <= per_add(32 downto 1) + unsigned(per_i);
+        frac_count <= frac_add(frac_count'range);
+        frac_carry <= frac_add(frac_add'high);
       else
-        percnt <= persub(32 downto 1);
-        fraccry <= '0';
+        per_count  <= per_add(32 downto 1);
+        frac_carry <= '0';
       end if;
     end if;
   end process p_counters;
 
+end generate g_frac_y;
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+g_frac_n : if (g_with_frac_counter = false) generate
+
+  frac_carry <= '0';
+
+  per_add    <= ('0' & per_count & '1') +
+                ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry);
+
+  p_counter : process (clk_i, rst_n_i)
+  begin
+    if (rst_n_i = '0') then
+      per_count  <= (others => '0');
+    elsif rising_edge(clk_i) then
+      if (per_add(per_add'high) = '1') then
+        per_count <= per_add(32 downto 1) + unsigned(per_i);
+      else
+        per_count <= per_add(32 downto 1);
+      end if;
+    end if;
+  end process p_counter;
+
+end generate g_frac_n;
+--------------------------------------------------------------------------------
+
   -- Saturated barrel shifter, shifts the mask by the number of bits indicated by
-  -- percnt, or fully if the counter is saturated from the point of view of the
+  -- per_count, or fully if the counter is saturated from the point of view of the
   -- shifter (shift value > SERDES number of bits).
   --
   -- The lower bits of the bit mask are presented to the XOR chain below prior to
   -- outputting to the SERDES.
-  msk   <= unsigned(mask_i(15 downto 0)) when fraccry = '0' else
-           unsigned(mask_i(15 downto 8) & ('0' & mask_i(7 downto 1)));
-  shmsk <= shift_right(msk, to_integer(percnt(3 downto 0))) when (percnt < 2*g_serdes_num_bits) else
+  msk   <= unsigned(mask_i(31 downto 0)) when (frac_carry = '0') else
+           unsigned(mask_i(31 downto g_num_serdes_bits) & ('0' & mask_i(g_num_serdes_bits-1 downto 1)));
+  shmsk <= shift_right(msk, to_integer(per_count(f_log2_size(2*g_num_serdes_bits)-1 downto 0)))
+              when (per_count < 2*g_num_serdes_bits) else
            (others => '0');
-  mask  <= std_logic_vector(shmsk(7 downto 0));
+  mask  <= std_logic_vector(shmsk(g_num_serdes_bits-1 downto 0));
 
   -- Output bit-flip based on mask and value of output on prev. cycle
-  outp(7) <= outp_d0 xor mask(7);
-  gen_outp_bits : for i in 6 downto 0 generate
+  outp(g_num_serdes_bits-1) <= outp_d0 xor mask(g_num_serdes_bits-1);
+  gen_outp_bits : for i in g_num_serdes_bits-2 downto 0 generate
     outp(i) <= outp(i+1) xor mask(i);
   end generate gen_outp_bits;
 
