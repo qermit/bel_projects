@@ -63,5 +63,21 @@ peripheral {
             clock = "clk_ref_i";
         };
     };
+
+    reg {
+        name = "PHSHR";
+        description = "Phase shift register -- banked";
+        prefix = "phsh";
+        field {
+            name = "Bits of currently selected banked register";
+            type = SLV;
+            size = 32;
+            access_dev = READ_WRITE;
+            access_bus = READ_WRITE;
+            load = LOAD_EXT;
+            clock = "clk_ref_i";
+        };
+    };
+
 };
 

@@ -90,7 +90,7 @@ begin
       clk_sys_i    => clk_sys_i,
       rst_sys_n_i  => rst_sys_n_i,
 
-      wb_adr_i     => wbs_i.adr(3 downto 2),
+      wb_adr_i     => wbs_i.adr(4 downto 2),
       wb_dat_i     => wbs_i.dat,
       wb_dat_o     => wbs_o.dat,
       wb_cyc_i     => wbs_i.cyc,

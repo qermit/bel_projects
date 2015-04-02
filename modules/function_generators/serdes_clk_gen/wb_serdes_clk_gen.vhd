@@ -55,7 +55,7 @@ entity wb_serdes_clk_gen is
     clk_sys_i    : in  std_logic;
     rst_sys_n_i  : in  std_logic;
 
-    wb_adr_i     : in  std_logic_vector(1 downto 0);
+    wb_adr_i     : in  std_logic_vector( 2 downto 0);
     wb_dat_i     : in  std_logic_vector(31 downto 0);
     wb_dat_o     : out std_logic_vector(31 downto 0);
     wb_cyc_i     : in  std_logic;
@@ -90,8 +90,9 @@ architecture arch of wb_serdes_clk_gen is
   component serdes_clk_gen is
     generic
     (
-      g_num_serdes_bits   : natural;
-      g_with_frac_counter : boolean := false
+      g_num_serdes_bits       : natural;
+      g_with_frac_counter     : boolean := false;
+      g_selectable_duty_cycle : boolean := false
     );
     port
     (
@@ -99,10 +100,12 @@ architecture arch of wb_serdes_clk_gen is
       clk_i        : in  std_logic;
       rst_n_i      : in  std_logic;
 
-      -- Period and maks register inputs, synchronous to clk_i
+      -- Inputs from registers, synchronous to clk_i
       per_i        : in  std_logic_vector(31 downto 0);
       frac_i       : in  std_logic_vector(31 downto 0);
       mask_i       : in  std_logic_vector(31 downto 0);
+      ph_shift_i   : in  std_logic_vector(31 downto 0);
+      ld_p0_i      : in  std_logic;
 
       -- Data output to SERDES, synchronous to clk_i
       serdes_dat_o : out std_logic_vector(7 downto 0)
@@ -113,7 +116,7 @@ architecture arch of wb_serdes_clk_gen is
     port (
       rst_n_i                                  : in     std_logic;
       clk_sys_i                                : in     std_logic;
-      wb_adr_i                                 : in     std_logic_vector(1 downto 0);
+      wb_adr_i                                 : in     std_logic_vector(2 downto 0);
       wb_dat_i                                 : in     std_logic_vector(31 downto 0);
       wb_dat_o                                 : out    std_logic_vector(31 downto 0);
       wb_cyc_i                                 : in     std_logic;
@@ -136,7 +139,11 @@ architecture arch of wb_serdes_clk_gen is
       -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'MASKR'
       reg_mask_o                               : out    std_logic_vector(31 downto 0);
       reg_mask_i                               : in     std_logic_vector(31 downto 0);
-      reg_mask_load_o                          : out    std_logic
+      reg_mask_load_o                          : out    std_logic;
+  -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'PHSHR'
+      reg_phsh_o                               : out    std_logic_vector(31 downto 0);
+      reg_phsh_i                               : in     std_logic_vector(31 downto 0);
+      reg_phsh_load_o                          : out    std_logic
     );
   end component serdes_clk_gen_regs;
 
@@ -159,6 +166,14 @@ architecture arch of wb_serdes_clk_gen is
   signal mask_fr_regs    : std_logic_vector(31 downto 0);
   signal mask_to_regs    : std_logic_vector(31 downto 0);
   signal mask_fr_regs_ld : std_logic;
+
+  signal phsh            : t_reg_array;
+  signal phsh_fr_regs    : std_logic_vector(31 downto 0);
+  signal phsh_to_regs    : std_logic_vector(31 downto 0);
+  signal phsh_fr_regs_ld : std_logic;
+
+  signal ld              : std_logic;
+  signal ld_clkgen_p0    : std_logic_vector(g_num_outputs-1 downto 0);
 
 --==============================================================================
 --  architecture begin
@@ -197,23 +212,34 @@ begin
 
       reg_mask_o       => mask_fr_regs,
       reg_mask_i       => mask_to_regs,
-      reg_mask_load_o  => mask_fr_regs_ld
+      reg_mask_load_o  => mask_fr_regs_ld,
+
+      reg_phsh_o       => phsh_fr_regs,
+      reg_phsh_i       => phsh_to_regs,
+      reg_phsh_load_o  => phsh_fr_regs_ld
     );
 
   --============================================================================
   -- Register banks
   --============================================================================
+  ld <= per_fr_regs_ld or frac_fr_regs_ld or mask_fr_regs_ld or phsh_fr_regs_ld;
+
   p_reg_banks : process (clk_ref_i)
   begin
     if rising_edge(clk_ref_i) then
       if (rst_ref_n_i = '0') then
+
         per          <= (others => (others => '0'));
         frac         <= (others => (others => '0'));
         mask         <= (others => (others => '0'));
         per_to_regs  <= (others => '0');
         frac_to_regs <= (others => '0');
         mask_to_regs <= (others => '0');
+        phsh_to_regs <= (others => '0');
+        ld_clkgen_p0 <= (others => '0');
+
       else
+
         per_to_regs <= per(to_integer(unsigned(chsel)));
         if (per_fr_regs_ld = '1') then
           per(to_integer(unsigned(chsel))) <= per_fr_regs;
@@ -228,6 +254,17 @@ begin
         if (mask_fr_regs_ld = '1') then
           mask(to_integer(unsigned(chsel))) <= mask_fr_regs;
         end if;
+
+        phsh_to_regs <= phsh(to_integer(unsigned(chsel)));
+        if (phsh_fr_regs_ld = '1') then
+          phsh(to_integer(unsigned(chsel))) <= phsh_fr_regs;
+        end if;
+
+        ld_clkgen_p0 <= (others => '0');
+        if (ld = '1') then
+          ld_clkgen_p0(to_integer(unsigned(chsel))) <= '1';
+        end if;
+
       end if; -- !rst_ref_n_i
     end if; -- rising_edge()
   end process p_reg_banks;
@@ -239,8 +276,9 @@ begin
     cmp_clk_gen : serdes_clk_gen
       generic map
       (
-        g_num_serdes_bits   => 8,
-        g_with_frac_counter => true
+        g_num_serdes_bits       => 8,
+        g_with_frac_counter     => true,
+        g_selectable_duty_cycle => true
       )
       port map
       (
@@ -250,6 +288,8 @@ begin
         per_i        => per(i),
         frac_i       => frac(i),
         mask_i       => mask(i),
+        ph_shift_i   => phsh(i),
+        ld_p0_i      => ld_clkgen_p0(i),
 
         serdes_dat_o => serdes_dat_o(i)
       );

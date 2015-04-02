@@ -85,7 +85,7 @@ package wb_serdes_clk_gen_pkg is
       clk_sys_i    : in  std_logic;
       rst_sys_n_i  : in  std_logic;
 
-      wb_adr_i     : in  std_logic_vector(1 downto 0);
+      wb_adr_i     : in  std_logic_vector(2 downto 0);
       wb_dat_i     : in  std_logic_vector(31 downto 0);
       wb_dat_o     : out std_logic_vector(31 downto 0);
       wb_cyc_i     : in  std_logic;
