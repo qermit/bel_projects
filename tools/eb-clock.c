@@ -15,7 +15,7 @@
 
 const char *program;
 static eb_device_t device;
-static int selr, pr, fracr, maskr;
+static int selr, pr, fracr, maskr, phshr;
 
 struct Control {
   uint32_t period_integer;  // half-period = integer.fraction
@@ -70,7 +70,7 @@ static void clk(double hi, double lo, struct Control *control)
   fprintf(stderr, "\n");
 }
 
-static void apply(int chan, struct Control *control)
+static void apply(int chan, struct Control *control, uint32_t phase_shift)
 {
   eb_status_t status;
 
@@ -92,6 +92,11 @@ static void apply(int chan, struct Control *control)
     die("eb_device_write(maskr)", status);
   }
 
+  if ((status = eb_device_write(device, phshr, EB_DATA32,
+                    phase_shift, 0, 0)) != EB_OK) {
+    die("eb_device_write(phshr)", status);
+  }
+
 }
 
 int main(int argc, char** argv) {
@@ -100,21 +105,32 @@ int main(int argc, char** argv) {
   eb_status_t status;
   eb_socket_t socket;
 
-  double hi1, hi2, hi3;
-  double lo1, lo2, lo3;
+  int chan = 0;
+  char port[16];
+
+  double hi;
+  double lo;
   struct Control control;
 
   /* Default arguments */
   program = argv[0];
-  error = 0;
 
   /* Process the command-line arguments */
   error = 0;
-  while ((opt = getopt(argc, argv, "h")) != -1) {
+  while ((opt = getopt(argc, argv, "hc:H:L:")) != -1) {
     switch (opt) {
     case 'h':
       help();
       return 0;
+    case 'c':
+      chan = atoi(optarg);
+      break;
+    case 'H':
+      hi = atof(optarg);
+      break;
+    case 'L':
+      lo = atof(optarg);
+      break;
     case ':':
     case '?':
       error = 1;
@@ -127,16 +143,19 @@ int main(int argc, char** argv) {
 
   if (error) return 1;
 
-  if (optind + 1 != argc) {
-    fprintf(stderr, "%s: expecting one non-optional arguments: <proto/host/port> <num_cycles>\n", program);
+  if (optind+1 != argc) {
+    help();
     return 1;
   }
+
+  /* Get the port from the command line */
+  strcpy(port, argv[optind]);
 
   if ((status = eb_socket_open(EB_ABI_CODE, 0, EB_DATAX|EB_ADDRX, &socket)) != EB_OK)
     die("eb_socket_open", status);
 
-  if ((status = eb_device_open(socket, argv[optind], EB_DATAX|EB_ADDRX, 3, &device)) != EB_OK)
-    die(argv[optind], status);
+  if ((status = eb_device_open(socket, port, EB_DATAX|EB_ADDRX, 3, &device)) != EB_OK)
+    die(port, status);
 
   c = 1;
   if ((status = eb_sdb_find_by_identity(device, GSI_ID, SERDES_CLK_GEN_ID, &sdb, &c)) != EB_OK)
@@ -153,36 +172,11 @@ int main(int argc, char** argv) {
   pr = first + 4;
   fracr = first + 8;
   maskr = first + 12;
+  phshr = first + 16;
 
-  /*-------------------------------------------------------------------------*/
-  printf("hi1 = ");
-  scanf("%lf", &hi1);
-  printf("lo1 = ");
-  scanf("%lf", &lo1);
-
-  clk(hi1, lo1, &control);
-
-  apply(0, &control);
-
-  /*-------------------------------------------------------------------------*/
-  printf("hi2 = ");
-  scanf("%lf", &hi2);
-  printf("lo2 = ");
-  scanf("%lf", &lo2);
-
-  clk(hi2, lo2, &control);
-
-  apply(1, &control);
-
-  /*-------------------------------------------------------------------------*/
-  printf("hi3 = ");
-  scanf("%lf", &hi3);
-  printf("lo3 = ");
-  scanf("%lf", &lo3);
-
-  clk(hi3, lo3, &control);
-
-  apply(2, &control);
+  /* Set and apply reg values to clock module */
+  clk(hi, lo, &control);
+  apply(chan-1, &control, floor(hi));
 
   return 0;
 }
