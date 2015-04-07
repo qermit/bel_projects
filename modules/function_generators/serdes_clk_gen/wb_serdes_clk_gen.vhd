@@ -105,7 +105,6 @@ architecture arch of wb_serdes_clk_gen is
       frac_i       : in  std_logic_vector(31 downto 0);
       mask_i       : in  std_logic_vector(31 downto 0);
       ph_shift_i   : in  std_logic_vector(31 downto 0);
-      ld_p0_i      : in  std_logic;
 
       -- Data output to SERDES, synchronous to clk_i
       serdes_dat_o : out std_logic_vector(7 downto 0)
@@ -174,6 +173,9 @@ architecture arch of wb_serdes_clk_gen is
 
   signal ld              : std_logic;
   signal ld_clkgen_p0    : std_logic_vector(g_num_outputs-1 downto 0);
+
+  signal rst_n           : std_logic_vector(g_num_outputs-1 downto 0);
+  signal rst_n_array     : std_logic_vector(g_num_outputs-1 downto 0);
 
 --==============================================================================
 --  architecture begin
@@ -272,6 +274,8 @@ begin
   --============================================================================
   -- SERDES clock generators
   --============================================================================
+  rst_n_array <= (others => rst_ref_n_i);
+  rst_n <= rst_n_array and (not ld_clkgen_p0);
   gen_components : for i in 0 to g_num_outputs-1 generate
     cmp_clk_gen : serdes_clk_gen
       generic map
@@ -283,13 +287,12 @@ begin
       port map
       (
         clk_i        => clk_ref_i,
-        rst_n_i      => rst_ref_n_i,
+        rst_n_i      => rst_n(i),
 
         per_i        => per(i),
         frac_i       => frac(i),
         mask_i       => mask(i),
         ph_shift_i   => phsh(i),
-        ld_p0_i      => ld_clkgen_p0(i),
 
         serdes_dat_o => serdes_dat_o(i)
       );

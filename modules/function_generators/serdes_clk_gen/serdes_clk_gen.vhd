@@ -58,7 +58,6 @@ entity serdes_clk_gen is
     frac_i       : in  std_logic_vector(31 downto 0);
     mask_i       : in  std_logic_vector(31 downto 0);
     ph_shift_i   : in  std_logic_vector(31 downto 0);
-    ld_p0_i      : in  std_logic;
 
     -- Data output to SERDES, synchronous to clk_i
     serdes_dat_o : out std_logic_vector(7 downto 0)
@@ -111,12 +110,12 @@ gen_frac_y : if (g_with_frac_counter = true) generate
 
   p_counters : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') or (ld_p0_i = '1')then
-      per_count_1  <= (others => '0');
-      frac_count_1 <= (others => '0');
-      frac_carry_1 <= '0';
-    elsif rising_edge(clk_i) then
-      if (per_add_1(per_add_1'high) = '1') then
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        per_count_1  <= (others => '0');
+        frac_count_1 <= (others => '0');
+        frac_carry_1 <= '0';
+      elsif (per_add_1(per_add_1'high) = '1') then
         per_count_1  <= per_add_1(32 downto 1) + unsigned(per_i);
         frac_count_1 <= frac_add_1(frac_count_1'range);
         frac_carry_1 <= frac_add_1(frac_add_1'high);
@@ -134,13 +133,11 @@ gen_frac_y : if (g_with_frac_counter = true) generate
 
     p_secondary_counters : process (clk_i, rst_n_i)
     begin
-      if (rst_n_i = '0') then
-        per_count_2  <= (others => '0');
-        frac_count_2 <= (others => '0');
-        frac_carry_2 <= '0';
-      elsif rising_edge(clk_i) then
-        if (ld_p0_i = '1') then
-          per_count_2 <= unsigned(ph_shift_i);
+      if rising_edge(clk_i) then
+        if (rst_n_i = '0') then
+          per_count_2  <= unsigned(ph_shift_i);
+          frac_count_2 <= (others => '0');
+          frac_carry_2 <= '0';
         elsif (per_add_2(per_add_2'high) = '1') then
           per_count_2  <= per_add_2(32 downto 1) + unsigned(per_i);
           frac_count_2 <= frac_add_2(frac_count_2'range);
@@ -167,10 +164,10 @@ gen_frac_n : if (g_with_frac_counter = false) generate
 
   p_counter : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') or (ld_p0_i = '1' )then
-      per_count_1  <= (others => '0');
-    elsif rising_edge(clk_i) then
-      if (per_add_1(per_add_1'high) = '1') then
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        per_count_1  <= (others => '0');
+      elsif (per_add_1(per_add_1'high) = '1') then
         per_count_1 <= per_add_1(32 downto 1) + unsigned(per_i);
       else
         per_count_1 <= per_add_1(32 downto 1);
@@ -187,10 +184,8 @@ gen_frac_n : if (g_with_frac_counter = false) generate
 
     p_secondary_counter : process (clk_i, rst_n_i)
     begin
-      if (rst_n_i = '0') then
-        per_count_2  <= (others => '0');
-      elsif rising_edge(clk_i) then
-        if (ld_p0_i = '1') then
+      if rising_edge(clk_i) then
+        if (rst_n_i = '0') then
           per_count_2 <= unsigned(ph_shift_i);
         elsif (per_add_2(per_add_2'high) = '1') then
           per_count_2 <= per_add_2(32 downto 1) + unsigned(per_i);
@@ -226,10 +221,12 @@ end generate gen_frac_n;
 
   p_outp_delay : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') then
-      outp_1_d0 <= '0';
-    elsif rising_edge(clk_i) then
-      outp_1_d0 <= outp_1(0);
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        outp_1_d0 <= '0';
+      else
+        outp_1_d0 <= outp_1(0);
+      end if;
     end if;
   end process p_outp_delay;
 
@@ -249,10 +246,12 @@ gen_secondary_outp_logic : if (g_selectable_duty_cycle = true) generate
 
   p_secondary_outp_delay : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') then
-      outp_2_d0 <= '0';
-    elsif rising_edge(clk_i) then
-      outp_2_d0 <= outp_2(0);
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        outp_2_d0 <= '0';
+      else
+        outp_2_d0 <= outp_2(0);
+      end if;
     end if;
   end process p_secondary_outp_delay;
 
@@ -264,10 +263,12 @@ end generate gen_secondary_outp_logic;
 gen_outp_reg_simple : if (g_selectable_duty_cycle = false) generate
   p_outp_reg : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') then
-      serdes_dat_o <= (others => '0');
-    elsif rising_edge(clk_i) then
-      serdes_dat_o <= outp_1;
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        serdes_dat_o <= (others => '0');
+      else
+        serdes_dat_o <= outp_1;
+      end if;
     end if;
   end process p_outp_reg;
 end generate gen_outp_reg_simple;
@@ -275,10 +276,12 @@ end generate gen_outp_reg_simple;
 gen_outp_reg_xored : if (g_selectable_duty_cycle = true) generate
   p_outp_reg : process (clk_i, rst_n_i)
   begin
-    if (rst_n_i = '0') then
-      serdes_dat_o <= (others => '0');
-    elsif rising_edge(clk_i) then
-      serdes_dat_o <= outp_1 xor outp_2;
+    if rising_edge(clk_i) then
+      if (rst_n_i = '0') then
+        serdes_dat_o <= (others => '0');
+      else
+        serdes_dat_o <= outp_1 xor outp_2;
+      end if;
     end if;
   end process p_outp_reg;
 end generate gen_outp_reg_xored;
