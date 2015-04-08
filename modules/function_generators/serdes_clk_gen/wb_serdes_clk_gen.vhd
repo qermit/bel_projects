@@ -45,7 +45,9 @@ use work.altera_lvds_pkg.all;
 entity wb_serdes_clk_gen is
   generic
   (
-    g_num_outputs : natural
+    g_num_outputs           : natural;
+    g_with_frac_counter     : boolean := false;
+    g_selectable_duty_cycle : boolean := false
   );
   port
   (
@@ -174,7 +176,7 @@ architecture arch of wb_serdes_clk_gen is
   signal ld              : std_logic;
   signal ld_clkgen_p0    : std_logic_vector(g_num_outputs-1 downto 0);
 
-  signal rst_n           : std_logic_vector(g_num_outputs-1 downto 0);
+  signal rst_ref_n_array : std_logic_vector(g_num_outputs-1 downto 0);
   signal rst_n_array     : std_logic_vector(g_num_outputs-1 downto 0);
 
 --==============================================================================
@@ -226,68 +228,66 @@ begin
   --============================================================================
   ld <= per_fr_regs_ld or frac_fr_regs_ld or mask_fr_regs_ld or phsh_fr_regs_ld;
 
-  p_reg_banks : process (clk_ref_i)
+  p_reg_banks : process (clk_ref_i, rst_ref_n_i)
   begin
-    if rising_edge(clk_ref_i) then
-      if (rst_ref_n_i = '0') then
+    if (rst_ref_n_i = '0') then
 
-        per          <= (others => (others => '0'));
-        frac         <= (others => (others => '0'));
-        mask         <= (others => (others => '0'));
-        per_to_regs  <= (others => '0');
-        frac_to_regs <= (others => '0');
-        mask_to_regs <= (others => '0');
-        phsh_to_regs <= (others => '0');
-        ld_clkgen_p0 <= (others => '0');
+      per          <= (others => (others => '0'));
+      frac         <= (others => (others => '0'));
+      mask         <= (others => (others => '0'));
+      per_to_regs  <= (others => '0');
+      frac_to_regs <= (others => '0');
+      mask_to_regs <= (others => '0');
+      phsh_to_regs <= (others => '0');
+      ld_clkgen_p0 <= (others => '0');
 
-      else
+    elsif rising_edge(clk_ref_i) then
 
-        per_to_regs <= per(to_integer(unsigned(chsel)));
-        if (per_fr_regs_ld = '1') then
-          per(to_integer(unsigned(chsel))) <= per_fr_regs;
-        end if;
+      per_to_regs <= per(to_integer(unsigned(chsel)));
+      if (per_fr_regs_ld = '1') then
+        per(to_integer(unsigned(chsel))) <= per_fr_regs;
+      end if;
 
-        frac_to_regs <= frac(to_integer(unsigned(chsel)));
-        if (frac_fr_regs_ld = '1') then
-          frac(to_integer(unsigned(chsel))) <= frac_fr_regs;
-        end if;
+      frac_to_regs <= frac(to_integer(unsigned(chsel)));
+      if (frac_fr_regs_ld = '1') then
+        frac(to_integer(unsigned(chsel))) <= frac_fr_regs;
+      end if;
 
-        mask_to_regs <= mask(to_integer(unsigned(chsel)));
-        if (mask_fr_regs_ld = '1') then
-          mask(to_integer(unsigned(chsel))) <= mask_fr_regs;
-        end if;
+      mask_to_regs <= mask(to_integer(unsigned(chsel)));
+      if (mask_fr_regs_ld = '1') then
+        mask(to_integer(unsigned(chsel))) <= mask_fr_regs;
+      end if;
 
-        phsh_to_regs <= phsh(to_integer(unsigned(chsel)));
-        if (phsh_fr_regs_ld = '1') then
-          phsh(to_integer(unsigned(chsel))) <= phsh_fr_regs;
-        end if;
+      phsh_to_regs <= phsh(to_integer(unsigned(chsel)));
+      if (phsh_fr_regs_ld = '1') then
+        phsh(to_integer(unsigned(chsel))) <= phsh_fr_regs;
+      end if;
 
-        ld_clkgen_p0 <= (others => '0');
-        if (ld = '1') then
-          ld_clkgen_p0(to_integer(unsigned(chsel))) <= '1';
-        end if;
+      ld_clkgen_p0 <= (others => '0');
+      if (ld = '1') then
+        ld_clkgen_p0(to_integer(unsigned(chsel))) <= '1';
+      end if;
 
-      end if; -- !rst_ref_n_i
     end if; -- rising_edge()
   end process p_reg_banks;
 
   --============================================================================
   -- SERDES clock generators
   --============================================================================
-  rst_n_array <= (others => rst_ref_n_i);
-  rst_n <= rst_n_array and (not ld_clkgen_p0);
+  rst_ref_n_array <= (others => rst_ref_n_i);
+  rst_n_array     <= rst_ref_n_array and (not ld_clkgen_p0);
   gen_components : for i in 0 to g_num_outputs-1 generate
     cmp_clk_gen : serdes_clk_gen
       generic map
       (
         g_num_serdes_bits       => 8,
-        g_with_frac_counter     => true,
-        g_selectable_duty_cycle => true
+        g_with_frac_counter     => g_with_frac_counter,
+        g_selectable_duty_cycle => g_selectable_duty_cycle
       )
       port map
       (
         clk_i        => clk_ref_i,
-        rst_n_i      => rst_n(i),
+        rst_n_i      => rst_n_array(i),
 
         per_i        => per(i),
         frac_i       => frac(i),

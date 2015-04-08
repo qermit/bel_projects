@@ -46,7 +46,9 @@ use work.wb_serdes_clk_gen_pkg.all;
 entity xwb_serdes_clk_gen is
   generic
   (
-    g_num_outputs : natural
+    g_num_outputs           : natural;
+    g_with_frac_counter     : boolean := false;
+    g_selectable_duty_cycle : boolean := false
   );
   port
   (
@@ -80,7 +82,9 @@ begin
   cmp_wrapped_component : wb_serdes_clk_gen
     generic map
     (
-      g_num_outputs => g_num_outputs
+      g_num_outputs           => g_num_outputs,
+      g_with_frac_counter     => g_with_frac_counter,
+      g_selectable_duty_cycle => g_selectable_duty_cycle
     )
     port map
     (

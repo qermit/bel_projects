@@ -75,7 +75,9 @@ package wb_serdes_clk_gen_pkg is
   component wb_serdes_clk_gen is
     generic
     (
-      g_num_outputs : natural
+      g_num_outputs           : natural;
+      g_with_frac_counter     : boolean := false;
+      g_selectable_duty_cycle : boolean := false
     );
     port
     (
@@ -111,7 +113,9 @@ package wb_serdes_clk_gen_pkg is
   component xwb_serdes_clk_gen is
     generic
     (
-      g_num_outputs : natural
+      g_num_outputs           : natural;
+      g_with_frac_counter     : boolean := false;
+      g_selectable_duty_cycle : boolean := false
     );
     port
     (
