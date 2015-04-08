@@ -105,7 +105,7 @@ begin
 gen_frac_y : if (g_with_frac_counter = true) generate
 
   per_add_1  <= ('0' & per_count_1 & '1') +
-                ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry_1);
+                ('1' & to_unsigned(-g_num_serdes_bits, 32) & frac_carry_1);
   frac_add_1 <= ('0' & frac_count_1) + ('0' & unsigned(frac_i));
 
   p_counters : process (clk_i, rst_n_i)
@@ -128,7 +128,7 @@ gen_frac_y : if (g_with_frac_counter = true) generate
 
   gen_secondary_counters : if (g_selectable_duty_cycle = true) generate
     per_add_2  <= ('0' & per_count_2 & '1') +
-                  ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry_2);
+                  ('1' & to_unsigned(-g_num_serdes_bits, 32) & frac_carry_2);
     frac_add_2 <= ('0' & frac_count_2) + ('0' & unsigned(frac_i));
 
     p_secondary_counters : process (clk_i, rst_n_i)
@@ -160,7 +160,7 @@ gen_frac_n : if (g_with_frac_counter = false) generate
   frac_carry_1 <= '0';
 
   per_add_1 <= ('0' & per_count_1 & '1') +
-               ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry_1);
+               ('1' & to_unsigned(-g_num_serdes_bits, 32) & frac_carry_1);
 
   p_counter : process (clk_i, rst_n_i)
   begin
@@ -180,7 +180,7 @@ gen_frac_n : if (g_with_frac_counter = false) generate
     frac_carry_2 <= '0';
 
     per_add_2 <= ('0' & per_count_2 & '1') +
-                 ('1' & unsigned(to_signed(-g_num_serdes_bits, 32)) & frac_carry_2);
+                 ('1' & to_unsigned(-g_num_serdes_bits, 32) & frac_carry_2);
 
     p_secondary_counter : process (clk_i, rst_n_i)
     begin
