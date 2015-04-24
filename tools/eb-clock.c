@@ -15,10 +15,11 @@
 
 const char *program;
 static eb_device_t device;
-static int selr, pr, fracr, maskr, phshr;
+static int selr, pr, fracr, maskr, perhir;
 
 struct Control {
-  uint32_t period_integer;  // half-period = integer.fraction
+  uint32_t period_integer;
+  uint32_t period_high;
   uint32_t period_fraction;
   uint16_t bit_pattern;     // size=2*BITS
 };
@@ -27,6 +28,9 @@ static void help(void) {
   fprintf(stderr, "Usage: %s [OPTION] <proto/host/port>\n", program);
   fprintf(stderr, "\n");
   fprintf(stderr, "  -h             display this help and exit\n");
+  fprintf(stderr, "  -c <channel>   channel number to access\n");
+  fprintf(stderr, "  -H <hi-period> set high period on the channel\n");
+  fprintf(stderr, "  -L <lo-period> set low period on the channel\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Report bugs to <w.terpstra@gsi.de>\n");
 }
@@ -52,8 +56,10 @@ static void clk(double hi, double lo, struct Control *control)
   fprintf(stderr, "wide_period     = %f\n", wide_period);
 
   control->period_integer  = floor(wide_period);
+  control->period_high     = floor(hi);
   control->period_fraction = round((wide_period - control->period_integer) * 4294967296.0);
   fprintf(stderr, "period_integer  = 0x%x\n", control->period_integer);
+  fprintf(stderr, "period_high     = 0x%x\n", control->period_high);
   fprintf(stderr, "period_fraction = 0x%x\n", control->period_fraction);
 
   control->bit_pattern = 0;
@@ -70,7 +76,7 @@ static void clk(double hi, double lo, struct Control *control)
   fprintf(stderr, "\n");
 }
 
-static void apply(int chan, struct Control *control, uint32_t phase_shift)
+static void apply(int chan, struct Control *control)
 {
   eb_status_t status;
 
@@ -79,22 +85,22 @@ static void apply(int chan, struct Control *control, uint32_t phase_shift)
 
   if ((status = eb_device_write(device, pr, EB_DATA32,
                     control->period_integer, 0, 0)) != EB_OK) {
-    die("eb_device_write(hperr)", status);
+    die("eb_device_write(perr)", status);
+  }
+
+  if ((status = eb_device_write(device, perhir, EB_DATA32,
+                    control->period_high, 0, 0)) != EB_OK) {
+    die("eb_device_write(perhir)", status);
   }
 
   if ((status = eb_device_write(device, fracr, EB_DATA32,
                     control->period_fraction, 0, 0)) != EB_OK) {
-    die("eb_device_write(hperr)", status);
+    die("eb_device_write(fracr)", status);
   }
 
   if ((status = eb_device_write(device, maskr, EB_DATA32,
                     control->bit_pattern, 0, 0)) != EB_OK) {
     die("eb_device_write(maskr)", status);
-  }
-
-  if ((status = eb_device_write(device, phshr, EB_DATA32,
-                    phase_shift, 0, 0)) != EB_OK) {
-    die("eb_device_write(phshr)", status);
   }
 
 }
@@ -141,6 +147,8 @@ int main(int argc, char** argv) {
     }
   }
 
+  printf("%lf/%lf\n", hi, lo);
+
   if (error) return 1;
 
   if (optind+1 != argc) {
@@ -167,16 +175,16 @@ int main(int argc, char** argv) {
 
   /* Clocking paraphernaelia */
   int first;
-  first = sdb.sdb_component.addr_first;
-  selr = first;
-  pr = first + 4;
-  fracr = first + 8;
-  maskr = first + 12;
-  phshr = first + 16;
+  first  = sdb.sdb_component.addr_first;
+  selr   = first;
+  pr     = first + 4;
+  perhir = first + 8;
+  fracr  = first + 12;
+  maskr  = first + 16;
 
   /* Set and apply reg values to clock module */
   clk(hi, lo, &control);
-  apply(chan-1, &control, floor(hi));
+  apply(chan-1, &control);
 
   return 0;
 }
