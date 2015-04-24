@@ -20,9 +20,24 @@ peripheral {
     };
 
     reg {
-        name = "PR";
+        name = "PERR";
         description = "Period register -- banked";
         prefix = "per";
+        field {
+            name = "Bits of currently selected banked register";
+            type = SLV;
+            size = 32;
+            access_dev = READ_WRITE;
+            access_bus = READ_WRITE;
+            load = LOAD_EXT;
+            clock = "clk_ref_i";
+        };
+    };
+
+    reg {
+        name = "PERHIR";
+        description = "High period register -- banked";
+        prefix = "perhi";
         field {
             name = "Bits of currently selected banked register";
             type = SLV;
@@ -65,9 +80,24 @@ peripheral {
     };
 
     reg {
-        name = "PHSHR";
-        description = "Phase shift register -- banked";
-        prefix = "phsh";
+        name = "PHOFSLR";
+        description = "Phase offset from TAI time 0, low 32 bits -- banked";
+        prefix = "phofsl";
+        field {
+            name = "Bits of currently selected banked register";
+            type = SLV;
+            size = 32;
+            access_dev = READ_WRITE;
+            access_bus = READ_WRITE;
+            load = LOAD_EXT;
+            clock = "clk_ref_i";
+        };
+    };
+
+    reg {
+        name = "PHOFSHR";
+        description = "Phase offset from TAI time 0, high 32 bits -- banked";
+        prefix = "phofsh";
         field {
             name = "Bits of currently selected banked register";
             type = SLV;
