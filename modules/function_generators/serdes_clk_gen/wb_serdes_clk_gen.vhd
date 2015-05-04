@@ -93,6 +93,18 @@ architecture arch of wb_serdes_clk_gen is
                         of std_logic_vector(31 downto 0);
 
   type t_state is (
+
+
+  --============================================================================
+  --============================================================================
+--- REMOVE ME
+  DUMMY,
+  --============================================================================
+  --============================================================================
+
+
+
+
     START,
     LOAD_REGS,
     SUB_PHASE_FROM_TIME,
@@ -102,7 +114,7 @@ architecture arch of wb_serdes_clk_gen is
     SET_FRAC_COUNTER,
     PREDICT_COUNTER_STATE,
     SET_PER_COUNTER,
-    SET_PER_COUNTER_1,
+    SET_DELAYED_BIT,
     APPLY_COUNTER_VALS
   );
 
@@ -135,6 +147,20 @@ architecture arch of wb_serdes_clk_gen is
       per_count_i   : in  std_logic_vector(31 downto 0);
       frac_count_i  : in  std_logic_vector(31 downto 0);
       frac_carry_i  : in  std_logic;
+      last_bit_i    : in  std_logic;
+
+
+
+
+
+  --============================================================================
+  --============================================================================
+
+----- REMOVE ME
+--    hi_o : out std_logic_vector(31 downto 0);
+--    lo_o : out std_logic_vector(31 downto 0);
+  --============================================================================
+  --============================================================================
 
       -- Data output to SERDES, synchronous to clk_i
       serdes_dat_o  : out std_logic_vector(7 downto 0)
@@ -230,21 +256,38 @@ architecture arch of wb_serdes_clk_gen is
   signal div_count        : unsigned(  5 downto 0);
   signal numerator        : unsigned(126 downto 0);
   signal denominator      : unsigned(126 downto 0);
+  signal did_subtract     : std_logic;
 
+  signal last_bit         : std_logic;
   signal frac_carry       : std_logic;
   signal int              : unsigned(31 downto 0);
   signal fraction         : unsigned(31 downto 0);
   signal count_integer    : unsigned(31 downto 0);
   signal count_fraction   : unsigned(32 downto 0);
   signal phase            : unsigned(63 downto 0);
+  signal mask             : unsigned(31 downto 0);
+  signal mask_b0          : std_logic;
+  signal parity           : std_logic;
   signal phase_addend     : std_logic_vector(63 downto 0);
   signal perhi_sync       : std_logic_vector(31 downto 0);
   signal set_lo_count     : std_logic;
 
-  signal tm_valid_rise_p0 : std_logic;
-  signal tm_valid_d0      : std_logic;
-
   signal sub_time         : unsigned(64 downto 0);
+
+
+  --============================================================================
+  --============================================================================
+----- REMOVE ME
+--  signal dbg : std_logic;
+--  signal hi,lo : t_reg_array;
+--  signal channel_count_d0 : natural range g_num_outputs-1 downto 0;
+--  signal channel_count_d1 : natural range g_num_outputs-1 downto 0;
+--  signal a , b, c : std_logic_vector(31 downto 0);
+--  signal a1, b1, p : unsigned(31 downto 0);
+--  attribute syn_keep : boolean;
+--  attribute syn_keep of a,b,c : signal is true;
+  --============================================================================
+  --============================================================================
 
 --==============================================================================
 --   architecture begin
@@ -379,11 +422,13 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
 
   -- Perform phase alignment of two clocks of the same frequency by dividing the
   -- current ECA time by the period assigned to the counter.
-  phase_addend <= x"00000000" & perhi_bank(channel_count) when set_lo_count = '1' else
+  phase_addend <= x"00000000" & perhi_bank(channel_count) when (set_lo_count = '1') else
                   (others => '0');
 
   p_sync_fsm : process (clk_ref_i, rst_ref_n_i)
-    variable tmp : std_logic_vector(phase'length-1 downto 0);
+    variable tmp_phase  : std_logic_vector(phase'length-1 downto 0);
+    variable tmp_mask   : unsigned(31 downto 0);
+    variable tmp_parity : unsigned(31 downto 0);
   begin
     if (rst_ref_n_i = '0') then
 
@@ -392,13 +437,18 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
       channel_count   <= 0;
       numerator       <= (others => '0');
       denominator     <= (others => '0');
+      did_subtract    <= '0';
       int             <= (others => '0');
       fraction        <= (others => '0');
       phase           <= (others => '0');
+      mask            <= (others => '0');
+      mask_b0         <= '0';
+      parity          <= '0';
       sub_time        <= (others => '0');
       count_integer   <= (others => '0');
       count_fraction  <= (others => '0');
       frac_carry      <= '0';
+      last_bit        <= '0';
       set_lo_count    <= '0';
       ld_lo_p0        <= (others => '0');
       ld_hi_p0        <= (others => '0');
@@ -414,12 +464,24 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           div_count   <= (others => '0');
           state       <= LOAD_REGS;
 
+  --============================================================================
+  --============================================================================
+--          if dbg = '1' then
+--            state <= DUMMY;
+--          end if;
+--
+--        when DUMMY =>
+--          state <= LOAD_REGS;
+  --============================================================================
+  --============================================================================
+
         when LOAD_REGS =>
-          int      <= unsigned(per_bank(channel_count));
-          fraction <= unsigned(frac_bank(channel_count));
-          tmp      := phofsh_bank(channel_count) & phofsl_bank(channel_count);
-          phase    <= unsigned(tmp) + unsigned(phase_addend);
-          state    <= SUB_PHASE_FROM_TIME;
+          int       <= unsigned(per_bank(channel_count));
+          fraction  <= unsigned(frac_bank(channel_count));
+          tmp_phase := phofsh_bank(channel_count) & phofsl_bank(channel_count);
+          phase     <= unsigned(tmp_phase) + unsigned(phase_addend);
+          mask      <= unsigned(mask_bank(channel_count));
+          state     <= SUB_PHASE_FROM_TIME;
 
         when SUB_PHASE_FROM_TIME =>
           -- NOTE: ECA time shifted left by 3 to be multiplied by 8 (8 ns increments)
@@ -445,8 +507,10 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           state <= DIVIDE_TIME_BY_PER;
 
         when DIVIDE_TIME_BY_PER =>
+          did_subtract <= '0';
           if (numerator > denominator) then
             numerator <= numerator - denominator;
+            did_subtract <= '1';
           end if;
           denominator <= shift_right(denominator, 1);
           div_count   <= div_count + 1;
@@ -476,9 +540,34 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           else
             count_integer <= int - numerator(63 downto 32);
           end if;
-          state <= APPLY_COUNTER_VALS;
+          state <= SET_DELAYED_BIT;
+
+        when SET_DELAYED_BIT =>
+          if (count_integer >= 16) then
+            tmp_mask := (others => '0');
+          else
+            tmp_mask := x"000000" & mask(15 downto 8);
+            tmp_mask := shift_right(tmp_mask, to_integer(count_integer));
+            tmp_mask := tmp_mask and x"000000ff";
+          end if;
+
+          for i in 6 downto 0 loop
+            tmp_mask(i) := tmp_mask(i+1) xor tmp_mask(i);
+          end loop;
+
+          tmp_parity := shift_right(mask, 7);
+          tmp_parity := tmp_parity and x"000000ff";
+          for i in 6 downto 0 loop
+            tmp_parity(i) := tmp_parity(i+1) xor tmp_parity(i);
+          end loop;
+
+          mask_b0 <= tmp_mask(0);
+          parity  <= tmp_parity(0);
+          state   <= APPLY_COUNTER_VALS;
 
         when APPLY_COUNTER_VALS =>
+          last_bit <= (parity and did_subtract) xor mask_b0 xor parity;
+
           if (set_lo_count = '0') then
             ld_hi_p0(channel_count) <= '1';
           else
@@ -529,11 +618,66 @@ end generate gen_clock_sync_yes;
         per_count_i     => std_logic_vector(count_integer),
         frac_count_i    => std_logic_vector(count_fraction(31 downto 0)),
         frac_carry_i    => frac_carry,
+        last_bit_i      => last_bit,
+
+  --============================================================================
+  --============================================================================
+--        hi_o  => hi(i),
+--        lo_o  => lo(i),
+  --============================================================================
+  --============================================================================
 
         serdes_dat_o    => serdes_dat_o(i)
       );
   end generate gen_components;
 
+  --============================================================================
+  --============================================================================
+  --============================================================================
+  --============================================================================
+  --============================================================================
+--  a1 <= unsigned(hi(channel_count_d1));
+--  b1 <= unsigned(lo(channel_count_d1));
+--  c  <= std_logic_vector(count_integer);
+--  p  <= unsigned(per_bank(channel_count_d1));
+--
+--  process (hi, a1, p, lo, b1)
+--  begin
+--    if (a1 > 7) then
+--      a <= std_logic_vector(a1 - 8);
+--    else
+--      a <= std_logic_vector(a1 - 8 + p);
+--    end if;
+--    if (b1 > 7) then
+--      b <= std_logic_vector(b1 - 8);
+--    else
+--      b <= std_logic_vector(b1 - 8 + p);
+--    end if;
+--  end process;
+--
+--  process(clk_ref_i, rst_ref_n_i)
+--  begin
+--    if rst_ref_n_i = '0' then
+--      dbg <= '0';
+--      channel_count_d0 <= 0;
+--      channel_count_d1 <= 0;
+--    elsif rising_edge(clk_ref_i) then
+--      channel_count_d0 <= channel_count;
+--      channel_count_d1 <= channel_count_d0;
+--      dbg <= '0';
+--      if (ld_hi_p0 /= (ld_hi_p0'range => '0') and a /= c) or
+--         (ld_lo_p0 /= (ld_lo_p0'range => '0') and b /= c) then
+--        dbg <= '1';
+--      end if;
+--    end if;
+--  end process;
+
+
+
+  --============================================================================
+  --============================================================================
+  --============================================================================
+  --============================================================================
 end architecture arch;
 --==============================================================================
 -- architecture end

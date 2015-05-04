@@ -66,6 +66,16 @@ entity serdes_clk_gen is
     per_count_i   : in  std_logic_vector(31 downto 0);
     frac_count_i  : in  std_logic_vector(31 downto 0);
     frac_carry_i  : in  std_logic;
+    last_bit_i    : in  std_logic;
+
+  --============================================================================
+  --============================================================================
+----- REMOVE ME
+--    hi_o : out std_logic_vector(31 downto 0);
+--    lo_o : out std_logic_vector(31 downto 0);
+  --============================================================================
+  --============================================================================
+
 
     -- Data output to SERDES, synchronous to clk_i
     serdes_dat_o  : out std_logic_vector(7 downto 0)
@@ -108,6 +118,17 @@ architecture arch of serdes_clk_gen is
 --  architecture begin
 --==============================================================================
 begin
+
+  --============================================================================
+  --============================================================================
+----- REMOVE ME
+--  hi_o <= std_logic_vector(per_count_hi);
+--  lo_o <= std_logic_vector(per_count_lo);
+  --============================================================================
+  --============================================================================
+
+
+
 
 --------------------------------------------------------------------------------
 gen_frac_yes : if (g_with_frac_counter = true) generate
@@ -254,8 +275,10 @@ end generate gen_frac_no;
     if (rst_n_i = '0') then
       outp_hi_d0 <= '0';
     elsif rising_edge(clk_i) then
-      if (ld_reg_p0_i = '1') then
-        outp_hi_d0 <= '0';
+--      if (ld_reg_p0_i = '1') then
+--        outp_hi_d0 <= '0';
+      if (ld_hi_p0_i = '1') then
+        outp_hi_d0 <= last_bit_i;
       else
         outp_hi_d0 <= outp_hi(0);
       end if;
@@ -288,8 +311,10 @@ gen_secondary_outp_logic : if (g_selectable_duty_cycle = true) generate
     if (rst_n_i = '0') then
       outp_lo_d0 <= '0';
     elsif rising_edge(clk_i) then
-      if (ld_reg_p0_i = '1') then
-        outp_lo_d0 <= '0';
+--      if (ld_reg_p0_i = '1') then
+--        outp_lo_d0 <= '0';
+      if (ld_lo_p0_i = '1') then
+        outp_lo_d0 <= last_bit_i;
       else
         outp_lo_d0 <= outp_lo(0);
       end if;
