@@ -93,18 +93,6 @@ architecture arch of wb_serdes_clk_gen is
                         of std_logic_vector(31 downto 0);
 
   type t_state is (
-
-
-  --============================================================================
-  --============================================================================
---- REMOVE ME
-  DUMMY,
-  --============================================================================
-  --============================================================================
-
-
-
-
     START,
     LOAD_REGS,
     SUB_PHASE_FROM_TIME,
@@ -139,7 +127,8 @@ architecture arch of wb_serdes_clk_gen is
       per_i         : in  std_logic_vector(31 downto 0);
       per_hi_i      : in  std_logic_vector(31 downto 0);
       frac_i        : in  std_logic_vector(31 downto 0);
-      mask_i        : in  std_logic_vector(31 downto 0);
+      mask_normal_i : in  std_logic_vector(31 downto 0);
+      mask_skip_i   : in  std_logic_vector(31 downto 0);
 
       -- Counter load ports for external synchronization machine
       ld_lo_p0_i    : in  std_logic;
@@ -148,19 +137,6 @@ architecture arch of wb_serdes_clk_gen is
       frac_count_i  : in  std_logic_vector(31 downto 0);
       frac_carry_i  : in  std_logic;
       last_bit_i    : in  std_logic;
-
-
-
-
-
-  --============================================================================
-  --============================================================================
-
------ REMOVE ME
---    hi_o : out std_logic_vector(31 downto 0);
---    lo_o : out std_logic_vector(31 downto 0);
-  --============================================================================
-  --============================================================================
 
       -- Data output to SERDES, synchronous to clk_i
       serdes_dat_o  : out std_logic_vector(7 downto 0)
@@ -195,10 +171,14 @@ architecture arch of wb_serdes_clk_gen is
       reg_frac_o                               : out    std_logic_vector(31 downto 0);
       reg_frac_i                               : in     std_logic_vector(31 downto 0);
       reg_frac_load_o                          : out    std_logic;
-  -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'MASKR'
-      reg_mask_o                               : out    std_logic_vector(31 downto 0);
-      reg_mask_i                               : in     std_logic_vector(31 downto 0);
-      reg_mask_load_o                          : out    std_logic;
+  -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'NORMMASKR'
+      reg_mask_normal_o                        : out    std_logic_vector(31 downto 0);
+      reg_mask_normal_i                        : in     std_logic_vector(31 downto 0);
+      reg_mask_normal_load_o                   : out    std_logic;
+  -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'SKIPMASKR'
+      reg_mask_skip_o                          : out    std_logic_vector(31 downto 0);
+      reg_mask_skip_i                          : in     std_logic_vector(31 downto 0);
+      reg_mask_skip_load_o                     : out    std_logic;
   -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'PHOFSLR'
       reg_phofsl_o                             : out    std_logic_vector(31 downto 0);
       reg_phofsl_i                             : in     std_logic_vector(31 downto 0);
@@ -213,81 +193,71 @@ architecture arch of wb_serdes_clk_gen is
   --============================================================================
   -- Signal declarations
   --============================================================================
-  signal chsel            : std_logic_vector(31 downto 0);
+  signal chsel                : std_logic_vector(31 downto 0);
 
-  signal per_bank         : t_reg_array;
-  signal per_reg_out      : std_logic_vector(31 downto 0);
-  signal per_reg_in       : std_logic_vector(31 downto 0);
-  signal per_reg_ld       : std_logic;
+  signal per_bank             : t_reg_array;
+  signal per_reg_out          : std_logic_vector(31 downto 0);
+  signal per_reg_in           : std_logic_vector(31 downto 0);
+  signal per_reg_ld           : std_logic;
 
-  signal frac_bank        : t_reg_array;
-  signal frac_reg_out     : std_logic_vector(31 downto 0);
-  signal frac_reg_in      : std_logic_vector(31 downto 0);
-  signal frac_reg_ld      : std_logic;
+  signal frac_bank            : t_reg_array;
+  signal frac_reg_out         : std_logic_vector(31 downto 0);
+  signal frac_reg_in          : std_logic_vector(31 downto 0);
+  signal frac_reg_ld          : std_logic;
 
-  signal mask_bank        : t_reg_array;
-  signal mask_reg_out     : std_logic_vector(31 downto 0);
-  signal mask_reg_in      : std_logic_vector(31 downto 0);
-  signal mask_reg_ld      : std_logic;
+  signal mask_normal_bank     : t_reg_array;
+  signal mask_normal_reg_out  : std_logic_vector(31 downto 0);
+  signal mask_normal_reg_in   : std_logic_vector(31 downto 0);
+  signal mask_normal_reg_ld   : std_logic;
 
-  signal phofsl_bank      : t_reg_array;
-  signal phofsl_reg_out   : std_logic_vector(31 downto 0);
-  signal phofsl_reg_in    : std_logic_vector(31 downto 0);
-  signal phofsl_reg_ld    : std_logic;
-  signal phofsh_bank      : t_reg_array;
-  signal phofsh_reg_out   : std_logic_vector(31 downto 0);
-  signal phofsh_reg_in    : std_logic_vector(31 downto 0);
-  signal phofsh_reg_ld    : std_logic;
+  signal mask_skip_bank       : t_reg_array;
+  signal mask_skip_reg_out    : std_logic_vector(31 downto 0);
+  signal mask_skip_reg_in     : std_logic_vector(31 downto 0);
+  signal mask_skip_reg_ld     : std_logic;
 
-  signal perhi_bank       : t_reg_array;
-  signal perhi_reg_out    : std_logic_vector(31 downto 0);
-  signal perhi_reg_in     : std_logic_vector(31 downto 0);
-  signal perhi_reg_ld     : std_logic;
+  signal phofsl_bank          : t_reg_array;
+  signal phofsl_reg_out       : std_logic_vector(31 downto 0);
+  signal phofsl_reg_in        : std_logic_vector(31 downto 0);
+  signal phofsl_reg_ld        : std_logic;
+  signal phofsh_bank          : t_reg_array;
+  signal phofsh_reg_out       : std_logic_vector(31 downto 0);
+  signal phofsh_reg_in        : std_logic_vector(31 downto 0);
+  signal phofsh_reg_ld        : std_logic;
 
-  signal ld               : std_logic;
-  signal ld_clkgen_p0     : std_logic_vector(g_num_outputs-1 downto 0);
-  signal ld_lo_p0         : std_logic_vector(g_num_outputs-1 downto 0);
-  signal ld_hi_p0         : std_logic_vector(g_num_outputs-1 downto 0);
-  signal ld_regs_p0       : std_logic_vector(g_num_outputs-1 downto 0);
+  signal perhi_bank           : t_reg_array;
+  signal perhi_reg_out        : std_logic_vector(31 downto 0);
+  signal perhi_reg_in         : std_logic_vector(31 downto 0);
+  signal perhi_reg_ld         : std_logic;
+
+  signal ld                   : std_logic;
+  signal ld_clkgen_p0         : std_logic_vector(g_num_outputs-1 downto 0);
+  signal ld_lo_p0             : std_logic_vector(g_num_outputs-1 downto 0);
+  signal ld_hi_p0             : std_logic_vector(g_num_outputs-1 downto 0);
+  signal ld_regs_p0           : std_logic_vector(g_num_outputs-1 downto 0);
 
   -- Signals used for synchronization
-  signal state            : t_state;
-  signal channel_count    : natural range g_num_outputs-1 downto 0;
-  signal div_count        : unsigned(  5 downto 0);
-  signal numerator        : unsigned(126 downto 0);
-  signal denominator      : unsigned(126 downto 0);
-  signal did_subtract     : std_logic;
+  signal state                : t_state;
+  signal channel_count        : natural range g_num_outputs-1 downto 0;
+  signal div_count            : unsigned(  5 downto 0);
+  signal numerator            : unsigned(126 downto 0);
+  signal denominator          : unsigned(126 downto 0);
+  signal did_subtract         : std_logic;
 
-  signal last_bit         : std_logic;
-  signal frac_carry       : std_logic;
-  signal int              : unsigned(31 downto 0);
-  signal fraction         : unsigned(31 downto 0);
-  signal count_integer    : unsigned(31 downto 0);
-  signal count_fraction   : unsigned(32 downto 0);
-  signal phase            : unsigned(63 downto 0);
-  signal mask             : unsigned(31 downto 0);
-  signal mask_b0          : std_logic;
-  signal parity           : std_logic;
-  signal phase_addend     : std_logic_vector(63 downto 0);
-  signal perhi_sync       : std_logic_vector(31 downto 0);
-  signal set_lo_count     : std_logic;
+  signal last_bit             : std_logic;
+  signal frac_carry           : std_logic;
+  signal int                  : unsigned(31 downto 0);
+  signal fraction             : unsigned(31 downto 0);
+  signal count_integer        : unsigned(31 downto 0);
+  signal count_fraction       : unsigned(32 downto 0);
+  signal phase                : unsigned(63 downto 0);
+  signal mask                 : unsigned(31 downto 0);
+  signal mask_bit0            : std_logic;
+  signal parity               : std_logic;
+  signal phase_addend         : std_logic_vector(63 downto 0);
+  signal perhi_sync           : std_logic_vector(31 downto 0);
+  signal set_lo_count         : std_logic;
 
-  signal sub_time         : unsigned(64 downto 0);
-
-
-  --============================================================================
-  --============================================================================
------ REMOVE ME
---  signal dbg : std_logic;
---  signal hi,lo : t_reg_array;
---  signal channel_count_d0 : natural range g_num_outputs-1 downto 0;
---  signal channel_count_d1 : natural range g_num_outputs-1 downto 0;
---  signal a , b, c : std_logic_vector(31 downto 0);
---  signal a1, b1, p : unsigned(31 downto 0);
---  attribute syn_keep : boolean;
---  attribute syn_keep of a,b,c : signal is true;
-  --============================================================================
-  --============================================================================
+  signal sub_time             : unsigned(64 downto 0);
 
 --==============================================================================
 --   architecture begin
@@ -300,70 +270,76 @@ begin
   cmp_wb_regs : serdes_clk_gen_regs
     port map
     (
-      rst_n_i           => rst_sys_n_i,
-      clk_sys_i         => clk_sys_i,
-      wb_adr_i          => wb_adr_i,
-      wb_dat_i          => wb_dat_i,
-      wb_dat_o          => wb_dat_o,
-      wb_cyc_i          => wb_cyc_i,
-      wb_sel_i          => wb_sel_i,
-      wb_stb_i          => wb_stb_i,
-      wb_we_i           => wb_we_i,
-      wb_ack_o          => wb_ack_o,
-      wb_stall_o        => wb_stall_o,
+      rst_n_i                 => rst_sys_n_i,
+      clk_sys_i               => clk_sys_i,
+      wb_adr_i                => wb_adr_i,
+      wb_dat_i                => wb_dat_i,
+      wb_dat_o                => wb_dat_o,
+      wb_cyc_i                => wb_cyc_i,
+      wb_sel_i                => wb_sel_i,
+      wb_stb_i                => wb_stb_i,
+      wb_we_i                 => wb_we_i,
+      wb_ack_o                => wb_ack_o,
+      wb_stall_o              => wb_stall_o,
 
-      clk_ref_i         => clk_ref_i,
+      clk_ref_i               => clk_ref_i,
 
-      reg_chsel_o       => chsel,
+      reg_chsel_o             => chsel,
 
-      reg_per_o         => per_reg_out,
-      reg_per_i         => per_reg_in,
-      reg_per_load_o    => per_reg_ld,
+      reg_per_o               => per_reg_out,
+      reg_per_i               => per_reg_in,
+      reg_per_load_o          => per_reg_ld,
 
-      reg_perhi_o       => perhi_reg_out,
-      reg_perhi_i       => perhi_reg_in,
-      reg_perhi_load_o  => perhi_reg_ld,
+      reg_perhi_o             => perhi_reg_out,
+      reg_perhi_i             => perhi_reg_in,
+      reg_perhi_load_o        => perhi_reg_ld,
 
-      reg_frac_o        => frac_reg_out,
-      reg_frac_i        => frac_reg_in,
-      reg_frac_load_o   => frac_reg_ld,
+      reg_frac_o              => frac_reg_out,
+      reg_frac_i              => frac_reg_in,
+      reg_frac_load_o         => frac_reg_ld,
 
-      reg_mask_o        => mask_reg_out,
-      reg_mask_i        => mask_reg_in,
-      reg_mask_load_o   => mask_reg_ld,
+      reg_mask_normal_o       => mask_normal_reg_out,
+      reg_mask_normal_i       => mask_normal_reg_in,
+      reg_mask_normal_load_o  => mask_normal_reg_ld,
 
-      reg_phofsl_o      => phofsl_reg_out,
-      reg_phofsl_i      => phofsl_reg_in,
-      reg_phofsl_load_o => phofsl_reg_ld,
+      reg_mask_skip_o         => mask_skip_reg_out,
+      reg_mask_skip_i         => mask_skip_reg_in,
+      reg_mask_skip_load_o    => mask_skip_reg_ld,
 
-      reg_phofsh_o      => phofsh_reg_out,
-      reg_phofsh_i      => phofsh_reg_in,
-      reg_phofsh_load_o => phofsh_reg_ld
+      reg_phofsl_o            => phofsl_reg_out,
+      reg_phofsl_i            => phofsl_reg_in,
+      reg_phofsl_load_o       => phofsl_reg_ld,
+
+      reg_phofsh_o            => phofsh_reg_out,
+      reg_phofsh_i            => phofsh_reg_in,
+      reg_phofsh_load_o       => phofsh_reg_ld
     );
 
   --============================================================================
   -- Register banks
   --============================================================================
-  ld <= per_reg_ld or perhi_reg_ld or frac_reg_ld or mask_reg_ld or
-          phofsl_reg_ld or phofsh_reg_ld;
+  ld <= per_reg_ld or perhi_reg_ld or frac_reg_ld or mask_normal_reg_ld or
+          mask_skip_reg_ld or phofsl_reg_ld or phofsh_reg_ld;
 
   p_reg_banks : process (clk_ref_i, rst_ref_n_i)
   begin
     if (rst_ref_n_i = '0') then
 
-      per_bank      <= (others => (others => '0'));
-      perhi_bank    <= (others => (others => '0'));
-      frac_bank     <= (others => (others => '0'));
-      mask_bank     <= (others => (others => '0'));
-      phofsl_bank   <= (others => (others => '0'));
-      phofsh_bank   <= (others => (others => '0'));
-      per_reg_in    <= (others => '0');
-      perhi_reg_in  <= (others => '0');
-      frac_reg_in   <= (others => '0');
-      mask_reg_in   <= (others => '0');
-      phofsl_reg_in <= (others => '0');
-      phofsh_reg_in <= (others => '0');
-      ld_regs_p0    <= (others => '0');
+      per_bank            <= (others => (others => '0'));
+      perhi_bank          <= (others => (others => '0'));
+      frac_bank           <= (others => (others => '0'));
+      mask_normal_bank    <= (others => (others => '0'));
+      mask_skip_bank      <= (others => (others => '0'));
+      phofsl_bank         <= (others => (others => '0'));
+      phofsh_bank         <= (others => (others => '0'));
+      per_reg_in          <= (others => '0');
+      perhi_reg_in        <= (others => '0');
+      frac_reg_in         <= (others => '0');
+      mask_normal_reg_in  <= (others => '0');
+      mask_skip_reg_in    <= (others => '0');
+      phofsl_reg_in       <= (others => '0');
+      phofsh_reg_in       <= (others => '0');
+      ld_regs_p0          <= (others => '0');
 
     elsif rising_edge(clk_ref_i) then
 
@@ -382,9 +358,14 @@ begin
         frac_bank(to_integer(unsigned(chsel))) <= frac_reg_out;
       end if;
 
-      mask_reg_in <= mask_bank(to_integer(unsigned(chsel)));
-      if (mask_reg_ld = '1') then
-        mask_bank(to_integer(unsigned(chsel))) <= mask_reg_out;
+      mask_normal_reg_in <= mask_normal_bank(to_integer(unsigned(chsel)));
+      if (mask_normal_reg_ld = '1') then
+        mask_normal_bank(to_integer(unsigned(chsel))) <= mask_normal_reg_out;
+      end if;
+
+      mask_skip_reg_in <= mask_skip_bank(to_integer(unsigned(chsel)));
+      if (mask_skip_reg_ld = '1') then
+        mask_skip_bank(to_integer(unsigned(chsel))) <= mask_skip_reg_out;
       end if;
 
       phofsl_reg_in <= phofsl_bank(to_integer(unsigned(chsel)));
@@ -442,7 +423,7 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
       fraction        <= (others => '0');
       phase           <= (others => '0');
       mask            <= (others => '0');
-      mask_b0         <= '0';
+      mask_bit0         <= '0';
       parity          <= '0';
       sub_time        <= (others => '0');
       count_integer   <= (others => '0');
@@ -464,23 +445,12 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           div_count   <= (others => '0');
           state       <= LOAD_REGS;
 
-  --============================================================================
-  --============================================================================
---          if dbg = '1' then
---            state <= DUMMY;
---          end if;
---
---        when DUMMY =>
---          state <= LOAD_REGS;
-  --============================================================================
-  --============================================================================
-
         when LOAD_REGS =>
           int       <= unsigned(per_bank(channel_count));
           fraction  <= unsigned(frac_bank(channel_count));
           tmp_phase := phofsh_bank(channel_count) & phofsl_bank(channel_count);
           phase     <= unsigned(tmp_phase) + unsigned(phase_addend);
-          mask      <= unsigned(mask_bank(channel_count));
+          mask      <= unsigned(mask_normal_bank(channel_count));
           state     <= SUB_PHASE_FROM_TIME;
 
         when SUB_PHASE_FROM_TIME =>
@@ -561,12 +531,12 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
             tmp_parity(i) := tmp_parity(i+1) xor tmp_parity(i);
           end loop;
 
-          mask_b0 <= tmp_mask(0);
-          parity  <= tmp_parity(0);
-          state   <= APPLY_COUNTER_VALS;
+          mask_bit0 <= tmp_mask(0);
+          parity    <= tmp_parity(0);
+          state     <= APPLY_COUNTER_VALS;
 
         when APPLY_COUNTER_VALS =>
-          last_bit <= (parity and did_subtract) xor mask_b0 xor parity;
+          last_bit <= (parity and did_subtract) xor mask_bit0 xor parity;
 
           if (set_lo_count = '0') then
             ld_hi_p0(channel_count) <= '1';
@@ -611,7 +581,8 @@ end generate gen_clock_sync_yes;
         per_i           => per_bank(i),
         per_hi_i        => perhi_bank(i),
         frac_i          => frac_bank(i),
-        mask_i          => mask_bank(i),
+        mask_normal_i   => mask_normal_bank(i),
+        mask_skip_i     => mask_skip_bank(i),
 
         ld_lo_p0_i      => ld_lo_p0(i),
         ld_hi_p0_i      => ld_hi_p0(i),
@@ -620,64 +591,10 @@ end generate gen_clock_sync_yes;
         frac_carry_i    => frac_carry,
         last_bit_i      => last_bit,
 
-  --============================================================================
-  --============================================================================
---        hi_o  => hi(i),
---        lo_o  => lo(i),
-  --============================================================================
-  --============================================================================
-
         serdes_dat_o    => serdes_dat_o(i)
       );
   end generate gen_components;
 
-  --============================================================================
-  --============================================================================
-  --============================================================================
-  --============================================================================
-  --============================================================================
---  a1 <= unsigned(hi(channel_count_d1));
---  b1 <= unsigned(lo(channel_count_d1));
---  c  <= std_logic_vector(count_integer);
---  p  <= unsigned(per_bank(channel_count_d1));
---
---  process (hi, a1, p, lo, b1)
---  begin
---    if (a1 > 7) then
---      a <= std_logic_vector(a1 - 8);
---    else
---      a <= std_logic_vector(a1 - 8 + p);
---    end if;
---    if (b1 > 7) then
---      b <= std_logic_vector(b1 - 8);
---    else
---      b <= std_logic_vector(b1 - 8 + p);
---    end if;
---  end process;
---
---  process(clk_ref_i, rst_ref_n_i)
---  begin
---    if rst_ref_n_i = '0' then
---      dbg <= '0';
---      channel_count_d0 <= 0;
---      channel_count_d1 <= 0;
---    elsif rising_edge(clk_ref_i) then
---      channel_count_d0 <= channel_count;
---      channel_count_d1 <= channel_count_d0;
---      dbg <= '0';
---      if (ld_hi_p0 /= (ld_hi_p0'range => '0') and a /= c) or
---         (ld_lo_p0 /= (ld_lo_p0'range => '0') and b /= c) then
---        dbg <= '1';
---      end if;
---    end if;
---  end process;
-
-
-
-  --============================================================================
-  --============================================================================
-  --============================================================================
-  --============================================================================
 end architecture arch;
 --==============================================================================
 -- architecture end

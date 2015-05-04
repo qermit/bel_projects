@@ -58,7 +58,8 @@ entity serdes_clk_gen is
     per_i         : in  std_logic_vector(31 downto 0);
     per_hi_i      : in  std_logic_vector(31 downto 0);
     frac_i        : in  std_logic_vector(31 downto 0);
-    mask_i        : in  std_logic_vector(31 downto 0);
+    mask_normal_i : in  std_logic_vector(31 downto 0);
+    mask_skip_i   : in  std_logic_vector(31 downto 0);
 
     -- Counter load ports for external synchronization machine
     ld_lo_p0_i    : in  std_logic;
@@ -67,15 +68,6 @@ entity serdes_clk_gen is
     frac_count_i  : in  std_logic_vector(31 downto 0);
     frac_carry_i  : in  std_logic;
     last_bit_i    : in  std_logic;
-
-  --============================================================================
-  --============================================================================
------ REMOVE ME
---    hi_o : out std_logic_vector(31 downto 0);
---    lo_o : out std_logic_vector(31 downto 0);
-  --============================================================================
-  --============================================================================
-
 
     -- Data output to SERDES, synchronous to clk_i
     serdes_dat_o  : out std_logic_vector(7 downto 0)
@@ -118,17 +110,6 @@ architecture arch of serdes_clk_gen is
 --  architecture begin
 --==============================================================================
 begin
-
-  --============================================================================
-  --============================================================================
------ REMOVE ME
---  hi_o <= std_logic_vector(per_count_hi);
---  lo_o <= std_logic_vector(per_count_lo);
-  --============================================================================
-  --============================================================================
-
-
-
 
 --------------------------------------------------------------------------------
 gen_frac_yes : if (g_with_frac_counter = true) generate
@@ -257,8 +238,8 @@ end generate gen_frac_no;
   --
   -- The lower bits of the bit mask are presented to the XOR chain below prior to
   -- outputting to the SERDES.
-  msk_hi   <= unsigned(mask_i(31 downto 0)) when (frac_carry_hi = '0') else
-              unsigned(mask_i(31 downto g_num_serdes_bits) & ('0' & mask_i(g_num_serdes_bits-1 downto 1)));
+  msk_hi   <= unsigned(mask_skip_i) when (frac_carry_hi = '1') else
+              unsigned(mask_normal_i);
   shmsk_hi <= shift_right(msk_hi, to_integer(per_count_hi(f_log2_size(2*g_num_serdes_bits)-1 downto 0)))
                 when (per_count_hi < 2*g_num_serdes_bits) else
               (others => '0');
@@ -294,8 +275,8 @@ end generate gen_frac_no;
 
 gen_secondary_outp_logic : if (g_selectable_duty_cycle = true) generate
 
-  msk_lo   <= unsigned(mask_i(31 downto 0)) when (frac_carry_lo = '0') else
-              unsigned(mask_i(31 downto g_num_serdes_bits) & ('0' & mask_i(g_num_serdes_bits-1 downto 1)));
+  msk_lo   <= unsigned(mask_skip_i) when (frac_carry_lo = '1') else
+              unsigned(mask_normal_i);
   shmsk_lo <= shift_right(msk_lo, to_integer(per_count_lo(f_log2_size(2*g_num_serdes_bits)-1 downto 0)))
                 when (per_count_lo < 2*g_num_serdes_bits) else
               (others => '0');

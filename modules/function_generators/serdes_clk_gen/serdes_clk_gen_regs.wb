@@ -65,9 +65,24 @@ peripheral {
     };
 
     reg {
-        name = "MASKR";
-        description = "Bit mask register -- banked";
-        prefix = "mask";
+        name = "NORMMASKR";
+        description = "Normal bit mask register -- banked";
+        prefix = "mask_normal";
+        field {
+            name = "Bits of currently selected banked register";
+            type = SLV;
+            size = 32;
+            access_dev = READ_WRITE;
+            access_bus = READ_WRITE;
+            load = LOAD_EXT;
+            clock = "clk_ref_i";
+        };
+    };
+
+    reg {
+        name = "SKIPMASKR";
+        description = "Skip bit mask register -- banked";
+        prefix = "mask_skip";
         field {
             name = "Bits of currently selected banked register";
             type = SLV;
