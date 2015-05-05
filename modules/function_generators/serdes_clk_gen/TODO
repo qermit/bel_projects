@@ -1,0 +1,13 @@
+g_with_sync = false sometimes has the clock output hanging LOW
+==============================================================
+
+The output of a clock can sometimes hang low _indefinitely_ after setting of the
+clock values for a channel. I say "sometimes" as this does not seem to happen
+for a determined frequency. This problem seems to stem from a timing mis-match
+between the setting of a channel's registers and the old value at the output
+(outp_*_d0).
+
+It is worth pointing out that this problem only affects the module when
+g_with_sync = false. With the synchronization FSM, the module works
+appropriately.
+
