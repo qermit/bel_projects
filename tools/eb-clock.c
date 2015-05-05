@@ -15,13 +15,15 @@
 
 const char *program;
 static eb_device_t device;
-static int selr, pr, fracr, maskr, perhir;
+static int selr, perr, fracr, normmaskr, skipmaskr, perhir, phofslr, phofshr;
 
 struct Control {
   uint32_t period_integer;
   uint32_t period_high;
   uint32_t period_fraction;
-  uint16_t bit_pattern;     // size=2*BITS
+  uint16_t bit_pattern_normal;     // size=2*BITS
+  uint16_t bit_pattern_skip;
+  uint64_t phase_offset;
 };
 
 static void help(void) {
@@ -31,6 +33,7 @@ static void help(void) {
   fprintf(stderr, "  -c <channel>   channel number to access\n");
   fprintf(stderr, "  -H <hi-period> set high period on the channel\n");
   fprintf(stderr, "  -L <lo-period> set low period on the channel\n");
+  fprintf(stderr, "  -p <ns>        set channel phase offset in nanoseconds\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Report bugs to <w.terpstra@gsi.de>\n");
 }
@@ -40,7 +43,7 @@ static void die(const char* msg, eb_status_t status) {
   exit(1);
 }
 
-static void clk(double hi, double lo, struct Control *control)
+static void clock(double hi, double lo, uint64_t phase, struct Control *control)
 {
   double period, wide_period, cut_period;
   int i, j, fill_factor, cut_wide_period;
@@ -58,21 +61,36 @@ static void clk(double hi, double lo, struct Control *control)
   control->period_integer  = floor(wide_period);
   control->period_high     = floor(hi);
   control->period_fraction = round((wide_period - control->period_integer) * 4294967296.0);
-  fprintf(stderr, "period_integer  = 0x%x\n", control->period_integer);
-  fprintf(stderr, "period_high     = 0x%x\n", control->period_high);
-  fprintf(stderr, "period_fraction = 0x%x\n", control->period_fraction);
+  control->phase_offset    = phase;
+  fprintf(stderr, "period_integer   = 0x%x\n", control->period_integer);
+  fprintf(stderr, "period_high      = 0x%x\n", control->period_high);
+  fprintf(stderr, "period_fraction  = 0x%x\n", control->period_fraction);
+  fprintf(stderr, "phase_offset     = 0x%lx\n", control->phase_offset);
 
-  control->bit_pattern = 0;
+  control->bit_pattern_normal = 0;
   for (i = 0; i < fill_factor; ++i) {
     int offset  = ceil(i*cut_period); // ceil guarantees gap before 7 is small
     if (BITS-1 >= offset) // future bits
-      control->bit_pattern |= 1 << (BITS-1 - offset);
+      control->bit_pattern_normal |= 1 << (BITS-1 - offset);
     if (cut_wide_period - offset <= BITS) // past bits
-      control->bit_pattern |= 1 << (BITS-1 - offset + cut_wide_period);
+      control->bit_pattern_normal |= 1 << (BITS-1 - offset + cut_wide_period);
   }
-  fprintf(stderr, "bit_pattern     = ");
+
+  // fractional bit insertion (0) must happen at cut_wide_period-1
+  uint16_t spot = (cut_wide_period >= 16) ? 0 : (0x8000 >> (15-cut_wide_period));
+  uint16_t low_mask = spot-1;
+  //low_mask = 0xFF; // old approach
+  uint16_t high_mask = ~low_mask;
+  control->bit_pattern_skip = (control->bit_pattern_normal & high_mask) |
+                              ((control->bit_pattern_normal & low_mask) >> 1);
+
+  fprintf(stderr, "bit_pattern_norm = ");
   for (j = 15; j >= 0; --j)
-    fprintf(stderr, "%d", (control->bit_pattern >> j) & 1);
+    fprintf(stderr, "%d", (control->bit_pattern_normal >> j) & 1);
+  fprintf(stderr, "\n");
+  fprintf(stderr, "bit_pattern_skip = ");
+  for (j = 15; j >= 0; --j)
+    fprintf(stderr, "%d", (control->bit_pattern_skip >> j) & 1);
   fprintf(stderr, "\n");
 }
 
@@ -83,7 +101,7 @@ static void apply(int chan, struct Control *control)
   if ((status = eb_device_write(device, selr, EB_DATA32, chan, 0, 0)) != EB_OK)
     die("eb_device_write(selr)", status);
 
-  if ((status = eb_device_write(device, pr, EB_DATA32,
+  if ((status = eb_device_write(device, perr, EB_DATA32,
                     control->period_integer, 0, 0)) != EB_OK) {
     die("eb_device_write(perr)", status);
   }
@@ -98,9 +116,24 @@ static void apply(int chan, struct Control *control)
     die("eb_device_write(fracr)", status);
   }
 
-  if ((status = eb_device_write(device, maskr, EB_DATA32,
-                    control->bit_pattern, 0, 0)) != EB_OK) {
-    die("eb_device_write(maskr)", status);
+  if ((status = eb_device_write(device, normmaskr, EB_DATA32,
+                    control->bit_pattern_normal, 0, 0)) != EB_OK) {
+    die("eb_device_write(normmaskr)", status);
+  }
+
+  if ((status = eb_device_write(device, skipmaskr, EB_DATA32,
+                    control->bit_pattern_skip, 0, 0)) != EB_OK) {
+    die("eb_device_write(skipmaskr)", status);
+  }
+
+  if ((status = eb_device_write(device, phofslr, EB_DATA32,
+                    (uint32_t)(control->phase_offset), 0, 0)) != EB_OK) {
+    die("eb_device_write(phofshr)", status);
+  }
+
+  if ((status = eb_device_write(device, phofshr, EB_DATA32,
+                    (uint32_t)(control->phase_offset >> 32), 0, 0)) != EB_OK) {
+    die("eb_device_write(phofslr)", status);
   }
 
 }
@@ -116,6 +149,7 @@ int main(int argc, char** argv) {
 
   double hi;
   double lo;
+  uint64_t phase;
   struct Control control;
 
   /* Default arguments */
@@ -123,7 +157,10 @@ int main(int argc, char** argv) {
 
   /* Process the command-line arguments */
   error = 0;
-  while ((opt = getopt(argc, argv, "hc:H:L:")) != -1) {
+  hi    = 0;
+  lo    = 0;
+  phase = 0;
+  while ((opt = getopt(argc, argv, "hc:H:L:p:")) != -1) {
     switch (opt) {
     case 'h':
       help();
@@ -136,6 +173,9 @@ int main(int argc, char** argv) {
       break;
     case 'L':
       lo = atof(optarg);
+      break;
+    case 'p':
+      phase = atoll(optarg);
       break;
     case ':':
     case '?':
@@ -169,21 +209,24 @@ int main(int argc, char** argv) {
   if ((status = eb_sdb_find_by_identity(device, GSI_ID, SERDES_CLK_GEN_ID, &sdb, &c)) != EB_OK)
     die("eb_sdb_find_by_identity", status);
   if (c != 1) {
-    fprintf(stderr, "Found %d clk gen identifiers on that device\n", c);
+    fprintf(stderr, "Found %d clock gen identifiers on that device\n", c);
     exit(1);
   }
 
   /* Clocking paraphernaelia */
   int first;
-  first  = sdb.sdb_component.addr_first;
-  selr   = first;
-  pr     = first + 4;
-  perhir = first + 8;
-  fracr  = first + 12;
-  maskr  = first + 16;
+  first     = sdb.sdb_component.addr_first;
+  selr      = first;
+  perr      = first + 4;
+  perhir    = first + 8;
+  fracr     = first + 12;
+  normmaskr = first + 16;
+  skipmaskr = first + 20;
+  phofslr   = first + 24;
+  phofshr   = first + 28;
 
   /* Set and apply reg values to clock module */
-  clk(hi, lo, &control);
+  clock(hi, lo, phase, &control);
   apply(chan-1, &control);
 
   return 0;
