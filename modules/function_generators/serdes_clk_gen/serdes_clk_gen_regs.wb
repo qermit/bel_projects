@@ -65,9 +65,9 @@ peripheral {
     };
 
     reg {
-        name = "NORMMASKR";
+        name = "NORMBITPATTR";
         description = "Normal bit mask register -- banked";
-        prefix = "mask_normal";
+        prefix = "bitpatt_normal";
         field {
             name = "Bits of currently selected banked register";
             type = SLV;
@@ -80,9 +80,9 @@ peripheral {
     };
 
     reg {
-        name = "SKIPMASKR";
+        name = "SKIPBITPATTR";
         description = "Skip bit mask register -- banked";
-        prefix = "mask_skip";
+        prefix = "bitpatt_skip";
         field {
             name = "Bits of currently selected banked register";
             type = SLV;
