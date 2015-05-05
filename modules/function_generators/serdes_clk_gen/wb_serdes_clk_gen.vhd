@@ -10,10 +10,15 @@
 -- version: 1.0
 --
 -- description:
+--    Top-level file for the SERDES clock generator, connects banked registers
+--    to the low-level modules that generate patterns for a SERDES, in order to
+--    have clocks generated at the SERDES modules' output.
 --
--- dependencies:
---
--- references:
+--    This module also implements synchronization of clocks of the same
+--    frequency, both on the same card and on different cards that implement
+--    the wb_serdes_clk_gen module. To enable synchronization of clocks on
+--    separate cards, the cards must obtain the same White Rabbit time from a
+--    White Rabbit network.
 --
 --==============================================================================
 -- GNU LESSER GENERAL PUBLIC LICENSE
@@ -31,7 +36,7 @@
 -- last changes:
 --    2015-03-25   Theodor Stana     File created
 --==============================================================================
--- TODO: -
+-- TODO: The module doesn't work properly when g_with_sync = false.
 --==============================================================================
 
 library ieee;
@@ -46,40 +51,52 @@ use work.genram_pkg.all;
 entity wb_serdes_clk_gen is
   generic
   (
+    -- Number of SERDES outputs to connect to
     g_num_outputs           : natural;
+
+    -- Number of bits for the SERDES channels (all g_num_outputs of them)
     g_num_serdes_bits       : natural;
+
+    -- Enable fractional division ratios
     g_with_frac_counter     : boolean := false;
+
+    -- Enable selectable duty cycles. If set to FALSE, the period at the SERDES
+    -- output will be double the period set in the registers and the duty cycle
+    -- will be 50/50.
     g_selectable_duty_cycle : boolean := false;
-    g_with_sync             : boolean := false
+
+    -- Enable synchronization of clocks of the same frequency. Needs White
+    -- Rabbit connection.
+    -- FIXME: FALSE DOESN'T WORK.
+    g_with_sync             : boolean := true
   );
   port
   (
     ---------------------------------------------------------------------------
     -- Ports in clk_sys_i domain
     ---------------------------------------------------------------------------
-    clk_sys_i         : in  std_logic;
-    rst_sys_n_i       : in  std_logic;
+    clk_sys_i    : in  std_logic;
+    rst_sys_n_i  : in  std_logic;
 
-    wb_adr_i          : in  std_logic_vector( 2 downto 0);
-    wb_dat_i          : in  std_logic_vector(31 downto 0);
-    wb_dat_o          : out std_logic_vector(31 downto 0);
-    wb_cyc_i          : in  std_logic;
-    wb_sel_i          : in  std_logic_vector(3 downto 0);
-    wb_stb_i          : in  std_logic;
-    wb_we_i           : in  std_logic;
-    wb_ack_o          : out std_logic;
-    wb_stall_o        : out std_logic;
+    wb_adr_i     : in  std_logic_vector( 2 downto 0);
+    wb_dat_i     : in  std_logic_vector(31 downto 0);
+    wb_dat_o     : out std_logic_vector(31 downto 0);
+    wb_cyc_i     : in  std_logic;
+    wb_sel_i     : in  std_logic_vector(3 downto 0);
+    wb_stb_i     : in  std_logic;
+    wb_we_i      : in  std_logic;
+    wb_ack_o     : out std_logic;
+    wb_stall_o   : out std_logic;
 
     ---------------------------------------------------------------------------
     -- Ports in clk_ref_i domain
     ---------------------------------------------------------------------------
-    clk_ref_i         : in  std_logic;
-    rst_ref_n_i       : in  std_logic;
+    clk_ref_i    : in  std_logic;
+    rst_ref_n_i  : in  std_logic;
 
-    eca_time_i        : in std_logic_vector(63 downto 0);
-    eca_time_valid_i  : in std_logic;
+    eca_time_i   : in std_logic_vector(63 downto 0);
 
-    serdes_dat_o      : out t_lvds_byte_array
+    serdes_dat_o : out t_lvds_byte_array
   );
 end entity wb_serdes_clk_gen;
 
@@ -119,27 +136,27 @@ architecture arch of wb_serdes_clk_gen is
     port
     (
       -- Clock and reset signals
-      clk_i         : in  std_logic;
-      rst_n_i       : in  std_logic;
+      clk_i                : in  std_logic;
+      rst_n_i              : in  std_logic;
 
       -- Inputs from registers, synchronous to clk_i
-      ld_reg_p0_i   : in  std_logic;
-      per_i         : in  std_logic_vector(31 downto 0);
-      per_hi_i      : in  std_logic_vector(31 downto 0);
-      frac_i        : in  std_logic_vector(31 downto 0);
-      mask_normal_i : in  std_logic_vector(31 downto 0);
-      mask_skip_i   : in  std_logic_vector(31 downto 0);
+      ld_reg_p0_i          : in  std_logic;
+      per_i                : in  std_logic_vector(31 downto 0);
+      per_hi_i             : in  std_logic_vector(31 downto 0);
+      frac_i               : in  std_logic_vector(31 downto 0);
+      bit_pattern_normal_i : in  std_logic_vector(31 downto 0);
+      bit_pattern_skip_i   : in  std_logic_vector(31 downto 0);
 
       -- Counter load ports for external synchronization machine
-      ld_lo_p0_i    : in  std_logic;
-      ld_hi_p0_i    : in  std_logic;
-      per_count_i   : in  std_logic_vector(31 downto 0);
-      frac_count_i  : in  std_logic_vector(31 downto 0);
-      frac_carry_i  : in  std_logic;
-      last_bit_i    : in  std_logic;
+      ld_lo_p0_i           : in  std_logic;
+      ld_hi_p0_i           : in  std_logic;
+      per_count_i          : in  std_logic_vector(31 downto 0);
+      frac_count_i         : in  std_logic_vector(31 downto 0);
+      frac_carry_i         : in  std_logic;
+      last_bit_i           : in  std_logic;
 
       -- Data output to SERDES, synchronous to clk_i
-      serdes_dat_o  : out std_logic_vector(7 downto 0)
+      serdes_dat_o         : out std_logic_vector(g_num_serdes_bits-1 downto 0)
     );
   end component serdes_clk_gen;
 
@@ -172,13 +189,13 @@ architecture arch of wb_serdes_clk_gen is
       reg_frac_i                               : in     std_logic_vector(31 downto 0);
       reg_frac_load_o                          : out    std_logic;
   -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'NORMMASKR'
-      reg_mask_normal_o                        : out    std_logic_vector(31 downto 0);
-      reg_mask_normal_i                        : in     std_logic_vector(31 downto 0);
-      reg_mask_normal_load_o                   : out    std_logic;
+      reg_bitpatt_normal_o                     : out    std_logic_vector(31 downto 0);
+      reg_bitpatt_normal_i                     : in     std_logic_vector(31 downto 0);
+      reg_bitpatt_normal_load_o                : out    std_logic;
   -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'SKIPMASKR'
-      reg_mask_skip_o                          : out    std_logic_vector(31 downto 0);
-      reg_mask_skip_i                          : in     std_logic_vector(31 downto 0);
-      reg_mask_skip_load_o                     : out    std_logic;
+      reg_bitpatt_skip_o                       : out    std_logic_vector(31 downto 0);
+      reg_bitpatt_skip_i                       : in     std_logic_vector(31 downto 0);
+      reg_bitpatt_skip_load_o                  : out    std_logic;
   -- Ports for asynchronous (clock: clk_ref_i) std_logic_vector field: 'Bits of currently selected banked register' in reg: 'PHOFSLR'
       reg_phofsl_o                             : out    std_logic_vector(31 downto 0);
       reg_phofsl_i                             : in     std_logic_vector(31 downto 0);
@@ -205,15 +222,15 @@ architecture arch of wb_serdes_clk_gen is
   signal frac_reg_in          : std_logic_vector(31 downto 0);
   signal frac_reg_ld          : std_logic;
 
-  signal mask_normal_bank     : t_reg_array;
-  signal mask_normal_reg_out  : std_logic_vector(31 downto 0);
-  signal mask_normal_reg_in   : std_logic_vector(31 downto 0);
-  signal mask_normal_reg_ld   : std_logic;
+  signal bitpatt_normal_bank    : t_reg_array;
+  signal bitpatt_normal_reg_out : std_logic_vector(31 downto 0);
+  signal bitpatt_normal_reg_in  : std_logic_vector(31 downto 0);
+  signal bitpatt_normal_reg_ld  : std_logic;
 
-  signal mask_skip_bank       : t_reg_array;
-  signal mask_skip_reg_out    : std_logic_vector(31 downto 0);
-  signal mask_skip_reg_in     : std_logic_vector(31 downto 0);
-  signal mask_skip_reg_ld     : std_logic;
+  signal bitpatt_skip_bank      : t_reg_array;
+  signal bitpatt_skip_reg_out   : std_logic_vector(31 downto 0);
+  signal bitpatt_skip_reg_in    : std_logic_vector(31 downto 0);
+  signal bitpatt_skip_reg_ld    : std_logic;
 
   signal phofsl_bank          : t_reg_array;
   signal phofsl_reg_out       : std_logic_vector(31 downto 0);
@@ -250,8 +267,8 @@ architecture arch of wb_serdes_clk_gen is
   signal count_integer        : unsigned(31 downto 0);
   signal count_fraction       : unsigned(32 downto 0);
   signal phase                : unsigned(63 downto 0);
-  signal mask                 : unsigned(31 downto 0);
-  signal mask_bit0            : std_logic;
+  signal bitpatt                 : unsigned(31 downto 0);
+  signal bitpatt_bit0            : std_logic;
   signal parity               : std_logic;
   signal phase_addend         : std_logic_vector(63 downto 0);
   signal perhi_sync           : std_logic_vector(31 downto 0);
@@ -270,76 +287,76 @@ begin
   cmp_wb_regs : serdes_clk_gen_regs
     port map
     (
-      rst_n_i                 => rst_sys_n_i,
-      clk_sys_i               => clk_sys_i,
-      wb_adr_i                => wb_adr_i,
-      wb_dat_i                => wb_dat_i,
-      wb_dat_o                => wb_dat_o,
-      wb_cyc_i                => wb_cyc_i,
-      wb_sel_i                => wb_sel_i,
-      wb_stb_i                => wb_stb_i,
-      wb_we_i                 => wb_we_i,
-      wb_ack_o                => wb_ack_o,
-      wb_stall_o              => wb_stall_o,
+      rst_n_i                   => rst_sys_n_i,
+      clk_sys_i                 => clk_sys_i,
+      wb_adr_i                  => wb_adr_i,
+      wb_dat_i                  => wb_dat_i,
+      wb_dat_o                  => wb_dat_o,
+      wb_cyc_i                  => wb_cyc_i,
+      wb_sel_i                  => wb_sel_i,
+      wb_stb_i                  => wb_stb_i,
+      wb_we_i                   => wb_we_i,
+      wb_ack_o                  => wb_ack_o,
+      wb_stall_o                => wb_stall_o,
 
-      clk_ref_i               => clk_ref_i,
+      clk_ref_i                 => clk_ref_i,
 
-      reg_chsel_o             => chsel,
+      reg_chsel_o               => chsel,
 
-      reg_per_o               => per_reg_out,
-      reg_per_i               => per_reg_in,
-      reg_per_load_o          => per_reg_ld,
+      reg_per_o                 => per_reg_out,
+      reg_per_i                 => per_reg_in,
+      reg_per_load_o            => per_reg_ld,
 
-      reg_perhi_o             => perhi_reg_out,
-      reg_perhi_i             => perhi_reg_in,
-      reg_perhi_load_o        => perhi_reg_ld,
+      reg_perhi_o               => perhi_reg_out,
+      reg_perhi_i               => perhi_reg_in,
+      reg_perhi_load_o          => perhi_reg_ld,
 
-      reg_frac_o              => frac_reg_out,
-      reg_frac_i              => frac_reg_in,
-      reg_frac_load_o         => frac_reg_ld,
+      reg_frac_o                => frac_reg_out,
+      reg_frac_i                => frac_reg_in,
+      reg_frac_load_o           => frac_reg_ld,
 
-      reg_mask_normal_o       => mask_normal_reg_out,
-      reg_mask_normal_i       => mask_normal_reg_in,
-      reg_mask_normal_load_o  => mask_normal_reg_ld,
+      reg_bitpatt_normal_o      => bitpatt_normal_reg_out,
+      reg_bitpatt_normal_i      => bitpatt_normal_reg_in,
+      reg_bitpatt_normal_load_o => bitpatt_normal_reg_ld,
 
-      reg_mask_skip_o         => mask_skip_reg_out,
-      reg_mask_skip_i         => mask_skip_reg_in,
-      reg_mask_skip_load_o    => mask_skip_reg_ld,
+      reg_bitpatt_skip_o        => bitpatt_skip_reg_out,
+      reg_bitpatt_skip_i        => bitpatt_skip_reg_in,
+      reg_bitpatt_skip_load_o   => bitpatt_skip_reg_ld,
 
-      reg_phofsl_o            => phofsl_reg_out,
-      reg_phofsl_i            => phofsl_reg_in,
-      reg_phofsl_load_o       => phofsl_reg_ld,
+      reg_phofsl_o              => phofsl_reg_out,
+      reg_phofsl_i              => phofsl_reg_in,
+      reg_phofsl_load_o         => phofsl_reg_ld,
 
-      reg_phofsh_o            => phofsh_reg_out,
-      reg_phofsh_i            => phofsh_reg_in,
-      reg_phofsh_load_o       => phofsh_reg_ld
+      reg_phofsh_o              => phofsh_reg_out,
+      reg_phofsh_i              => phofsh_reg_in,
+      reg_phofsh_load_o         => phofsh_reg_ld
     );
 
   --============================================================================
   -- Register banks
   --============================================================================
-  ld <= per_reg_ld or perhi_reg_ld or frac_reg_ld or mask_normal_reg_ld or
-          mask_skip_reg_ld or phofsl_reg_ld or phofsh_reg_ld;
+  ld <= per_reg_ld or perhi_reg_ld or frac_reg_ld or bitpatt_normal_reg_ld or
+          bitpatt_skip_reg_ld or phofsl_reg_ld or phofsh_reg_ld;
 
   p_reg_banks : process (clk_ref_i, rst_ref_n_i)
   begin
     if (rst_ref_n_i = '0') then
 
-      per_bank            <= (others => (others => '0'));
-      perhi_bank          <= (others => (others => '0'));
-      frac_bank           <= (others => (others => '0'));
-      mask_normal_bank    <= (others => (others => '0'));
-      mask_skip_bank      <= (others => (others => '0'));
-      phofsl_bank         <= (others => (others => '0'));
-      phofsh_bank         <= (others => (others => '0'));
-      per_reg_in          <= (others => '0');
-      perhi_reg_in        <= (others => '0');
-      frac_reg_in         <= (others => '0');
-      mask_normal_reg_in  <= (others => '0');
-      mask_skip_reg_in    <= (others => '0');
-      phofsl_reg_in       <= (others => '0');
-      phofsh_reg_in       <= (others => '0');
-      ld_regs_p0          <= (others => '0');
+      per_bank              <= (others => (others => '0'));
+      perhi_bank            <= (others => (others => '0'));
+      frac_bank             <= (others => (others => '0'));
+      bitpatt_normal_bank   <= (others => (others => '0'));
+      bitpatt_skip_bank     <= (others => (others => '0'));
+      phofsl_bank           <= (others => (others => '0'));
+      phofsh_bank           <= (others => (others => '0'));
+      per_reg_in            <= (others => '0');
+      perhi_reg_in          <= (others => '0');
+      frac_reg_in           <= (others => '0');
+      bitpatt_normal_reg_in <= (others => '0');
+      bitpatt_skip_reg_in   <= (others => '0');
+      phofsl_reg_in         <= (others => '0');
+      phofsh_reg_in         <= (others => '0');
+      ld_regs_p0            <= (others => '0');
 
     elsif rising_edge(clk_ref_i) then
 
@@ -358,14 +375,14 @@ begin
         frac_bank(to_integer(unsigned(chsel))) <= frac_reg_out;
       end if;
 
-      mask_normal_reg_in <= mask_normal_bank(to_integer(unsigned(chsel)));
-      if (mask_normal_reg_ld = '1') then
-        mask_normal_bank(to_integer(unsigned(chsel))) <= mask_normal_reg_out;
+      bitpatt_normal_reg_in <= bitpatt_normal_bank(to_integer(unsigned(chsel)));
+      if (bitpatt_normal_reg_ld = '1') then
+        bitpatt_normal_bank(to_integer(unsigned(chsel))) <= bitpatt_normal_reg_out;
       end if;
 
-      mask_skip_reg_in <= mask_skip_bank(to_integer(unsigned(chsel)));
-      if (mask_skip_reg_ld = '1') then
-        mask_skip_bank(to_integer(unsigned(chsel))) <= mask_skip_reg_out;
+      bitpatt_skip_reg_in <= bitpatt_skip_bank(to_integer(unsigned(chsel)));
+      if (bitpatt_skip_reg_ld = '1') then
+        bitpatt_skip_bank(to_integer(unsigned(chsel))) <= bitpatt_skip_reg_out;
       end if;
 
       phofsl_reg_in <= phofsl_bank(to_integer(unsigned(chsel)));
@@ -389,6 +406,9 @@ begin
   --============================================================================
   -- Synchronization with clocks of the same frequency
   --============================================================================
+
+  -- No clock sync => set counter settings to zeroes, to avoid problems
+  -- FIXME: g_with_sync = false sometimes has the clock output hanging LOW
 gen_clock_sync_no : if (g_with_sync = false) generate
 
   ld_lo_p0        <= (others => '0');
@@ -396,20 +416,38 @@ gen_clock_sync_no : if (g_with_sync = false) generate
   count_integer   <= (others => '0');
   count_fraction  <= (others => '0');
   frac_carry      <= '0';
+  last_bit        <= '0';
 
 end generate gen_clock_sync_no;
 
 gen_clock_sync_yes : if (g_with_sync = true) generate
 
-  -- Perform phase alignment of two clocks of the same frequency by dividing the
-  -- current ECA time by the period assigned to the counter.
+  -- The FSM below sets the high and low periods successively, not at the same
+  -- time. So we need a way of knowing when to add the high period value to the
+  -- phase offset. The value of the high period for the current working channel
+  -- is added to the phase when we are working on the low period counter.
   phase_addend <= x"00000000" & perhi_bank(channel_count) when (set_lo_count = '1') else
                   (others => '0');
 
+  -- This FSM performs phase aligment of two clock channels of the same period
+  -- on the same or different modules, the latter only if White Rabbit is
+  -- available to both modules.
+  --
+  -- Synchronization is performed by obtaining the number of cycles left until
+  -- the rising edge of a clock at a certain moment in time. The number of
+  -- cycles left is represented by a modulo operation between this moment in time
+  -- and the period.
+  --
+  -- Due to the fact that the FSM always takes the same number of cycles to
+  -- complete, the modulo operation will be the same every time it happens.
+  --
+  -- Note that since there are two counters to set inside the serdes_clk_gen
+  -- module, the FSM takes two passes for each channel, once for the high
+  -- counter and another time for the low counter.
   p_sync_fsm : process (clk_ref_i, rst_ref_n_i)
-    variable tmp_phase  : std_logic_vector(phase'length-1 downto 0);
-    variable tmp_mask   : unsigned(31 downto 0);
-    variable tmp_parity : unsigned(31 downto 0);
+    variable tmp_phase   : std_logic_vector(phase'length-1 downto 0);
+    variable tmp_bitpatt : unsigned(31 downto 0);
+    variable tmp_parity  : unsigned(31 downto 0);
   begin
     if (rst_ref_n_i = '0') then
 
@@ -422,8 +460,8 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
       int             <= (others => '0');
       fraction        <= (others => '0');
       phase           <= (others => '0');
-      mask            <= (others => '0');
-      mask_bit0         <= '0';
+      bitpatt         <= (others => '0');
+      bitpatt_bit0    <= '0';
       parity          <= '0';
       sub_time        <= (others => '0');
       count_integer   <= (others => '0');
@@ -438,27 +476,42 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
 
       case state is
 
+        -----------------------------------------------------------------------
+        -- Reset sensitive signals and start over
+        -----------------------------------------------------------------------
         when START =>
           ld_lo_p0    <= (others => '0');
           ld_hi_p0    <= (others => '0');
           frac_carry  <= '0';
           div_count   <= (others => '0');
           state       <= LOAD_REGS;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Load the banked registers for the current working channel
+        -----------------------------------------------------------------------
         when LOAD_REGS =>
           int       <= unsigned(per_bank(channel_count));
           fraction  <= unsigned(frac_bank(channel_count));
           tmp_phase := phofsh_bank(channel_count) & phofsl_bank(channel_count);
           phase     <= unsigned(tmp_phase) + unsigned(phase_addend);
-          mask      <= unsigned(mask_normal_bank(channel_count));
+          bitpatt   <= unsigned(bitpatt_normal_bank(channel_count));
           state     <= SUB_PHASE_FROM_TIME;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Subtract the channel's phase offset from the current ECA time
+        -----------------------------------------------------------------------
         when SUB_PHASE_FROM_TIME =>
           -- NOTE: ECA time shifted left by 3 to be multiplied by 8 (8 ns increments)
           sub_time <= unsigned('0' & shift_left(unsigned(eca_time_i), 3)) -
                       unsigned('0' & phase);
           state    <= LOAD_DIV;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Load the numerator and denominator of the divider
+        -----------------------------------------------------------------------
         when LOAD_DIV =>
           numerator <= (numerator(126 downto 96)'range => sub_time(64)) &
                        sub_time(63 downto 0) &
@@ -469,13 +522,22 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           denominator( 62 downto  0)  <= (others => '0');
 
           state <= CHECK_TIME;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Make sure we do a valid division (the phase offset time is not zero
+        -- AND the phase offset is not higher than the ECA time)
+        -----------------------------------------------------------------------
         when CHECK_TIME =>
           if (sub_time(64) = '1') or (sub_time = 0) then
             numerator <= numerator + denominator;
           end if;
           state <= DIVIDE_TIME_BY_PER;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Perform long division; this returns both integer and fractional parts
+        -----------------------------------------------------------------------
         when DIVIDE_TIME_BY_PER =>
           did_subtract <= '0';
           if (numerator > denominator) then
@@ -487,12 +549,21 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           if (div_count = 63) then
             state <= SET_FRAC_COUNTER;
           end if;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- The divider output is a modulo, so we need to decrement the fraction
+        -- as given by the divider from the original fraction value.
         when SET_FRAC_COUNTER =>
           count_fraction <= ('0' & fraction) -
                             ('0' & numerator(31 downto 0));
           state <= PREDICT_COUNTER_STATE;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Predict whether a fractional carry will take place on the next cycle
+        -- in the serdes_clk_gen.
+        -----------------------------------------------------------------------
         when PREDICT_COUNTER_STATE =>
           frac_carry <= '0';
           if (numerator(63 downto 32) < g_num_serdes_bits) and
@@ -500,7 +571,12 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
             frac_carry <= '1';
           end if;
           state <= SET_PER_COUNTER;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Set the period counter (again, modulo operation, but taking into
+        -- account the predicted carry state)
+        -----------------------------------------------------------------------
         when SET_PER_COUNTER =>
       -- !!! two borrow bits
           if (count_fraction(32) = '1') and (frac_carry = '1') then
@@ -511,32 +587,43 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
             count_integer <= int - numerator(63 downto 32);
           end if;
           state <= SET_DELAYED_BIT;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- We also need to predict the state of the last bit, based on whether
+        -- the last operation in the divider subtracted or not.
+        -----------------------------------------------------------------------
         when SET_DELAYED_BIT =>
           if (count_integer >= 16) then
-            tmp_mask := (others => '0');
+            tmp_bitpatt := (others => '0');
           else
-            tmp_mask := x"000000" & mask(15 downto 8);
-            tmp_mask := shift_right(tmp_mask, to_integer(count_integer));
-            tmp_mask := tmp_mask and x"000000ff";
+            tmp_bitpatt := x"000000" & bitpatt(15 downto 8);
+            tmp_bitpatt := shift_right(tmp_bitpatt, to_integer(count_integer));
+            tmp_bitpatt := tmp_bitpatt and x"000000ff";
           end if;
 
           for i in 6 downto 0 loop
-            tmp_mask(i) := tmp_mask(i+1) xor tmp_mask(i);
+            tmp_bitpatt(i) := tmp_bitpatt(i+1) xor tmp_bitpatt(i);
           end loop;
 
-          tmp_parity := shift_right(mask, 7);
+          tmp_parity := shift_right(bitpatt, 7);
           tmp_parity := tmp_parity and x"000000ff";
           for i in 6 downto 0 loop
             tmp_parity(i) := tmp_parity(i+1) xor tmp_parity(i);
           end loop;
 
-          mask_bit0 <= tmp_mask(0);
-          parity    <= tmp_parity(0);
-          state     <= APPLY_COUNTER_VALS;
+          bitpatt_bit0 <= tmp_bitpatt(0);
+          parity       <= tmp_parity(0);
+          state        <= APPLY_COUNTER_VALS;
+        -----------------------------------------------------------------------
 
+        -----------------------------------------------------------------------
+        -- Finally, apply the counter values and repeat the whole process for
+        -- the low counter, or for the next channel if we were performing the
+        -- sync process on the low counter.
+        -----------------------------------------------------------------------
         when APPLY_COUNTER_VALS =>
-          last_bit <= (parity and did_subtract) xor mask_bit0 xor parity;
+          last_bit <= (parity and did_subtract) xor bitpatt_bit0 xor parity;
 
           if (set_lo_count = '0') then
             ld_hi_p0(channel_count) <= '1';
@@ -549,6 +636,7 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
           end if;
           set_lo_count <= set_lo_count xor '1';
           state        <= START;
+        -----------------------------------------------------------------------
 
         when others =>
           state <= START;
@@ -574,24 +662,24 @@ end generate gen_clock_sync_yes;
       )
       port map
       (
-        clk_i           => clk_ref_i,
-        rst_n_i         => rst_ref_n_i,
+        clk_i                => clk_ref_i,
+        rst_n_i              => rst_ref_n_i,
 
-        ld_reg_p0_i     => ld_regs_p0(i),
-        per_i           => per_bank(i),
-        per_hi_i        => perhi_bank(i),
-        frac_i          => frac_bank(i),
-        mask_normal_i   => mask_normal_bank(i),
-        mask_skip_i     => mask_skip_bank(i),
+        ld_reg_p0_i          => ld_regs_p0(i),
+        per_i                => per_bank(i),
+        per_hi_i             => perhi_bank(i),
+        frac_i               => frac_bank(i),
+        bit_pattern_normal_i => bitpatt_normal_bank(i),
+        bit_pattern_skip_i   => bitpatt_skip_bank(i),
 
-        ld_lo_p0_i      => ld_lo_p0(i),
-        ld_hi_p0_i      => ld_hi_p0(i),
-        per_count_i     => std_logic_vector(count_integer),
-        frac_count_i    => std_logic_vector(count_fraction(31 downto 0)),
-        frac_carry_i    => frac_carry,
-        last_bit_i      => last_bit,
+        ld_lo_p0_i           => ld_lo_p0(i),
+        ld_hi_p0_i           => ld_hi_p0(i),
+        per_count_i          => std_logic_vector(count_integer),
+        frac_count_i         => std_logic_vector(count_fraction(31 downto 0)),
+        frac_carry_i         => frac_carry,
+        last_bit_i           => last_bit,
 
-        serdes_dat_o    => serdes_dat_o(i)
+        serdes_dat_o         => serdes_dat_o(i)
       );
   end generate gen_components;
 
