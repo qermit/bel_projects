@@ -187,8 +187,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  printf("%lf/%lf\n", hi, lo);
-
   if (error) return 1;
 
   if (optind+1 != argc) {
