@@ -56,7 +56,6 @@ use work.wb_nau8811_audio_driver_pkg.all;
 use work.fg_quad_pkg.all;
 use work.cfi_flash_pkg.all;
 use work.psram_pkg.all;
-use work.wb_serdes_clk_gen_pkg.all;
 
 entity monster is
   generic(
@@ -336,7 +335,7 @@ architecture rtl of monster is
   constant c_topm_eca_wbm   : natural := 7;
   
   -- required slaves
-  constant c_top_slaves     : natural := 28;
+  constant c_top_slaves     : natural := 27;
   constant c_tops_irq       : natural := 0;
   constant c_tops_wrc       : natural := 1;
   constant c_tops_lm32      : natural := 2;
@@ -350,7 +349,6 @@ architecture rtl of monster is
   constant c_tops_eca_aq    : natural := 10;
   constant c_tops_iodir     : natural := 11;
   constant c_tops_eca_wbm   : natural := 26;
-  constant c_tops_serdes_clk_gen : natural := 27;
 
   -- optional slaves:
   constant c_tops_lcd       : natural := 12;
@@ -408,8 +406,7 @@ architecture rtl of monster is
     c_tops_fg        => f_sdb_auto_device(c_wb_fg_sdb,                      g_en_fg),
     c_tops_fgirq     => f_sdb_auto_device(c_fg_irq_ctrl_sdb,                g_en_fg),
     c_tops_psram     => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
-    c_tops_eca_wbm   => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true),
-    c_tops_serdes_clk_gen => f_sdb_auto_device(c_wb_serdes_clk_gen_sdb,  true)
+    c_tops_eca_wbm   => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true)
 );
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
@@ -602,15 +599,8 @@ architecture rtl of monster is
   signal gpio    : std_logic_vector(15 downto 0);
   signal user_ow_pwren  : std_logic_vector(1 downto 0);
   signal user_ow_en     : std_logic_vector(1 downto 0);
-
-  signal lvds_dat_fr_eca_chan : t_lvds_byte_array(11 downto 0);
-  signal lvds_dat_fr_clk_gen  : t_lvds_byte_array(11 downto 0);
-
-  constant dum : natural := 3;
-  signal lvds_dum : t_lvds_byte_array(dum-1 downto 0);
-
-  signal lvds_dat : t_lvds_byte_array(11 downto 0);
-  signal lvds_i   : t_lvds_byte_array(15 downto 0);
+  signal lvds_o  : t_lvds_byte_array(11 downto 0);
+  signal lvds_i  : t_lvds_byte_array(15 downto 0);
   
   signal s_triggers : t_trigger_array(g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in -1 downto 0);
   
@@ -1417,7 +1407,7 @@ begin
       clk_i     => clk_ref,
       rst_n_i   => rstn_ref,
       channel_i => channels(2),
-      lvds_o    => lvds_dat_fr_eca_chan);
+      lvds_o    => lvds_o);
   
   c3 : eca_scubus_channel
     port map(
@@ -1445,37 +1435,6 @@ c4: eca_ac_wbm
    master_i    => top_cbar_slave_o(c_topm_eca_wbm)                                         
   );
 
-  --============================================================================
-  -- SERDES clock generator and connection to LVDS driver component
-  --============================================================================
-  -- Instantiate SERDES clock generator
-  cmp_serdes_clk_gen : xwb_serdes_clk_gen
-    generic map
-    (
-      g_num_outputs =>  dum
-    )
-    port map
-    (
-      clk_sys_i    => clk_sys,
-      rst_sys_n_i  => rstn_sys,
-
-      wbs_i        => top_cbar_master_o(c_tops_serdes_clk_gen),
-      wbs_o        => top_cbar_master_i(c_tops_serdes_clk_gen),
-
-      clk_ref_i    => clk_ref,
-      rst_ref_n_i  => rstn_ref,
-
-      serdes_dat_o => lvds_dum
-    );
-
-  -- LVDS component data input is OR between ECA chan output and SERDES clk. gen.
-  lvds_dat_fr_clk_gen( dum-1 downto 0) <= lvds_dum;
-  lvds_dat_fr_clk_gen(11 downto dum) <= (others => (others => '0'));
-  gen_lvds_dat : for i in 0 to 11 generate
-    lvds_dat(i) <= lvds_dat_fr_eca_chan(i) or lvds_dat_fr_clk_gen(i);
-  end generate gen_lvds_dat;
-
-  -- Instantiate LVDS driver component
   lvds_pins : altera_lvds
     generic map(
       g_family  => g_family,
@@ -1491,7 +1450,7 @@ c4: eca_ac_wbm
       lvds_p_i     => lvds_p_i,
       lvds_n_i     => lvds_n_i,
       lvds_i_led_o => lvds_i_led_o,
-      dat_i        => lvds_dat(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
+      dat_i        => lvds_o(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
       lvds_p_o     => lvds_p_o,
       lvds_n_o     => lvds_n_o,
       lvds_o_led_o => lvds_o_led_o);
