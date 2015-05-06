@@ -22,6 +22,7 @@
 //#define CBDEBUG
 #define MSI_SLAVE 0
 #define MSI_WB_FG 2
+#define CLK_PERIOD (1000000 / USRCPUCLK) // USRCPUCLK in KHz
 
 extern struct w1_bus wrpc_w1_bus;
 
@@ -58,18 +59,23 @@ volatile unsigned int param_sent[MAX_FG_DEVICES];
 volatile int initialized[MAX_SCU_SLAVES] = {0};
 int endp_idx = 0;
 
-void usleep(int us)
+
+void msDelayBig(uint64_t ms)
 {
-  unsigned i;
-  unsigned long long delay = us;
+  uint64_t later = getSysTime() + ms * 1000000ULL / 8;
+  while(getSysTime() < later) {asm("# noop");}
+}
+
+void usleep(uint32_t us)
+{
+  uint32_t i;
+  uint32_t delay = us*1000;
   /* prevent arithmetic overflow */
-  delay *= USRCPUCLK;
-  delay /= 1000000;
-  delay /= 4; // instructions per loop
+  delay /= (CLK_PERIOD<<1); //two cycles per loop
   for (i = delay; i > 0; i--) asm("# noop");
 }  
 
-void msDelay(int msecs) {
+void msDelay(uint32_t msecs) {
   usleep(1000 * msecs);
 }
 
@@ -202,7 +208,7 @@ void enable_msi_irqs(int fg_mask) {
       if (fgs.devs[i]->version == 0x1) {
         scub_irq_base[8] = slot-1;                                      //channel select
         scub_irq_base[9] = 0x08154711;                                  //msg
-        slave_endp_addr = getSdbAdr(&lm32_irq_endp[endp_idx + MSI_SLAVE]) + (slot << 2); //destination address, do not use lower 2 bits
+        scub_irq_base[10] = getSdbAdr(&lm32_irq_endp[endp_idx + MSI_SLAVE]) + (slot << 2); //destination address, do not use lower 2 bits
         initialized[slot - 1] = 0;                                      //counter needs to be resynced
         scub_irq_base[2] |= (1 << (slot - 1));                          //enable slaves
       } else if (fgs.devs[i]->version == 0x2) {
@@ -460,7 +466,7 @@ void updateTemp() {
 }
 
 void tmr_irq_handler() {
-  updateTemp();
+  //updateTemp();
 }
 
 void init_irq_handlers() {
@@ -505,6 +511,9 @@ int main(void) {
   wb_fg_base      = (unsigned int*)find_device_adr(GSI, WB_FG_QUAD);
   find_device_multi(ow_base, &ow_base_idx, 2, CERN, WR_1Wire);
 
+  msDelay(1500); //wait for powerup of the slave cards
+  init(); 
+  
   if(cpu_info_base) {
     mprintf("CPU ID: 0x%x\n", cpu_info_base[0]);
     mprintf("number MSI endpoints: %d\n", cpu_info_base[1]);
@@ -524,8 +533,6 @@ int main(void) {
   disp_reset();
   disp_put_c('\f');
   
-  usleep(1500000); //wait for powerup of the slave cards
-  init(); 
 
   mprintf("number of lm32_irq_endpoints found: %d\n", lm32_endp_idx);
   for (i=0; i < lm32_endp_idx; i++) {
@@ -542,7 +549,7 @@ int main(void) {
 
   while(1) {
     updateTemp();
-    msDelay(15000);
+    msDelayBig(15000);
   }
   while(1) { 
     i = 0; 
