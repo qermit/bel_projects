@@ -1,6 +1,6 @@
 TOP		:= $(dir $(lastword $(MAKEFILE_LIST)))..
 
-QUARTUS		?= /opt/quartus
+QUARTUS		?= /opt/altera/13.1/quartus
 QUARTUS_BIN	=  $(QUARTUS)/bin
 
 RAM_SIZE	?= 4096

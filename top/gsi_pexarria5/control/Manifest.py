@@ -3,8 +3,8 @@ files = [
    "pci_control.sdc",
 ]
 
-modules = {
-  "local" : [
-    "../../..",
-  ]
-}
+#modules = {
+#  "local" : [
+#    "../../..",
+#  ]
+#}
