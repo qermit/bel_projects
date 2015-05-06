@@ -152,6 +152,8 @@ int main(int argc, char** argv) {
   uint64_t phase;
   struct Control control;
 
+  int base;
+
   /* Default arguments */
   program = argv[0];
 
@@ -174,8 +176,7 @@ int main(int argc, char** argv) {
     case 'L':
       lo = atof(optarg);
       break;
-    case 'p':
-      phase = atoll(optarg);
+    case 'p': phase = atoll(optarg);
       break;
     case ':':
     case '?':
@@ -203,6 +204,22 @@ int main(int argc, char** argv) {
   if ((status = eb_device_open(socket, port, EB_DATAX|EB_ADDRX, 3, &device)) != EB_OK)
     die(port, status);
 
+  /* Set channel I/O as output using IO_HACK module */
+  // TODO: change when IO_HACK removed
+  c = 1;
+  if ((status = eb_sdb_find_by_identity(device, GSI_ID, 0x4d78adfd, &sdb, &c)) != EB_OK)
+    die("eb_sdb_find_by_identity", status);
+  if (c != 1) {
+    fprintf(stderr, "Found %d IO_HACK identifiers on that device\n", c);
+    exit(1);
+  }
+
+  /* Enable the channel's output using the IO_HACK module */
+  base = sdb.sdb_component.addr_first;
+  if ((status = eb_device_write(device, base + 4, EB_DATA32, (1 << (chan-1)), 0, NULL)) != EB_OK)
+    die("eb_device_write(iodir)", status);
+
+  /* Now find the clock generator module and set the addresses */
   c = 1;
   if ((status = eb_sdb_find_by_identity(device, GSI_ID, SERDES_CLK_GEN_ID, &sdb, &c)) != EB_OK)
     die("eb_sdb_find_by_identity", status);
@@ -211,17 +228,15 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  /* Clocking paraphernaelia */
-  int first;
-  first     = sdb.sdb_component.addr_first;
-  selr      = first;
-  perr      = first + 4;
-  perhir    = first + 8;
-  fracr     = first + 12;
-  normmaskr = first + 16;
-  skipmaskr = first + 20;
-  phofslr   = first + 24;
-  phofshr   = first + 28;
+  base      = sdb.sdb_component.addr_first;
+  selr      = base;
+  perr      = base + 4;
+  perhir    = base + 8;
+  fracr     = base + 12;
+  normmaskr = base + 16;
+  skipmaskr = base + 20;
+  phofslr   = base + 24;
+  phofshr   = base + 28;
 
   /* Set and apply reg values to clock module */
   clock(hi, lo, phase, &control);
