@@ -36,7 +36,8 @@
 -- last changes:
 --    2015-03-25   Theodor Stana     File created
 --==============================================================================
--- TODO: The module doesn't work properly when g_with_sync = false.
+-- TODO: * The module doesn't work properly when g_with_sync = false.
+--       * Two borrow bits in the SET_PER_COUNTER state
 --==============================================================================
 
 library ieee;
@@ -578,7 +579,7 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
         -- account the predicted carry state)
         -----------------------------------------------------------------------
         when SET_PER_COUNTER =>
-      -- !!! two borrow bits
+      -- TODO: two borrow bits
           if (count_fraction(32) = '1') and (frac_carry = '1') then
             count_integer <= int - numerator(63 downto 32) - 2;
           elsif (count_fraction(32) = '1') or (frac_carry = '1') then
