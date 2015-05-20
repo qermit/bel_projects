@@ -11,8 +11,11 @@ It is worth pointing out that this problem only affects the module when
 g_with_sync = false. With the synchronization FSM, the module works
 appropriately.
 
-Two borrow bits in the SET_PER_COUNTER state
-============================================
+[DONE] Two borrow bits in the SET_PER_COUNTER state
+===================================================
+
+[20-05-15] DONE, saves ~70 LUTs off the design. It is possible that better
+optimization may be obtained.
 
 The integer counter that gets subtracted from the previous value of the counter
 when the FSM started to operate should keep into account whether carries occur

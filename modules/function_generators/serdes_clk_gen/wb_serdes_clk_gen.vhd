@@ -37,7 +37,6 @@
 --    2015-03-25   Theodor Stana     File created
 --==============================================================================
 -- TODO: * The module doesn't work properly when g_with_sync = false.
---       * Two borrow bits in the SET_PER_COUNTER state
 --==============================================================================
 
 library ieee;
@@ -268,14 +267,15 @@ architecture arch of wb_serdes_clk_gen is
   signal count_integer        : unsigned(31 downto 0);
   signal count_fraction       : unsigned(32 downto 0);
   signal phase                : unsigned(63 downto 0);
-  signal bitpatt                 : unsigned(31 downto 0);
-  signal bitpatt_bit0            : std_logic;
+  signal bitpatt              : unsigned(31 downto 0);
+  signal bitpatt_bit0         : std_logic;
   signal parity               : std_logic;
   signal phase_addend         : std_logic_vector(63 downto 0);
   signal perhi_sync           : std_logic_vector(31 downto 0);
   signal set_lo_count         : std_logic;
 
   signal sub_time             : unsigned(64 downto 0);
+  signal sub_carries          : unsigned(31 downto 0);
 
 --==============================================================================
 --   architecture begin
@@ -430,6 +430,10 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
   phase_addend <= x"00000000" & perhi_bank(channel_count) when (set_lo_count = '1') else
                   (others => '0');
 
+  sub_carries(0) <= count_fraction(32) xor frac_carry;
+  sub_carries(1) <= count_fraction(32) and frac_carry;
+  sub_carries(31 downto 2) <= (others => '0');
+
   -- This FSM performs phase aligment of two clock channels of the same period
   -- on the same or different modules, the latter only if White Rabbit is
   -- available to both modules.
@@ -579,14 +583,7 @@ gen_clock_sync_yes : if (g_with_sync = true) generate
         -- account the predicted carry state)
         -----------------------------------------------------------------------
         when SET_PER_COUNTER =>
-      -- TODO: two borrow bits
-          if (count_fraction(32) = '1') and (frac_carry = '1') then
-            count_integer <= int - numerator(63 downto 32) - 2;
-          elsif (count_fraction(32) = '1') or (frac_carry = '1') then
-            count_integer <= int - numerator(63 downto 32) - 1;
-          else
-            count_integer <= int - numerator(63 downto 32);
-          end if;
+          count_integer <= int - numerator(63 downto 32) - sub_carries;
           state <= SET_DELAYED_BIT;
         -----------------------------------------------------------------------
 
