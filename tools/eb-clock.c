@@ -216,7 +216,11 @@ int main(int argc, char** argv) {
 
   /* Enable the channel's output using the IO_HACK module */
   base = sdb.sdb_component.addr_first;
-  if ((status = eb_device_write(device, base + 4, EB_DATA32, (1 << (chan-1)), 0, NULL)) != EB_OK)
+  eb_data_t iodir;
+  if ((status = eb_device_read(device, base + 4, EB_DATA32, &iodir, 0, NULL)) != EB_OK)
+    die("eb_device_read(iodir)", status);
+  iodir |= (1 << (chan-1));
+  if ((status = eb_device_write(device, base + 4, EB_DATA32, iodir, 0, NULL)) != EB_OK)
     die("eb_device_write(iodir)", status);
 
   /* Now find the clock generator module and set the addresses */
