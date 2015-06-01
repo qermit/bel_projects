@@ -1,0 +1,3 @@
+lm32-elf-gcc -Wall -fPIC -O2 start.S gip.c -T mylink.ld -o gip.elf
+lm32-elf-objcopy -O binary gip.elf gip.bin
+lm32-elf-objdump -S gip.elf
