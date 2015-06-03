@@ -14,6 +14,10 @@ typedef uint8_t t_type;
 #define T_SIG     0x4
 #define T_MSG     0x8
 
+#define F_INIT    0x10
+#define F_THREAD  0x11
+#define F_DUMP    0x12
+
 #define BLOB_PT   0x1
 #define BLOB_CT   0x2
 #define BLOB_PPS  0x3
@@ -64,12 +68,12 @@ typedef union {
 } t_data;
 
 //***reference to globals
-extern uint64_t sT; //cumulative blob start time
-extern void*   pL;  //current label
-extern t_blob* pB;  //current blob ptr
-extern uint32_t** pBase; //base pointer to main fw. periphery ptrs, cmd if, etc
-extern uint32_t deadline; //cycle count deadline for thread execution
-
+static uint64_t sT; //cumulative blob start time
+static void*   pL;  //current label
+static t_blob* pB;  //current blob ptr
+static uint32_t** pBase; //base pointer to main fw. periphery ptrs, cmd if, etc
+static uint32_t deadline; //cycle count deadline for thread execution
+static uint32_t** pBase = (uint32_t**)BASEPTR;
 //***helper functions
 
 #define T_DUE(o) (sT + o) //preptime starttime offset
@@ -133,7 +137,7 @@ static inline void checkCon(t_data* d, void* lbl)
 }
 
 //FIXME: inline me again
-static  int sendMsg(t_data* d)
+static inline  int sendMsg(t_data* d)
 {
   int     ret = 0;
   t_msg*  m   = &d->m;
@@ -161,7 +165,7 @@ static  int sendMsg(t_data* d)
 }
 
 //FIXME: inline me again
-static   void procBlob(t_data* d)
+static inline  void procBlob(t_data* d)
 {
    
    //switch(d->b.mode) {
@@ -172,6 +176,99 @@ static   void procBlob(t_data* d)
    // default       : sT  = pB->period  + getSysTime();
    //}
    pB = &d->b;
+}
+
+static inline uint32_t init() {   
+  pL = NULL;
+  deadline = 0;
+  return 0;
+}
+
+static inline uint32_t dump() {   
+  return 0xdeadbeef;
+}   
+
+static uint32_t inline thread() {   
+  if (pL != NULL) goto *pL;
+  
+  pL = &&start;
+  
+     
+  start:
+  if(deadline > 1) return ((uint32_t)pL | 0x10000000);
+  deadline++;
+  //return (uint32_t)(uint32_t*)*(uint32_t**)(BASEPTR + DEV_TIME);
+ 
+  //********** Schedule **********// 
+  
+  //do Action A with data X
+  label1:  
+  pL = &&label1;
+  if(deadline > 1) return ((uint32_t)pL | 0x20000000);
+  deadline++;
+  label2:  
+  pL = &&label2;
+  return ((uint32_t)pL | 0x30000000);
+  
+  /*
+  if (!gotTime(COST_BLB)) return T_BLB;
+  procBlob(&data[0]);
+  
+  label2:
+  pL = &&label2;
+  if (!gotTime(COST_MSG)) return T_MSG;
+  if (!sendMsg(&data[1])) return T_MSG;
+    
+  //do Action A with data Y
+  label3:
+  pL = &&label3;
+  if (!gotTime(COST_SIG)) return T_SIG;
+  sendSig(&data[2]);
+  
+  //do Action B with data Z
+  label4:
+  pL = &&label4; //remember where we were
+  if (!gotTime(COST_BLB)) return T_BLB;
+  procBlob(&data[3]);
+  
+  label5:
+  pL = &&label5; //remember where we were
+  if (!gotTime(COST_MSG)) return T_MSG;
+  if (!sendMsg(&data[4])) return T_MSG;
+  
+  //if src is XYZ jump to label2
+  
+  label6:
+  pL = &&label6; //remember where we were
+  if (!gotTime(COST_BLB)) return T_BLB;
+  procBlob(&data[5]); //set blob
+  
+  label7:
+  pL = &&label7; //remember where we were
+  if (!gotTime(COST_CON)) return T_CON;
+  checkCon(&data[6], &&label4);
+  
+  //if src is ABC go idle
+  label8:
+  pL = &&label8; //remember where we were
+  if (!gotTime(COST_CON)) return T_CON;
+  checkCon(&data[7], &&idle);
+  
+  //do Action A with data Y
+  label9:
+  pL = &&label9;
+  if (!gotTime(COST_SIG)) return T_SIG;
+  sendSig(&data[9]);
+  
+  /// Generic Stuff --->
+  idle:
+  pL = &&idle;
+  return DM_THR_IDLE;
+  
+  pageswap:
+  return DM_THR_PAGESWAP | DM_THR_STOPPED;
+  /// ---> Generic Stuff
+  */
 }
 
 #endif

@@ -1,7 +1,7 @@
-
+#include <stdio.h>
 #include "thread.h"
 
-uint32_t** pBase = (uint32_t**)BASEPTR;
+
 
 
 
@@ -32,11 +32,10 @@ t_type types[10] = {
 };
 
 /// Generic Stuff --->
-uint64_t sT = 0;
-void*   pL;
-t_blob* pB;
-uint32_t deadline;
 
+extern  uint32_t thread();
+extern  uint32_t init();
+extern  uint32_t dump();
 extern  uint8_t gotTime(uint32_t cost);
 extern  uint64_t inline getSysTime();
 extern  void procBlob(t_data* data);
@@ -45,82 +44,16 @@ extern  int sendMsg(t_data* data);
 extern  void checkCon(t_data* data, void* lbl);
 
 
-__attribute__((visibility("hidden")))
-uint32_t entry(uint32_t dl) { //instruction count deadline
+
+ __attribute__((visibility("hidden")))
+uint32_t entry(char exec, uint32_t dl) { //instruction count deadline
+  uint32_t ret = 0;
   deadline = dl;
-  goto *pL;
-  start:
-/// ---> Generic Stuff
-  
-  //********** Schedule **********// 
-  
-  //do Action A with data X
-  label1:  
-  pL = &&label1;
-  if (!gotTime(COST_BLB)) return T_BLB;
-  procBlob(&data[0]);
-  
-  label2:
-  pL = &&label2;
-  if (!gotTime(COST_MSG)) return T_MSG;
-  if (!sendMsg(&data[1])) return T_MSG;
-    
-  //do Action A with data Y
-  label3:
-  pL = &&label3;
-  if (!gotTime(COST_SIG)) return T_SIG;
-  sendSig(&data[2]);
-  
-  //do Action B with data Z
-  label4:
-  pL = &&label4; //remember where we were
-  if (!gotTime(COST_BLB)) return T_BLB;
-  procBlob(&data[3]);
-  
-  label5:
-  pL = &&label5; //remember where we were
-  if (!gotTime(COST_MSG)) return T_MSG;
-  if (!sendMsg(&data[4])) return T_MSG;
-  
-  //if src is XYZ jump to label2
-  
-  label6:
-  pL = &&label6; //remember where we were
-  if (!gotTime(COST_BLB)) return T_BLB;
-  procBlob(&data[5]); //set blob
-  
-  label7:
-  pL = &&label7; //remember where we were
-  if (!gotTime(COST_CON)) return T_CON;
-  checkCon(&data[6], &&label4);
-  
-  //if src is ABC go idle
-  label8:
-  pL = &&label8; //remember where we were
-  if (!gotTime(COST_CON)) return T_CON;
-  checkCon(&data[7], &&idle);
-  
-  //do Action A with data Y
-  label9:
-  pL = &&label9;
-  if (!gotTime(COST_SIG)) return T_SIG;
-  sendSig(&data[9]);
-  
-  /// Generic Stuff --->
-  idle:
-  pL = &&idle;
-  return DM_THR_IDLE;
-  
-  pageswap:
-  return DM_THR_PAGESWAP | DM_THR_STOPPED;
-  /// ---> Generic Stuff
-  
-}
-
-
-
-
-
-
-
- 
+  switch (exec) {
+    case F_INIT:    ret = init(); break;
+    case F_THREAD:  ret = thread(); break;
+    case F_DUMP:    ret = dump(); break;
+    default: ret = thread();
+  }
+  return ret;
+}  

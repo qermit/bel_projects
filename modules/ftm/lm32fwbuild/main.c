@@ -15,7 +15,7 @@ unsigned int cpuId, cpuQty, heapCap;
 uint32_t SHARED hub[SHARED_IF_END_/4 +1]; //allocate space for interface to host
 
 uint32_t enable, stopreq;
-extern uint32_t*       _startshared[];
+extern uint32_t* _startshared[];
 
 
 void ebmInit()
@@ -131,7 +131,7 @@ void main(void) {
    int j, k;
    init();
    uint32_t adr = (uint32_t)&_startshared + OFFSET;
-   typedef int (*fPtr)(int);
+   typedef uint32_t (*fPtr)(uint32_t, uint32_t);
    fPtr foo = (fPtr)adr;
    //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    atomic_on();
@@ -146,15 +146,21 @@ void main(void) {
      while (1) {} 
    }
    */     
-    k=1;
-   mprintf("#%02u: for testing func, write 0x1 to 0x%08x\n", cpuId, &hub[REG_THR_RUN]);
+   k=1;
+   mprintf("#%02u: for testing func, cmd 0x%08x, typ 0x%08x\n", cpuId, &hub[REG_THR_RUN], &hub[REG_THR_ERR]);
    while (1) {
+    
+    
     for (j = 0; j < (125000000); ++j) { asm("nop"); }
+    
     mprintf("#%02u: 0x%08x\n", cpuId, hub[REG_THR_RUN]);
-    if(hub[REG_THR_RUN] & 0x1) {
-    hub[REG_THR_RUN] = 0;
+    
+    if(hub[REG_THR_RUN]) {
+    
     refreshICC();
-    mprintf("#%02u: Calling function x @ %08x with k=%u. Result: %u\n", cpuId, adr, k, foo(k));   
+    //mprintf("#%02u: Calling function x @ %08x with k=%u. Result: %u\n", cpuId, adr, k, foo(k));   
+    mprintf("#%02u: Calling function x @ %08x Result: %08x\n", cpuId, adr, foo(hub[REG_THR_ERR], hub[REG_THR_RUN]));
+    hub[REG_THR_RUN] = 0;
     k++;  
     }
     
