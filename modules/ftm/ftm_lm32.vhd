@@ -74,17 +74,17 @@ end ftm_lm32;
 architecture rtl of ftm_lm32 is 
    
    -- crossbar layout
-   constant c_lm32_slaves          : natural := 8;
+   constant c_lm32_slaves          : natural := 7;
    constant c_lm32_masters         : natural := 2;
       
    constant c_lm32_ram             : natural := 0;
-   constant c_lm32_timer           : natural := 1;
-   constant c_lm32_msi_ctrl        : natural := 2;
-   constant c_lm32_cpu_info        : natural := 3;
-   constant c_lm32_sys_time        : natural := 4;
-   constant c_lm32_atomic          : natural := 5;
-   constant c_lm32_clu_bridge      : natural := 6;
-   constant c_lm32_world_bridge    : natural := 7;
+  -- constant c_lm32_timer           : natural := 1;
+   constant c_lm32_msi_ctrl        : natural := 1;
+   constant c_lm32_cpu_info        : natural := 2;
+   constant c_lm32_sys_time        : natural := 3;
+   constant c_lm32_atomic          : natural := 4;
+   constant c_lm32_clu_bridge      : natural := 5;
+   constant c_lm32_world_bridge    : natural := 6;
    
    signal   s_cpu_info,
             s_sys_time,
@@ -113,7 +113,7 @@ architecture rtl of ftm_lm32 is
    
    constant c_lm32_layout : t_sdb_record_array(c_lm32_slaves-1 downto 0) :=
    (c_lm32_ram                => f_sdb_embed_device(f_xwb_dpram_userlm32(g_size),   x"00000000"), -- this CPU's RAM
-    c_lm32_timer              => f_sdb_embed_device(c_irq_timer_sdb,       x"3FFFFB00"),
+--    c_lm32_timer              => f_sdb_embed_device(c_irq_timer_sdb,       x"3FFFFB00"),
     c_lm32_msi_ctrl           => f_sdb_embed_device(c_irq_slave_ctrl_sdb,  x"3FFFFC00"),
     c_lm32_cpu_info           => f_sdb_embed_device(c_cpu_info_sdb,        x"3FFFFEE0"),
     c_lm32_sys_time           => f_sdb_embed_device(c_sys_time_sdb,        x"3FFFFEF8"),
@@ -214,18 +214,18 @@ begin
 --******************************************************************************
 -- TIMER IRQ 
 --------------------------------------------------------------------------------
-   TIMER_IRQ: wb_irq_timer
-   generic map(g_timers    => 3)
-   port map(clk_sys_i      => clk_sys_i,            
-            rst_sys_n_i    => rst_n_i,             
-
-            tm_tai8ns_i    => tm_tai8ns_i,       
-
-            ctrl_slave_o   => lm32_cb_master_in(c_lm32_timer),
-            ctrl_slave_i   => lm32_cb_master_out(c_lm32_timer),
-
-            irq_master_o   => irq_timer_master_out,                             -- wb msi interface 
-            irq_master_i   => irq_timer_master_in);
+--   TIMER_IRQ: wb_irq_timer
+--   generic map(g_timers    => 3)
+--   port map(clk_sys_i      => clk_sys_i,            
+--            rst_sys_n_i    => rst_n_i,             
+--
+--            tm_tai8ns_i    => tm_tai8ns_i,       
+--
+--            ctrl_slave_o   => lm32_cb_master_in(c_lm32_timer),
+--            ctrl_slave_i   => lm32_cb_master_out(c_lm32_timer),
+--
+--            irq_master_o   => irq_timer_master_out,                             -- wb msi interface 
+--            irq_master_i   => irq_timer_master_in);
 
 --******************************************************************************
 -- MSI-IRQ
