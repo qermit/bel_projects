@@ -1,0 +1,58 @@
+<thread>
+  <!-- Entry point. Execution starting with the next pps pulse -->
+  <era label="DEMO_A_START" start="pps" duration="0" />
+
+  <era label="DEMO_A_WAIT" start="prev" duration="0" />
+  <con type="bne" jmp="DEMO_A_WAIT" >
+    <src type="shared" slot="Gustav" ntact="clr" width="32"/>
+    <cmp value="0x1" mask="0x1" />
+  </con>
+
+  <!-- Plan A: Simple loop with following Idle and breakout to Plan B -->
+  <era label="DEMO_A0" start="prev" duration="1.0e9" repeat="2.0e6">
+
+    <msg offset="1.0e6" tef="000">
+      <id fid="0" gid="200" evtno="256" sid="1" bpid="1"></id>
+      <pl par="0x0"/>
+    </msg>
+    
+    <!-- TODO: So far support for be and bne. Do we also need bg, bl, bge, ble ? -->
+    <con type="be" jmp="DEMO_B0" >
+      <!-- TODO: So far support for types "self", "cmd", "shared" and "interlock", anything else we need ? -->
+      <!-- TODO: So far support for taken/not taken actions:
+                 "clear", "set to cmp", "decrement", "increment".  Anything else ? -->
+      <src type="interlock" slot="2" width="64"/>
+      <!-- TODO: Do we really need masks ? -->
+      <cmp value="0xdead00" mask="0xffff00" />
+    </con>
+
+  </era>
+  <era label="DEMO_A_IDLE" start="prev" duration="1.0e5" repeat="inf" />
+
+  <!-- Plan B: One shot Msg with following Idle -->
+  <era label="DEMO_B0" start="prev" duration="1.0e3">
+    
+    <msg offset="0" tef="000">
+      <id fid="0" gid="200" evtno="100" sid="1" bpid="1"></id>
+      <pl par="0x0"/>
+    </msg>
+   
+  </era>
+
+  <era label="DEMO_B_IDLE" start="prev" duration="1.0e5" repeat="inf" />
+</thread>
+
+<thread>
+  <era label="DEMO_X_START" start="pps" duration="0" />
+  <sig offset="0">
+    <dst type="shared" slot="Gustav"/>
+    <pl value="0x1" mask="0x1"/>
+  </sig>
+  <era label="DEMO_X0" start="prev" duration="1.0e4" repeat="10">
+    <msg offset="1e2" tef="000">
+      <id fid="0" gid="200" evtno="100" sid="1" bpid="1"></id>
+      <pl par="0x0"/>
+    </msg>
+  </era>
+  <era label="DEMO_X_IDLE" start="prev" duration="1.0e5" repeat="inf" />
+</thread>
