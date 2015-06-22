@@ -33,7 +33,7 @@ function configure_iodir()
 # $2 = ECA pattern
 function configure_eca()
 {
-  echo -n "Configuring ECA at$1 ($2) ... "
+  echo -n "Configuring ECA at $1 ($2) ... "
   # Enable
   eca-ctl udp/$2 enable
   # Disable interrupts
@@ -44,10 +44,10 @@ function configure_eca()
   eca-ctl udp/$2 activate -c 0
   eca-table udp/$2 add $eca_pattern/64 +0.0 0 0x0000ffff
   eca-table udp/$2 add $eca_pattern/64 +0.1 0 0xffff0000
-  # LEMOs/channel2 (pulse width = 4*8=32ns)
+  # LEMOs/channel2 (pulse width = 204*8=1632ns ~= Switch PPS)
   eca-ctl udp/$2 activate -c 2
   eca-table udp/$2 add $eca_pattern/64 0 2 0x000fff
-  eca-table udp/$2 add $eca_pattern/64 4 2 0xfff000
+  eca-table udp/$2 add $eca_pattern/64 204 2 0xfff000
   eca-table udp/$2 flip-active
   echo "done."
 }
@@ -57,8 +57,11 @@ echo "Configuration script started ..."
 [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
 while read name ip io
 do
-  configure_iodir $name $ip
-  configure_eca   $name $ip
+  # Don't configure reference device (io0)
+  if [ $io -ne 0 ]; then
+    configure_iodir $name $ip
+    configure_eca   $name $ip
+  fi
 done < $input_file
 
 

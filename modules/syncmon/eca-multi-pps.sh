@@ -4,9 +4,23 @@
 # Configuration
 input_file=devices.cfg
 eca_pattern=0xC0CAC01A
-dev="$1"
 period=125000000
 last=0
+dev=0
+ref_ip=0
+ref_name=0
+
+# Find reference device in list
+echo "ECA-Multi-PPS script started ..."
+[ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
+while read name ip io
+do
+  if [ $io -eq 0 ]; then
+    dev=udp/$ip
+    ref_ip=$ip
+    ref_name=$name
+  fi
+done < $input_file
 
 while true; do
   # Try to schedule next pulse 3x a second.
@@ -22,10 +36,13 @@ while true; do
     [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
     while read name ip io
     do
-      eca-ctl udp/$ip send $eca_pattern 0 0 $next
+      # Don't drive IOs from reference device (io0)
+      if [ $io -ne 0 ]; then
+        eca-ctl udp/$ip send $eca_pattern 0 0 $next
+      fi
     done < $input_file
     time=$((next*8))
-    printf "\rNext pulse at %d ..." "$time"
+    printf "\rNext pulse at %d -> reference device %s (%s) ..." "$time" "$ref_name" "$ref_ip"
    next=$((next))
   fi
   last="$next"

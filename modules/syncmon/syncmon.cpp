@@ -71,13 +71,14 @@ typedef struct
 
 /* Global */
 /* ==================================================================================================== */
-volatile sig_atomic_t flag = 0;
+volatile sig_atomic_t s_sigint = 0;
+volatile sig_atomic_t s_dump = 0;
 
 /* Function vSignalHandler */
 /* ==================================================================================================== */
 void vSignalHandler(int sig)
 {
-  flag = 1;
+  s_sigint = 1;
 }
 
 /* Function main */
@@ -156,14 +157,11 @@ int main (int argc, const char** argv)
   /* Check TLU */
   while (true)
   {
-
-    if(flag)
+    if(s_sigint || s_dump)
     {
-      iSysCallRes = system("clear");
       /* Create debug dump */
       for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
       {
-      
         /* Did we capture any event here? */
         if(a_sIOMeasurement[uIterator].uTotalEvents)
         {
@@ -171,9 +169,9 @@ int main (int argc, const char** argv)
           if(uIterator!=EXPLODER5_LEMO_OFFSET)
           {
             /* Create or overwrite a log file */
-            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
             fp = fopen(a_cFileNameBuffer, "w");
-          
+            /* Print result to file */
             fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
             fprintf(fp, "  Events:           %ld\n", a_sIOMeasurement[uIterator].uTotalEvents);
             fprintf(fp, "  Latest Timestamp: %ld\n", a_sIOMeasurement[uIterator].uLastTimestamp);
@@ -185,11 +183,14 @@ int main (int argc, const char** argv)
             a_sIOMeasurement[uIterator].uAverage /= a_sIOMeasurement[uIterator].uTotalEvents;
             fprintf(fp, "  Average:          %fns\n\n", a_sIOMeasurement[uIterator].uAverage);
             /* TODO: StdDeviation */
+            /* Close file */
+            fclose(fp);
           }
         }
       }
-      flag = 0;
-      exit(0);
+      /* Reset signals and maybe quit */
+      if (s_sigint != 0) { s_sigint = 0; exit(0); }
+      if (s_dump != 0)   { s_dump = 0; }
     }
 
     /* TODO: Poll device */
@@ -212,6 +213,8 @@ int main (int argc, const char** argv)
         iSysCallRes = system("clear");
         fprintf(stdout, "%s: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast\n", argv[0]);
         fprintf(stdout, "%s: --------------------------------------------------------------------------------------\n", argv[0]);
+        /* Got new data, create log dump after printing */
+        s_dump = 1;
       }
       
       if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
@@ -274,9 +277,7 @@ int main (int argc, const char** argv)
                                                                               a_sIOMeasurement[uQueueIterator].uMinFuture,
                                                                               a_sIOMeasurement[uQueueIterator].uMaxPast,
                                                                               a_sIOMeasurement[uQueueIterator].uMinPast);
-            
           }
-        
       }
     }
   }
