@@ -105,6 +105,7 @@ int main (int argc, const char** argv)
   /* Logging */
   FILE *fp;
   char a_cFileNameBuffer[0x100];
+  int iSysCallRes = 0;
 
   /* Clean results */
   for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
@@ -158,7 +159,7 @@ int main (int argc, const char** argv)
 
     if(flag)
     {
-      system("clear");
+      iSysCallRes = system("clear");
       /* Create debug dump */
       for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
       {
@@ -208,7 +209,7 @@ int main (int argc, const char** argv)
       /* Inspect items with queue contains data */
       if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents)
       {
-        system("clear");
+        iSysCallRes = system("clear");
         fprintf(stdout, "%s: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast\n", argv[0]);
         fprintf(stdout, "%s: --------------------------------------------------------------------------------------\n", argv[0]);
       }
@@ -281,6 +282,6 @@ int main (int argc, const char** argv)
   }
 
   /* Should never get here */
-  return 0;
+  return iSysCallRes;
   
 }

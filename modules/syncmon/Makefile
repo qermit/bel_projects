@@ -1,9 +1,9 @@
 PREFIX  ?= /usr/local
 STAGING ?= 
-EB      ?= ../ip_cores/etherbone-core/api
-ECA	?= ../ip_cores/wr-cores/modules/wr_eca
-TLU	?= ../ip_cores/wr-cores/modules/wr_tlu
-TARGETS := eb-flash eb-info eb-console eb-config-nv eca-snoop button-game io-test
+EB      ?= ../../ip_cores/etherbone-core/api
+ECA	?= ../../ip_cores/wr-cores/modules/wr_eca
+TLU	?= ../../ip_cores/wr-cores/modules/wr_tlu
+TARGETS := syncmon
 
 EXTRA_FLAGS ?=
 CFLAGS      ?= $(EXTRA_FLAGS) -Wall -O2 -I $(EB) -I $(ECA) -I $(TLU)
