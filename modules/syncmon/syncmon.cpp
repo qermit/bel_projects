@@ -85,20 +85,26 @@ void vSignalHandler(int sig)
 int main (int argc, const char** argv)
 {
 
-  /* Helpers */
+  /* Etherbone */
   Socket socket;
   Device device;
   status_t status;
+  
+  /* TLU */
   std::vector<TLU> tlus;
   std::vector<std::vector<uint64_t> > queues;
   s_IOMeasurement a_sIOMeasurement[EXPLODER5_IOS];
-  Table table;
+
+  /* Format and Measurement */
   uint32_t uQueueIterator = 0;
-  uint32_t uQueueItemIterator = 0;
   uint32_t uQueuesTotal = 0;
   uint32_t uQueneItems = 0;
   uint64_t uTimeDiff = 0;
   uint32_t uIterator = 0;
+  
+  /* Logging */
+  FILE *fp;
+  char a_cFileNameBuffer[0x100];
 
   /* Clean results */
   for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
@@ -152,23 +158,33 @@ int main (int argc, const char** argv)
 
     if(flag)
     {
+      system("clear");
       /* Create debug dump */
       for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
       {
+      
         /* Did we capture any event here? */
         if(a_sIOMeasurement[uIterator].uTotalEvents)
         {
-          fprintf(stdout, "%s: Results for IO %d:\n", argv[0], uIterator);
-          fprintf(stdout, "%s:   Events:           %ld\n", argv[0], a_sIOMeasurement[uIterator].uTotalEvents);
-          fprintf(stdout, "%s:   Latest Timestamp: %ld\n", argv[0], a_sIOMeasurement[uIterator].uLastTimestamp);
-          fprintf(stdout, "%s:   Max. Past:        %ldns\n", argv[0], a_sIOMeasurement[uIterator].uMaxPast);
-          fprintf(stdout, "%s:   Min. Past:        %ldns\n", argv[0], a_sIOMeasurement[uIterator].uMinPast);
-          fprintf(stdout, "%s:   Max. Future:      %ldns\n", argv[0], a_sIOMeasurement[uIterator].uMaxFuture);
-          fprintf(stdout, "%s:   Min. Future:      %ldns\n", argv[0], a_sIOMeasurement[uIterator].uMinFuture);
-          /* Calculate statistics */
-          a_sIOMeasurement[uIterator].uAverage /= a_sIOMeasurement[uIterator].uTotalEvents;
-          fprintf(stdout, "%s:   Average:          %fns\n", argv[0], a_sIOMeasurement[uIterator].uAverage);
+          /* Don't create log file for ts0 IO */
+          if(uIterator!=EXPLODER5_LEMO_OFFSET)
+          {
+            /* Create or overwrite a log file */
+            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+            fp = fopen(a_cFileNameBuffer, "w");
           
+            fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
+            fprintf(fp, "  Events:           %ld\n", a_sIOMeasurement[uIterator].uTotalEvents);
+            fprintf(fp, "  Latest Timestamp: %ld\n", a_sIOMeasurement[uIterator].uLastTimestamp);
+            fprintf(fp, "  Max. Past:        %ldns\n", a_sIOMeasurement[uIterator].uMaxPast);
+            fprintf(fp, "  Min. Past:        %ldns\n", a_sIOMeasurement[uIterator].uMinPast);
+            fprintf(fp, "  Max. Future:      %ldns\n", a_sIOMeasurement[uIterator].uMaxFuture);
+            fprintf(fp, "  Min. Future:      %ldns\n", a_sIOMeasurement[uIterator].uMinFuture);
+            /* Calculate statistics */
+            a_sIOMeasurement[uIterator].uAverage /= a_sIOMeasurement[uIterator].uTotalEvents;
+            fprintf(fp, "  Average:          %fns\n\n", a_sIOMeasurement[uIterator].uAverage);
+            /* TODO: StdDeviation */
+          }
         }
       }
       flag = 0;
@@ -193,8 +209,8 @@ int main (int argc, const char** argv)
       if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents)
       {
         system("clear");
-        fprintf(stdout, "%s: Latest TS               Count          Offset ts0          MaxFuture  MinFuture  MaxPast  MinPast\n", argv[0]);
-        fprintf(stdout, "%s: ------------------------------------------------------------------------------------------------------------------\n", argv[0]);
+        fprintf(stdout, "%s: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast\n", argv[0]);
+        fprintf(stdout, "%s: --------------------------------------------------------------------------------------\n", argv[0]);
       }
       
       if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
@@ -207,18 +223,12 @@ int main (int argc, const char** argv)
           if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
           {
             a_sIOMeasurement[uQueueIterator].uAverage += (int64_t)uTimeDiff;
-            //fprintf(stdout, "%s: %f\n", argv[0], a_sIOMeasurement[uQueueIterator].uAverage);
           }
         
           a_sIOMeasurement[uQueueIterator].uTotalEvents = uQueneItems;
           a_sIOMeasurement[uQueueIterator].uLastTimestamp = queue[uQueneItems-1];
           
-          
-          /* Ignore broken LEMO */
-          if(!(uQueueIterator-EXPLODER5_LEMO_OFFSET == 5))
-          {
-            fprintf(stdout, "%s: ts%d: %ld       %d", argv[0], uQueueIterator-EXPLODER5_LEMO_OFFSET, queue[uQueneItems-1], uQueneItems);
-          }
+          fprintf(stdout, "%s: ts%d: %019ld  %08d", argv[0], uQueueIterator-EXPLODER5_LEMO_OFFSET, queue[uQueneItems-1], uQueneItems);
           
           if (uQueueIterator-EXPLODER5_LEMO_OFFSET == 0)
           {
@@ -258,13 +268,11 @@ int main (int argc, const char** argv)
               a_sIOMeasurement[uQueueIterator].uMinPast = 0;
             }
             
-            fprintf(stdout, "          %ldns               %ldns     %ldns     %ldns     %ldns\n", uTimeDiff, 
+            fprintf(stdout, "  %+04ldns      %+04ldns     %+04ldns     %+04ldns   %+04ldns\n", uTimeDiff, 
                                                                               a_sIOMeasurement[uQueueIterator].uMaxFuture,
                                                                               a_sIOMeasurement[uQueueIterator].uMinFuture,
                                                                               a_sIOMeasurement[uQueueIterator].uMaxPast,
                                                                               a_sIOMeasurement[uQueueIterator].uMinPast);
-                                                                              
-
             
           }
         

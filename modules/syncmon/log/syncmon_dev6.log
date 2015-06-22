@@ -1,0 +1,9 @@
+Results for IO10 (device 6):
+  Events:           4
+  Latest Timestamp: 503587000000071
+  Max. Past:        0ns
+  Min. Past:        0ns
+  Max. Future:      -70ns
+  Min. Future:      -69ns
+  Average:          -69.750000ns
+
