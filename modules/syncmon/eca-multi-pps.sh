@@ -2,7 +2,7 @@
 ################################################################################
 
 # Configuration
-input_file=devices.cfg
+input_file=$1
 eca_pattern=0xC0CAC01A
 period=125000000
 last=0

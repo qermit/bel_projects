@@ -2,7 +2,7 @@
 ################################################################################
 
 # Configuration
-input_file=devices.cfg
+input_file=$1
 eca_pattern=0xC0CAC01A
 iodir_lvds_oe_addr=0x10
 iodir_lemo_oe_addr=0x14
