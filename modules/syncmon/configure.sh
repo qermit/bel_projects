@@ -55,7 +55,7 @@ function configure_eca()
 # Script starts here
 echo "Configuration script started ..."
 [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
-while read name ip io
+while read name ip io lenght
 do
   # Don't configure reference device (io0)
   if [ $io -ne 0 ]; then

@@ -13,7 +13,7 @@ ref_name=0
 # Find reference device in list
 echo "ECA-Multi-PPS script started ..."
 [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
-while read name ip io
+while read name ip io lenght
 do
   if [ $io -eq 0 ]; then
     dev=udp/$ip
@@ -34,7 +34,7 @@ while true; do
   if [ $next -ne $last ]; then 
    next=$((next))
     [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
-    while read name ip io
+    while read name ip io lenght
     do
       # Don't drive IOs from reference device (io0)
       if [ $io -ne 0 ]; then
