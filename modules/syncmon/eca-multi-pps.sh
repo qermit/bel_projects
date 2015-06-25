@@ -39,6 +39,10 @@ while true; do
       # Don't drive IOs from reference device (io0)
       if [ $io -ne 0 ]; then
         eca-ctl udp/$ip send $eca_pattern 0 0 $next
+        if [ $? -ne 0 ]; then
+          echo "failed!"
+          exit 1
+        fi
       fi
     done < $input_file
     time=$((next*8))
