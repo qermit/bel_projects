@@ -200,12 +200,12 @@ int main (int argc, const char** argv)
     }
 
     /* TODO: Poll device */
-    usleep(500000);
+    usleep(10000);
 
     /* Read-out result */
     tlu.pop_all(queues);
     uQueuesTotal = queues.size();
-
+     
     /* Check each queue now */
     for(uQueueIterator=0; uQueueIterator<uQueuesTotal; uQueueIterator++)
     {
@@ -221,6 +221,8 @@ int main (int argc, const char** argv)
         fprintf(stdout, "%s: ----------------------------------------------------------------------------------------------------\n", argv[0]);
         /* Got new data, create log dump after printing */
         s_dump = 1;
+        /* Make sure we all popped everything (even delay edges) */
+        tlu.pop_all(queues);
       }
       
       if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
