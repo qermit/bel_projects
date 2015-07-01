@@ -291,14 +291,14 @@ architecture rtl of monster is
   ----------------------------------------------------------------------------------
   -- MSI IRQ Crossbar --------------------------------------------------------------
   ----------------------------------------------------------------------------------
-  constant c_irq_masters : natural := 7;
-  constant c_irqm_top    : natural := 0;
-  constant c_irqm_eca    : natural := 1;
-  constant c_irqm_aq     : natural := 2;
-  constant c_irqm_scubus : natural := 3;
-  constant c_irqm_tlu    : natural := 4;
-  constant c_irqm_mil    : natural := 5;
-  constant c_irqm_fg     : natural := 6;
+  constant c_irq_masters    : natural := 7;
+  constant c_irqm_top       : natural := 0;
+  constant c_irqm_eca       : natural := 1;
+  constant c_irqm_aq        : natural := 2;
+  constant c_irqm_scubus    : natural := 3;
+  constant c_irqm_tlu       : natural := 4;
+  constant c_irqm_mil       : natural := 5;
+  constant c_irqm_fg     	 : natural := 6;
   
   constant c_irq_slaves     : natural := 3;
   constant c_irqs_lm32      : natural := 0;
@@ -341,20 +341,19 @@ architecture rtl of monster is
   constant c_topm_eca_wbm   : natural := 7;
   
   -- required slaves
-  constant c_top_slaves     : natural := 27;
-  constant c_tops_irq       : natural := 0;
-  constant c_tops_wrc       : natural := 1;
-  constant c_tops_lm32      : natural := 2;
-  constant c_tops_build_id  : natural := 3;
-  constant c_tops_flash     : natural := 4;
-  constant c_tops_reset     : natural := 5;
-  constant c_tops_ebm       : natural := 6;
-  constant c_tops_tlu       : natural := 7;
-  constant c_tops_eca_ctl   : natural := 8;
-  constant c_tops_eca_event : natural := 9;
-  constant c_tops_eca_aq    : natural := 10;
-  constant c_tops_iodir     : natural := 11;
-  constant c_tops_eca_wbm   : natural := 26;
+  constant c_top_slaves     : natural := 26;
+  constant c_tops_wrc       : natural := 0;
+  constant c_tops_lm32      : natural := 1;
+  constant c_tops_build_id  : natural := 2;
+  constant c_tops_flash     : natural := 3;
+  constant c_tops_reset     : natural := 4;
+  constant c_tops_ebm       : natural := 5;
+  constant c_tops_tlu       : natural := 6;
+  constant c_tops_eca_ctl   : natural := 7;
+  constant c_tops_eca_event : natural := 8;
+  constant c_tops_eca_aq    : natural := 9;
+  constant c_tops_iodir     : natural := 10;
+  constant c_tops_eca_wbm   : natural := 11;
 
   -- optional slaves:
   constant c_tops_lcd       : natural := 12;
@@ -386,8 +385,7 @@ architecture rtl of monster is
   ----------------------------------------------------------------------------------------------------
   
   constant c_top_layout_req : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (c_tops_irq       => f_sdb_auto_bridge(c_irq_bridge_sdb,                 true),
-    c_tops_wrc       => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
+   (c_tops_wrc       => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
     c_tops_lm32      => f_sdb_auto_bridge(c_lm32_main_bridge_sdb,           true),
     c_tops_build_id  => f_sdb_auto_device(c_build_id_sdb,                   true),
     c_tops_flash     => f_sdb_auto_device(f_wb_spi_flash_sdb(g_flash_bits), true),
@@ -858,24 +856,24 @@ begin
       slave_o       => irq_cbar_slave_o,
       master_i      => irq_cbar_master_i,
       master_o      => irq_cbar_master_o);
-  
-  top2irq : xwb_register_link
-    port map(
-      clk_sys_i     => clk_sys,
-      rst_n_i       => rstn_sys,
-      slave_i       => top_cbar_master_o(c_tops_irq),
-      slave_o       => top_cbar_master_i(c_tops_irq),
-      master_i      => irq_cbar_slave_o (c_irqm_top),
-      master_o      => irq_cbar_slave_i (c_irqm_top));
-  
-  top2wrc : xwb_register_link
-    port map(
+		
+  top2wrc : xwb_register_link   
+  port map(
       clk_sys_i     => clk_sys,
       rst_n_i       => rstn_sys,
       slave_i       => top_cbar_master_o(c_tops_wrc),
       slave_o       => top_cbar_master_i(c_tops_wrc),
       master_i      => wrc_slave_o,
       master_o      => wrc_slave_i);
+
+--  top2irq : xwb_register_link
+--    port map(
+--      clk_sys_i     => clk_sys,
+--      rst_n_i       => rstn_sys,
+--      slave_i       => top_cbar_master_o(c_tops_irq),
+--      slave_o       => top_cbar_master_i(c_tops_irq),
+--      master_i      => irq_cbar_slave_o (c_irqm_top),
+--      master_o      => irq_cbar_slave_i (c_irqm_top));
   
   -- END OF Wishbone crossbars
   ----------------------------------------------------------------------------------
@@ -901,9 +899,8 @@ begin
       ebs_wb_master_i => top_cbar_slave_o (c_topm_ebs),
       ebm_wb_slave_i  => top_cbar_master_o(c_tops_ebm),
       ebm_wb_slave_o  => top_cbar_master_i(c_tops_ebm));
- 
- 
-   
+  
+  
   lm32 : ftm_lm32_cluster 
     generic map(
       g_is_ftm           => g_lm32_are_ftm,	
@@ -936,8 +933,10 @@ begin
   pcie_y : if g_en_pcie generate
     pcie : pcie_wb
       generic map(
-        g_family => g_family,
-        sdb_addr => c_top_sdb_address)
+        g_family      => g_family,
+        sdb_addr      => c_top_sdb_address,
+        sdb_int_first => f_sdb_layout_get_first(c_irq_layout, c_irqs_pcie),
+        sdb_int_last  => f_sdb_layout_get_last (c_irq_layout, c_irqs_pcie))
       port map(
         clk125_i      => core_clk_125m_local_i,
         cal_clk50_i   => clk_reconf,

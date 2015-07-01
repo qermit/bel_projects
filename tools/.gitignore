@@ -3,5 +3,6 @@ eb-info
 eb-console
 eb-config-nv
 eca-snoop
+eca-snoop-irq-cut
 io-test
 button-game
