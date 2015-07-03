@@ -1,7 +1,6 @@
 /* Synopsis */
 /* ==================================================================================================== */
-/*
- * @file syncmon.cpp
+/* @file syncmon.cpp
  * @brief Simple monitor for timing nodes
  *
  * Copyright (C) 2014 GSI Helmholtz Centre for Heavy Ion Research GmbH 
@@ -14,6 +13,8 @@
  * - Check int/uint conversation
  * - Check failure cases (ts0 lost, ...)
  * - LONG LONG runtime? Integer overflow(s)?
+ * - Fix "format ‘%lld’ expects argument" warnings for raspberry pi and std linux/x84_64
+ * - Std. Deviation
  * 
  * Nice to have:
  * - PPS sound
@@ -70,11 +71,12 @@ typedef struct
 {
   uint64_t uTotalEvents;
   uint64_t uLastTimestamp;
-  int64_t uMaxPast;
-  int64_t uMinPast;
-  int64_t uMaxFuture;
-  int64_t uMinFuture;
-  int64_t uDiffSum;
+  int64_t iLastDiff;
+  int64_t iMaxPast;
+  int64_t iMinPast;
+  int64_t iMaxFuture;
+  int64_t iMinFuture;
+  int64_t iDiffSum;
 } s_IOMeasurement;
 
 /* Global */
@@ -121,11 +123,12 @@ int main (int argc, const char** argv)
   {
     a_sIOMeasurement[uIterator].uTotalEvents = 0;
     a_sIOMeasurement[uIterator].uLastTimestamp = 0;
-    a_sIOMeasurement[uIterator].uMaxPast = 0;
-    a_sIOMeasurement[uIterator].uMinPast = 0;
-    a_sIOMeasurement[uIterator].uMaxFuture = 0;
-    a_sIOMeasurement[uIterator].uMinFuture = 0;
-    a_sIOMeasurement[uIterator].uDiffSum = 0;
+    a_sIOMeasurement[uIterator].iLastDiff = 0;
+    a_sIOMeasurement[uIterator].iMaxPast = 0;
+    a_sIOMeasurement[uIterator].iMinPast = 0;
+    a_sIOMeasurement[uIterator].iMaxFuture = 0;
+    a_sIOMeasurement[uIterator].iMinFuture = 0;
+    a_sIOMeasurement[uIterator].iDiffSum = 0;
   }
 
   /* Setup signal handler */
@@ -172,26 +175,30 @@ int main (int argc, const char** argv)
         /* Did we capture any event here? */
         if(a_sIOMeasurement[uIterator].uTotalEvents)
         {
-          /* Don't create log file for ts0 IO */
-          if(uIterator!=EXPLODER5_LEMO_OFFSET)
-          {
-            /* Create or overwrite a log file */
-            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
-            fp = fopen(a_cFileNameBuffer, "w");
-            /* Print result to file */
-            fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
-            fprintf(fp, "  Events:           %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
-            fprintf(fp, "  Latest Timestamp: %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
-            fprintf(fp, "  Max. Past:        %lldns\n", a_sIOMeasurement[uIterator].uMaxPast);
-            fprintf(fp, "  Min. Past:        %lldns\n", a_sIOMeasurement[uIterator].uMinPast);
-            fprintf(fp, "  Max. Future:      %lldns\n", a_sIOMeasurement[uIterator].uMaxFuture);
-            fprintf(fp, "  Min. Future:      %lldns\n", a_sIOMeasurement[uIterator].uMinFuture);
-            /* Calculate statistics */
-            fprintf(fp, "  Average:          %fns\n\n", (double)a_sIOMeasurement[uIterator].uDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
-            /* TODO: StdDeviation */
-            /* Close file */
-            fclose(fp);
-          }
+          /* Create or overwrite a log file */
+          snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+          fp = fopen(a_cFileNameBuffer, "w");
+          /* Print result to file */
+          fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
+          fprintf(fp, "  Events:           %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
+          fprintf(fp, "  Latest Timestamp: %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
+          fprintf(fp, "  Late Difference:  %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
+          fprintf(fp, "  Max. Past:        %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
+          fprintf(fp, "  Min. Past:        %lldns\n", a_sIOMeasurement[uIterator].iMinPast);
+          fprintf(fp, "  Max. Future:      %lldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
+          fprintf(fp, "  Min. Future:      %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
+          /* Calculate statistics */
+          fprintf(fp, "  Average:          %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+          /* Close file */
+          fclose(fp);
+          
+          /* Concatenate data into plot log file */
+          snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_plot_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+          fp = fopen(a_cFileNameBuffer, "a+");
+          /* Print result to file */
+          fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
+          /* Close file */
+          fclose(fp);
         }
       }
       /* Reset signals and maybe quit */
@@ -230,11 +237,12 @@ int main (int argc, const char** argv)
           
           /* Calculate time difference */
           uTimeDiff = queue[uQueneItems-1]-a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uLastTimestamp;
-        
+
           /* Event seen? */
           if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
           {
-            a_sIOMeasurement[uQueueIterator].uDiffSum += uTimeDiff;
+            a_sIOMeasurement[uQueueIterator].iDiffSum += uTimeDiff;            
+            a_sIOMeasurement[uQueueIterator].iLastDiff = uTimeDiff;       
           }
         
           a_sIOMeasurement[uQueueIterator].uTotalEvents = uQueneItems;
@@ -252,46 +260,46 @@ int main (int argc, const char** argv)
             if ((int64_t)uTimeDiff < 0)
             {
               /* Update differences */
-              if((int64_t)uTimeDiff<(int64_t)a_sIOMeasurement[uQueueIterator].uMaxFuture) { a_sIOMeasurement[uQueueIterator].uMaxFuture = uTimeDiff; }
-              if((int64_t)uTimeDiff>(int64_t)a_sIOMeasurement[uQueueIterator].uMinFuture) { a_sIOMeasurement[uQueueIterator].uMinFuture = uTimeDiff; }
+              if((int64_t)uTimeDiff<(int64_t)a_sIOMeasurement[uQueueIterator].iMaxFuture) { a_sIOMeasurement[uQueueIterator].iMaxFuture = uTimeDiff; }
+              if((int64_t)uTimeDiff>(int64_t)a_sIOMeasurement[uQueueIterator].iMinFuture) { a_sIOMeasurement[uQueueIterator].iMinFuture = uTimeDiff; }
               /* This is the first time we see an event, set time marks */
               if(uQueneItems==1)
               {
-                a_sIOMeasurement[uQueueIterator].uMaxFuture = uTimeDiff;
-                a_sIOMeasurement[uQueueIterator].uMinFuture = uTimeDiff;
+                a_sIOMeasurement[uQueueIterator].iMaxFuture = uTimeDiff;
+                a_sIOMeasurement[uQueueIterator].iMinFuture = uTimeDiff;
               }
             }
             else if ((int64_t)uTimeDiff > 0)
             {
               /* Update differences */
-              if((int64_t)uTimeDiff>(int64_t)a_sIOMeasurement[uQueueIterator].uMaxPast) { a_sIOMeasurement[uQueueIterator].uMaxPast = uTimeDiff; }
-              if((int64_t)uTimeDiff<(int64_t)a_sIOMeasurement[uQueueIterator].uMinPast) { a_sIOMeasurement[uQueueIterator].uMinPast = uTimeDiff; }
+              if((int64_t)uTimeDiff>(int64_t)a_sIOMeasurement[uQueueIterator].iMaxPast) { a_sIOMeasurement[uQueueIterator].iMaxPast = uTimeDiff; }
+              if((int64_t)uTimeDiff<(int64_t)a_sIOMeasurement[uQueueIterator].iMinPast) { a_sIOMeasurement[uQueueIterator].iMinPast = uTimeDiff; }
               /* This is the first time we see an event, set time marks */
               if(uQueneItems==1)
               {
-                a_sIOMeasurement[uQueueIterator].uMaxPast = uTimeDiff;
-                a_sIOMeasurement[uQueueIterator].uMinPast = uTimeDiff;
+                a_sIOMeasurement[uQueueIterator].iMaxPast = uTimeDiff;
+                a_sIOMeasurement[uQueueIterator].iMinPast = uTimeDiff;
               }
             }
             else
             {
               /* Set minimal values to zero, because there is no difference */
-              a_sIOMeasurement[uQueueIterator].uMinFuture = 0;
-              a_sIOMeasurement[uQueueIterator].uMinPast = 0;
+              a_sIOMeasurement[uQueueIterator].iMinFuture = 0;
+              a_sIOMeasurement[uQueueIterator].iMinPast = 0;
             }
             
             fprintf(stdout, "  %+04lldns      %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", uTimeDiff, 
-                                                                                                    a_sIOMeasurement[uQueueIterator].uMaxFuture,
-                                                                                                    a_sIOMeasurement[uQueueIterator].uMinFuture,
-                                                                                                    a_sIOMeasurement[uQueueIterator].uMaxPast,
-                                                                                                    a_sIOMeasurement[uQueueIterator].uMinPast,
-                                                                                                    (double)a_sIOMeasurement[uQueueIterator].uDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
+                                                                                                    a_sIOMeasurement[uQueueIterator].iMaxFuture,
+                                                                                                    a_sIOMeasurement[uQueueIterator].iMinFuture,
+                                                                                                    a_sIOMeasurement[uQueueIterator].iMaxPast,
+                                                                                                    a_sIOMeasurement[uQueueIterator].iMinPast,
+                                                                                                    (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
           }
       }
     }
   }
 
   /* Should never get here */
-  return iSysCallRes;
+  return 0;
   
 }
