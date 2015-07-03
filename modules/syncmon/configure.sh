@@ -64,4 +64,8 @@ do
   fi
 done < $input_file
 
-
+# Delete old log files
+echo "Deleting old log files ..."
+rm -r log
+mkdir log
+touch log/dummy
