@@ -17,6 +17,9 @@ def main(argv):
   global device_time_stamps
   global deivce_time_diffs
   
+  max_time_diff = 0
+  min_time_diff = 0
+  
   # Check if a file name was given as argument
   if (len(sys.argv) == 2):
     filename = sys.argv[1]
@@ -96,7 +99,15 @@ def main(argv):
         
         # Calculate average
         average_dev = average_dev + value_dev[i]
-
+      
+      # Get max value (for better plotting)
+      if max(value_dev) > max_time_diff:
+        max_time_diff = max(value_dev)
+      
+      # Get min value (for better plotting)
+      if min(value_dev) < min_time_diff:
+        min_time_diff = min(value_dev)
+      
       # Create legend with average note and plot it
       average_dev = average_dev/len(value_dev)
       dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
@@ -116,13 +127,17 @@ def main(argv):
   ax1.legend()
   
   # Plot settings (auto scale)
+  max_time_diff = max_time_diff+(max_time_diff*0.1)
+  min_time_diff = min_time_diff+(min_time_diff*0.1)
   ax2.set_title('Synchronization Monitor for White Rabbit (auto scale)')
   ax2.set_ylabel('Time Difference[ns]')
   ax2.set_xlabel('PPS Count')
   ax2.set_xlim([1,(len(value_ref)-1)])
+  ax2.set_ylim([min_time_diff,max_time_diff])
   ax2.grid()
+  ax2.legend()
   
-  # Show plo
+  # Show plot
   plt.show()
   
 if __name__ == "__main__":
