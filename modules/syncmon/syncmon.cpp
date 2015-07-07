@@ -15,10 +15,6 @@
  * - LONG LONG runtime? Integer overflow(s)?
  * - Fix "format ‘%lld’ expects argument" warnings for raspberry pi and std linux/x84_64
  * - Std. Deviation
- * 
- * Nice to have:
- * - PPS sound
- * - Display message
  *
  * *****************************************************************************
  * This library is free software; you can redistribute it and/or
@@ -64,6 +60,7 @@ using namespace GSI_TLU;
 #define EXPECTED_PULSE_DIFF_NS    100000000
 #define TLU_ID                    0x4d78adfdU
 #define TLU_VENDOR                0x651
+#define DEBUG_MODE                0
 
 /* Structures */
 /* ==================================================================================================== */
@@ -169,6 +166,15 @@ int main (int argc, const char** argv)
   /* Check TLU */
   while (true)
   {
+  
+    /* Check for system call error */
+    if (iSysCallRes)
+    { 
+      fprintf(stdout, "%s: System call error!\n", argv[0]);
+      exit(1);
+    }
+    
+    /* CTRL+C or dump time? */
     if(s_sigint || s_dump)
     {
       /* Create debug dump */
@@ -214,8 +220,8 @@ int main (int argc, const char** argv)
       if (s_dump != 0)   { s_dump = 0; }
     }
 
-    /* TODO: Poll device */
-    usleep(10000);
+    /* Sleep */
+    usleep(100000);
 
     /* Read-out result */
     tlu.pop_all(queues);
@@ -224,7 +230,6 @@ int main (int argc, const char** argv)
     /* Check each queue now */
     for(uQueueIterator=0; uQueueIterator<uQueuesTotal; uQueueIterator++)
     {
-      
       std::vector<uint64_t>& queue = queues[uQueueIterator];
       uQueneItems = queue.size(); /* Get the actual size */
       
@@ -240,9 +245,18 @@ int main (int argc, const char** argv)
         tlu.pop_all(queues);
       }
       
+      /* Got something new? */
       if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
       {
-          
+        /* Make sure that we don't have more PPS pulse form any device under test than from our reference device */
+        if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents && uQueueIterator != EXPLODER5_LEMO_OFFSET)
+        {
+#if DEBUG_MODE
+          fprintf(stdout, "%s: Bad measurement: %d % d\n", argv[0], uQueneItems, a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents);
+#endif
+        }
+        else
+        {
           /* Calculate time difference */
           uTimeDiff = queue[uQueneItems-1]-a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uLastTimestamp;
 
@@ -303,6 +317,7 @@ int main (int argc, const char** argv)
                                                                                                     a_sIOMeasurement[uQueueIterator].iMinPast,
                                                                                                     (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
           }
+        }
       }
     }
   }
