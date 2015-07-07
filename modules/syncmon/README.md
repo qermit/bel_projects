@@ -39,17 +39,20 @@ ts1 _____|   |______________________________
 ts2 ___________________________|   |________
 </pre>
 
-Example Usage (without Data Master)
+Example Usage
 -----------------------------------
 
 1. Configure all devices:
   <pre>./configure.sh cfg/timing_devices_complete.cfg</pre>
 
-2. Let all devices output a pulse per second (this script musst run all the time):
+2. Let all devices output a pulse per second (this script musst run all the time if you don't use a data master):
   <pre>./eca-multi-pps.sh cfg/timing_devices_complete.cfg</pre>
 
 3. Start the monitor:
   <pre>./syncmon dev/ttyUSB0</pre>
+
+4. Plot the results (optional):
+  <pre>./plot-results.py cfg/timing_devices_complete.cfg</pre>
 
 Log Files
 ---------

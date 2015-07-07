@@ -51,7 +51,7 @@ def main(argv):
   # Check every device in list now
   global value_refz;
   fig = plt.figure()
-  ax = fig.add_subplot(111, axisbg = 'w')
+  ax = fig.add_subplot(1,1,1, axisbg = 'w')
   index = 0
   
   for i in device_ios:
@@ -102,14 +102,14 @@ def main(argv):
       average_dev = average_dev/len(value_dev)
       dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
       ax.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
-    
+      
     # Go for next device in list
     index = index + 1
     
   # Plot settings
   plt.xlabel('PPS Count')
   plt.ylabel('Time Difference[ns]')
-  plt.title('Synchronization Monitor for White Rabbit')
+  plt.title('Synchronization Monitor for White Rabbit (-200ns to 200ns)')
   axes = plt.gca()
   axes.set_xlim([1,(len(value_ref)-1)])
   axes.set_ylim([-200,200])
