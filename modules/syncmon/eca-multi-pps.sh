@@ -40,7 +40,7 @@ while true; do
       if [ $io -ne 0 ]; then
         eca-ctl udp/$ip send $eca_pattern 0 0 $next
         if [ $? -ne 0 ]; then
-          echo "Warning: $name ($ip) at IO $io is not reachable!\n"
+          echo "Warning: $name ($ip) at IO$io is not reachable!\n"
         fi
       fi
     done < $input_file

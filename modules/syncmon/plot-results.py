@@ -8,12 +8,10 @@ import os.path
 # Function main(...)
 # --------------------------------------------------------------------------------
 def main(argv):
-  # Helper
-  global device_count
-  
-  global device_names
-  global device_ios
-  
+  # Helpers
+  global device_count # Total devices to plot
+  global device_names # List of all device names
+  global device_ios   # List of all device ios
   global device_pps_total
   global device_pps_ids
   global device_time_stamps
@@ -62,23 +60,25 @@ def main(argv):
 
     # Reference device
     if i == 0:
+      # Get data from file
       data_ref = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
       time_ref = [row[0] for row in data_ref]
       value_ref = [row[1] for row in data_ref]
       value_refz = range(len(value_ref))
+      # Set value(s) to zero, we only care about the time difference (not the timestamp)
       for i in range (0, len(value_refz)):
         value_refz[i] = 0;
       ax.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
       
     # Device under test
     else:
+      # Get data from file
       data_dev = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
       time_dev = [row[0] for row in data_dev]
       value_dev = [row[1] for row in data_dev]
-      average_dev = 0
-      average_dev_float = 0.0
+      average_dev = 0.0
       
-      # Get the max lenght of the plot
+      # Get the max possible lenght of the plot
       ref_elements = len(value_ref)
       dev_elements = len(value_dev)
       if ref_elements < dev_elements:
@@ -97,19 +97,10 @@ def main(argv):
         
         # Calculate average
         average_dev = average_dev + value_dev[i]
-        print average_dev
 
-      print i
-      print "iiiiiiiii"
       # Create legend with average note and plot it
-      print average_dev
-      print len(value_dev)
-      print min_elements
-      print "===================="
-      
-      average_dev_float = average_dev/min_elements
-
-      dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev_float)
+      average_dev = average_dev/len(value_dev)
+      dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
       ax.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
     
     # Go for next device in list
