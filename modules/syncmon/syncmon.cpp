@@ -71,6 +71,7 @@ typedef struct
 {
   uint64_t uTotalEvents;
   uint64_t uLastTimestamp;
+  uint64_t uLatestPrintedEvent;
   int64_t iLastDiff;
   int64_t iMaxPast;
   int64_t iMinPast;
@@ -122,6 +123,7 @@ int main (int argc, const char** argv)
   for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
   {
     a_sIOMeasurement[uIterator].uTotalEvents = 0;
+    a_sIOMeasurement[uIterator].uLatestPrintedEvent = 0;
     a_sIOMeasurement[uIterator].uLastTimestamp = 0;
     a_sIOMeasurement[uIterator].iLastDiff = 0;
     a_sIOMeasurement[uIterator].iMaxPast = 0;
@@ -180,25 +182,31 @@ int main (int argc, const char** argv)
           fp = fopen(a_cFileNameBuffer, "w");
           /* Print result to file */
           fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
-          fprintf(fp, "  Events:           %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
-          fprintf(fp, "  Latest Timestamp: %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
-          fprintf(fp, "  Late Difference:  %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
-          fprintf(fp, "  Max. Past:        %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
-          fprintf(fp, "  Min. Past:        %lldns\n", a_sIOMeasurement[uIterator].iMinPast);
-          fprintf(fp, "  Max. Future:      %lldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
-          fprintf(fp, "  Min. Future:      %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
+          fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
+          fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
+          fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
+          fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
+          fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
+          fprintf(fp, "  Min. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMinPast);
+          fprintf(fp, "  Max. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
+          fprintf(fp, "  Min. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
           /* Calculate statistics */
-          fprintf(fp, "  Average:          %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+          fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
           /* Close file */
           fclose(fp);
           
-          /* Concatenate data into plot log file */
-          snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_plot_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
-          fp = fopen(a_cFileNameBuffer, "a+");
-          /* Print result to file */
-          fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
-          /* Close file */
-          fclose(fp);
+          if(a_sIOMeasurement[uIterator].uLatestPrintedEvent != a_sIOMeasurement[uIterator].uTotalEvents)
+          {
+            /* Concatenate data into plot log file */
+            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_plot_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+            fp = fopen(a_cFileNameBuffer, "a+");
+            /* Print result to file */
+            fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
+            /* Close file */
+            fclose(fp);
+            /* Increase printed counter */
+            a_sIOMeasurement[uIterator].uLatestPrintedEvent++;
+          }
         }
       }
       /* Reset signals and maybe quit */
