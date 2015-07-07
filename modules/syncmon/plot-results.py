@@ -50,8 +50,7 @@ def main(argv):
   
   # Check every device in list now
   global value_refz;
-  fig = plt.figure()
-  ax = fig.add_subplot(1,1,1, axisbg = 'w')
+  f, (ax1, ax2) = plt.subplots(2, 1)
   index = 0
   
   for i in device_ios:
@@ -68,7 +67,8 @@ def main(argv):
       # Set value(s) to zero, we only care about the time difference (not the timestamp)
       for i in range (0, len(value_refz)):
         value_refz[i] = 0;
-      ax.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
+      ax1.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
+      ax2.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
       
     # Device under test
     else:
@@ -88,7 +88,6 @@ def main(argv):
       
       # Calculate difference be reference and device under test
       for i in range (0, min_elements):
-
         if (value_dev[i] < value_ref[i]):
           value_dev[i] = value_dev[i] - value_ref[i]
         else:
@@ -101,20 +100,29 @@ def main(argv):
       # Create legend with average note and plot it
       average_dev = average_dev/len(value_dev)
       dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
-      ax.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
+      ax1.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
+      ax2.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
       
     # Go for next device in list
     index = index + 1
     
-  # Plot settings
-  plt.xlabel('PPS Count')
-  plt.ylabel('Time Difference[ns]')
-  plt.title('Synchronization Monitor for White Rabbit (-200ns to 200ns)')
-  axes = plt.gca()
-  axes.set_xlim([1,(len(value_ref)-1)])
-  axes.set_ylim([-200,200])
-  plt.legend()
-  plt.grid()
+  # Plot settings (-200ns to 200ns)
+  ax1.set_title('Synchronization Monitor for White Rabbit (-200ns to 200ns)')
+  ax1.set_ylabel('Time Difference[ns]')
+  ax1.set_xlabel('PPS Count')
+  ax1.set_xlim([1,(len(value_ref)-1)])
+  ax1.set_ylim([-200,200])
+  ax1.grid()
+  ax1.legend()
+  
+  # Plot settings (auto scale)
+  ax2.set_title('Synchronization Monitor for White Rabbit (auto scale)')
+  ax2.set_ylabel('Time Difference[ns]')
+  ax2.set_xlabel('PPS Count')
+  ax2.set_xlim([1,(len(value_ref)-1)])
+  ax2.grid()
+  
+  # Show plo
   plt.show()
   
 if __name__ == "__main__":
