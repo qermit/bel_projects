@@ -113,7 +113,7 @@ def main(argv):
   ax1.set_xlim([1,(len(value_ref)-1)])
   ax1.set_ylim([-200,200])
   ax1.grid()
-  ax1.legend()
+  ax1.legend(loc=2)
   
   # Plot settings (auto scale)
   ax2.set_title('Synchronization Monitor for White Rabbit (auto scale)')
@@ -121,7 +121,7 @@ def main(argv):
   ax2.set_xlabel('PPS Count')
   ax2.set_xlim([1,(len(value_ref)-1)])
   ax2.grid()
-  ax2.legend()
+  ax2.legend(loc=2)
   
   # Show plot
   plt.show()
