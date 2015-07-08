@@ -16,6 +16,7 @@ def main(argv):
   global device_pps_ids
   global device_time_stamps
   global deivce_time_diffs
+  global value_refz
   
   # Check if a file name was given as argument
   if (len(sys.argv) == 2):
@@ -49,7 +50,6 @@ def main(argv):
   device_ios = [row[2] for row in data_ref]
   
   # Check every device in list now
-  global value_refz;
   f, (ax1, ax2) = plt.subplots(2, 1)
   index = 0
   
