@@ -55,7 +55,7 @@ def main(argv):
   
   for i in device_ios:
     help_buffer = "log/syncmon_dev_plot_io%d.log" % i
-    dev_name_buffer = "%s (reference)" % str(device_names[index])
+    dev_name_buffer = "%s (reference 0.0ns)" % str(device_names[index])
 
     # Reference device
     if i == 0:
@@ -107,8 +107,8 @@ def main(argv):
     index = index + 1
     
   # Plot settings (-200ns to 200ns)
-  ax1.set_title('Synchronization Monitor for White Rabbit (-200ns to 200ns)')
-  ax1.set_ylabel('Time Difference[ns]')
+  ax1.set_title('Synchronization Monitor for White Rabbit (-200ns to 200ns range)')
+  ax1.set_ylabel('Time Difference [ns]')
   ax1.set_xlabel('PPS Count')
   ax1.set_xlim([1,(len(value_ref)-1)])
   ax1.set_ylim([-200,200])
@@ -116,10 +116,11 @@ def main(argv):
   ax1.legend(loc=2)
   
   # Plot settings (auto scale)
-  ax2.set_title('Synchronization Monitor for White Rabbit (auto scale)')
-  ax2.set_ylabel('Time Difference[ns]')
+  ax2.set_title('Synchronization Monitor for White Rabbit (auto scale, gray span shows -200ns to 200ns range)')
+  ax2.set_ylabel('Time Difference [ns]')
   ax2.set_xlabel('PPS Count')
   ax2.set_xlim([1,(len(value_ref)-1)])
+  ax2.axhspan(-200, 200, facecolor='0.25', alpha=0.25)
   ax2.grid()
   ax2.legend(loc=2)
   

@@ -201,6 +201,7 @@ int main (int argc, const char** argv)
           /* Close file */
           fclose(fp);
           
+          /* Dump event only once to file */
           if(a_sIOMeasurement[uIterator].uLatestPrintedEvent != a_sIOMeasurement[uIterator].uTotalEvents)
           {
             /* Concatenate data into plot log file */
