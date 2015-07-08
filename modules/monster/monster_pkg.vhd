@@ -242,6 +242,27 @@ package monster_pkg is
       lvds_oen_o : out std_logic_vector(f_sub1(g_lvds_inout) downto 0));
   end component;
 
+  component monster_pll5 is
+    port(
+      refclk     : in  std_logic                    := 'X';             -- clk
+      rst        : in  std_logic                    := 'X';             -- reset
+      outclk_0   : out std_logic;                                       -- clk
+      outclk_1   : out std_logic;                                       -- clk
+      outclk_2   : out std_logic;                                       -- clk
+      outclk_3   : out std_logic;                                       -- clk
+      outclk_4   : out std_logic;                                       -- clk
+      outclk_5   : out std_logic;                                       -- clk
+      outclk_6   : out std_logic;                                       -- clk
+      outclk_7   : out std_logic;                                       -- clk
+      outclk_8   : out std_logic;                                       -- clk
+      locked     : out std_logic;                                       -- export
+      phase_en   : in  std_logic                    := 'X';             -- phase_en
+      scanclk    : in  std_logic                    := 'X';             -- scanclk
+      updn       : in  std_logic                    := 'X';             -- updn
+      cntsel     : in  std_logic_vector(4 downto 0) := (others => 'X'); -- cntsel
+      phase_done : out std_logic);                                      -- phase_done
+  end component monster_pll5;
+
 end package;
 
 package body monster_pkg is

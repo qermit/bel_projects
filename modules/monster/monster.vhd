@@ -546,7 +546,7 @@ begin
   
   -- We need at least one off-chip free running clock to setup PLLs
   free_a5 : if c_is_arria5 generate
-    clk_free <= core_clk_125m_local_i;
+    clk_free <= core_clk_125m_pllref_i;
   end generate;
   free_a2 : if c_is_arria2 generate
     clk_free <= core_clk_20m_vcxo_i; -- (125MHz is too fast)
@@ -604,16 +604,6 @@ begin
       c3     => clk_sys3,         --  10  MHz
       locked => sys_locked);
   end generate;
-  sys_a5 : if c_is_arria5 generate
-    sys_inst : sys_pll5 port map(
-      rst      => pll_rst,
-      refclk   => core_clk_125m_local_i, -- 125  Mhz 
-      outclk_0 => clk_sys0,           --  62.5MHz
-      outclk_1 => clk_sys1,           -- 100  MHz
-      outclk_2 => clk_sys2,           --  20  MHz
-      outclk_3 => clk_sys3,           --  10  MHz
-      locked   => sys_locked);
-  end generate;
   
   sys_clk : global_region port map(
     inclk  => clk_sys0,
@@ -648,21 +638,26 @@ begin
       phaseupdown        => '1');
   end generate;
 
-  ref_a5 : if c_is_arria5 generate
-    ref_inst : ref_pll5 port map(
+  monster_a5 : if c_is_arria5 generate
+    monster_inst : monster_pll5 port map(
       rst        => pll_rst,
       refclk     => core_clk_125m_pllref_i, -- 125 MHz
-      outclk_0   => clk_ref0,         -- 125 MHz
-      outclk_1   => clk_ref1,         -- 200 MHz
-      outclk_2   => clk_ref2,         --  25 MHz
-      outclk_3   => clk_ref3,         --1000 MHz
-      outclk_4   => clk_ref4,         -- 125 MHz, 1/8 duty, -1.5ns phase
+      outclk_0   => clk_ref0,         -- 125  MHz
+      outclk_1   => clk_ref1,         -- 200  MHz
+      outclk_2   => clk_ref2,         --  25  MHz
+      outclk_3   => clk_ref3,         --1000  MHz
+      outclk_4   => clk_ref4,         -- 125  MHz, 1/8 duty, -1.5ns phase
+      outclk_5   => clk_sys0,         --  62.5MHz
+      outclk_6   => clk_sys1,         -- 100  MHz
+      outclk_7   => clk_sys2,         --  20  MHz
+      outclk_8   => clk_sys3,         --  10  MHz
       locked     => ref_locked,
       scanclk    => clk_free,  
       cntsel     => phase_sel, 
       phase_en   => phase_step,
       updn       => '1',              -- positive phase shift (widen period)
       phase_done => phase_done);
+    sys_locked <= ref_locked;
   end generate;
   
   phase : altera_phase
@@ -853,7 +848,7 @@ begin
         g_family => g_family,
         sdb_addr => c_top_sdb_address)
       port map(
-        clk125_i      => core_clk_125m_local_i,
+        clk125_i      => core_clk_125m_pllref_i,
         cal_clk50_i   => clk_reconf,
         pcie_refclk_i => pcie_refclk_i,
         pcie_rstn_i   => pcie_rstn_i,

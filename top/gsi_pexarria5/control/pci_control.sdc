@@ -5,8 +5,7 @@ derive_clock_uncertainty
 set_clock_groups -asynchronous                           \
  -group { altera_reserved_tck                          } \
  -group { clk_20m_vcxo_i    main|\dmtd_a5:dmtd_inst|*  } \
- -group { clk_125m_local_i  main|\sys_a5:sys_inst|*    } \
- -group { sfp234_ref_clk_i  main|\ref_a5:ref_inst|*      \
+ -group { sfp234_ref_clk_i  main|\monster_a5:monster_inst|*      \
           main|\phy_a5:phy|*.cdr_refclk*                 \
           main|\phy_a5:phy|*.cmu_pll.*                   \
           main|\phy_a5:phy|*|av_tx_pma|*                 \
@@ -30,11 +29,11 @@ set_clock_groups -asynchronous                           \
  -group { main|\pcie_y:pcie|*|coreclkout               }
 
 # cut: wb sys <=> wb flash   (different frequencies and using xwb_clock_crossing)
-set_false_path -from [get_clocks {main|\sys_a5:sys_inst|*|general[0].*}] -to [get_clocks {main|\sys_a5:sys_inst|*|general[3].*}]
-set_false_path -from [get_clocks {main|\sys_a5:sys_inst|*|general[3].*}] -to [get_clocks {main|\sys_a5:sys_inst|*|general[0].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[5].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[6].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[6].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[5].*}]
 # cut: wb sys <=> wb display (different frequencies and using xwb_clock_crossing)
-set_false_path -from [get_clocks {main|\sys_a5:sys_inst|*|general[0].*}] -to [get_clocks {main|\sys_a5:sys_inst|*|general[1].*}]
-set_false_path -from [get_clocks {main|\sys_a5:sys_inst|*|general[1].*}] -to [get_clocks {main|\sys_a5:sys_inst|*|general[0].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[5].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[7].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[7].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[5].*}]
 # cut: wr-ref <=> butis
-set_false_path -from [get_clocks {main|\ref_a5:ref_inst|*|counter[0].*}] -to [get_clocks {main|\ref_a5:ref_inst|*|counter[1].*}]
-set_false_path -from [get_clocks {main|\ref_a5:ref_inst|*|counter[1].*}] -to [get_clocks {main|\ref_a5:ref_inst|*|counter[0].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[0].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[1].*}]
+set_false_path -from [get_clocks {main|\monster_a5:monster_inst|*|counter[1].*}] -to [get_clocks {main|\monster_a5:monster_inst|*|counter[0].*}]
