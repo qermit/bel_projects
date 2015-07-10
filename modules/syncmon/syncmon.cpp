@@ -110,6 +110,8 @@ int main (int argc, const char** argv)
   uint32_t uQueneItems = 0;
   uint64_t uTimeDiff = 0;
   uint32_t uIterator = 0;
+  uint64_t uEventsTemp = 0;
+  uint32_t uRefIO = 4;
   
   /* Logging */
   FILE *fp;
@@ -220,10 +222,10 @@ int main (int argc, const char** argv)
       if (s_sigint != 0) { s_sigint = 0; exit(0); }
       if (s_dump != 0)   { s_dump = 0; }
     }
-
+    
     /* Sleep */
-    usleep(100000);
-
+    usleep(250000);
+    
     /* Read-out result */
     tlu.pop_all(queues);
     uQueuesTotal = queues.size();
@@ -237,9 +239,6 @@ int main (int argc, const char** argv)
       /* Inspect items with queue contains data */
       if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents)
       {
-        iSysCallRes = system("clear");
-        fprintf(stdout, "%s: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast  Average\n", argv[0]);
-        fprintf(stdout, "%s: ----------------------------------------------------------------------------------------------------\n", argv[0]);
         /* Got new data, create log dump after printing */
         s_dump = 1;
         /* Make sure we all popped everything (even delay edges) */
@@ -253,7 +252,7 @@ int main (int argc, const char** argv)
         if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents && uQueueIterator != EXPLODER5_LEMO_OFFSET)
         {
 #if DEBUG_MODE
-          fprintf(stdout, "%s: Bad measurement: %d % d\n", argv[0], uQueneItems, a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents);
+          fprintf(stdout, "%s: Bad measurement or bit jitter: %d %d\n", argv[0], uQueneItems, a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents);
 #endif
         }
         else
@@ -271,11 +270,11 @@ int main (int argc, const char** argv)
           a_sIOMeasurement[uQueueIterator].uTotalEvents = uQueneItems;
           a_sIOMeasurement[uQueueIterator].uLastTimestamp = queue[uQueneItems-1];
           
-          fprintf(stdout, "%s: ts%d: %019llu  %08d", argv[0], uQueueIterator-EXPLODER5_LEMO_OFFSET, queue[uQueneItems-1], uQueneItems);
-          
           if (uQueueIterator-EXPLODER5_LEMO_OFFSET == 0)
           {
-            fprintf(stdout, "\n");
+#if DEBUG_MODE
+          fprintf(stdout, "%s: Checking reference device ...\n", argv[0]);
+#endif
           }
           else
           {
@@ -310,15 +309,34 @@ int main (int argc, const char** argv)
               a_sIOMeasurement[uQueueIterator].iMinFuture = 0;
               a_sIOMeasurement[uQueueIterator].iMinPast = 0;
             }
-            
-            fprintf(stdout, "  %+04lldns      %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", uTimeDiff, 
-                                                                                                    a_sIOMeasurement[uQueueIterator].iMaxFuture,
-                                                                                                    a_sIOMeasurement[uQueueIterator].iMinFuture,
-                                                                                                    a_sIOMeasurement[uQueueIterator].iMaxPast,
-                                                                                                    a_sIOMeasurement[uQueueIterator].iMinPast,
-                                                                                                    (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
           }
         }
+      }
+    }
+    
+    /* Print results */
+    iSysCallRes = system("clear");
+    fprintf(stdout, "%s: TS#   Latest TS            Count     Offset ts%02d  MaxFuture  MinFuture  MaxPast  MinPast  Average\n", argv[0], uRefIO);
+    fprintf(stdout, "%s: --------------------------------------------------------------------------------------------------------\n", argv[0]);
+    
+    /* Print each IO */
+    for(uQueueIterator=0; uQueueIterator<uQueuesTotal; uQueueIterator++)
+    {
+      uEventsTemp = a_sIOMeasurement[uQueueIterator].uTotalEvents;
+      if (uQueueIterator == uRefIO)
+      {
+        fprintf(stdout, "%s: ts%02d: %019llu  %08d\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+      }
+      if (uEventsTemp && uQueueIterator > uRefIO)
+      {
+        /* Print old status */
+        fprintf(stdout, "%s: ts%02d: %019llu  %08d", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+        fprintf(stdout, "  %+04lldns       %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMaxFuture,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMinFuture,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMaxPast,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMinPast,
+                                                                                                         (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
       }
     }
   }
