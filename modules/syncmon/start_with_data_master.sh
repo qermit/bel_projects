@@ -5,6 +5,6 @@
 input_file=$1
 
 # Run all scripts
-./check_devices.sh $input_file
+./check-devices.sh $input_file
 ./configure.sh $input_file
 
