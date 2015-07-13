@@ -59,6 +59,6 @@ Log Files
 
 This tool will create two kinds of log files in the log/ directory:
 
-1. syncmon_dev_io{n}.log: Snapshot of the latest measurement (see "Console Output").
+1. {reference_device}_syncmon_dev_io{n}.log: Snapshot of the latest measurement (see "Console Output").
 
-2. syncmon_dev_plot_io{n}.log: Contains Event Numbers and Timestamps (since the tools has been started), for data plotting.
+2. {reference_device}_syncmon_dev_plot_io{n}.log: Contains Event Numbers and Timestamps (since the tools has been started), for data plotting.
