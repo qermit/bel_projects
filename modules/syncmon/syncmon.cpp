@@ -193,15 +193,18 @@ int main (int argc, const char** argv)
           fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
           
-          /* TBD: only for non ref devices */
-          fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
-          fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
-          fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
-          fprintf(fp, "  Min. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMinPast);
-          fprintf(fp, "  Max. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
-          fprintf(fp, "  Min. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
-          /* Calculate statistics */
-          fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+          /* Only for non ref devices */
+          if (uIterator != uRefIO)
+          {
+            fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
+            fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
+            fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
+            fprintf(fp, "  Min. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMinPast);
+            fprintf(fp, "  Max. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
+            fprintf(fp, "  Min. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
+            /* Calculate statistics */
+            fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+          }
           /* Close file */
           fclose(fp);
           
@@ -243,8 +246,6 @@ int main (int argc, const char** argv)
       {
         /* Got new data, create log dump after printing */
         s_dump = 1;
-        /* Make sure we all popped everything (even delay edges) */
-        tlu.pop_all(queues);
       }
       
       /* Got something new? */
@@ -268,14 +269,13 @@ int main (int argc, const char** argv)
             a_sIOMeasurement[uQueueIterator].iDiffSum += uTimeDiff;            
             a_sIOMeasurement[uQueueIterator].iLastDiff = uTimeDiff;       
           }
-        
-          a_sIOMeasurement[uQueueIterator].uTotalEvents = uQueneItems;
+          a_sIOMeasurement[uQueueIterator].uTotalEvents++;
           a_sIOMeasurement[uQueueIterator].uLastTimestamp = queue[uQueneItems-1];
           
           if (uQueueIterator-EXPLODER5_LEMO_OFFSET == 0)
           {
 #if DEBUG_MODE
-          fprintf(stdout, "%s: Checking reference device ...\n", argv[0]);
+            fprintf(stdout, "%s: Checking reference device ...\n", argv[0]);
 #endif
           }
           else
