@@ -192,6 +192,8 @@ int main (int argc, const char** argv)
           fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
           fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
+          
+          /* TBD: only for non ref devices */
           fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
           fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
           fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);

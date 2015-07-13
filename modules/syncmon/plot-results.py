@@ -16,7 +16,7 @@ def main(argv):
   global device_pps_ids
   global device_time_stamps
   global deivce_time_diffs
-  global value_refz
+  global value_refz;
   
   # Check if a file name was given as argument
   if (len(sys.argv) == 2):
@@ -88,12 +88,7 @@ def main(argv):
       
       # Calculate difference be reference and device under test
       for i in range (0, min_elements):
-        if (value_dev[i] < value_ref[i]):
-          value_dev[i] = value_dev[i] - value_ref[i]
-        else:
-          value_dev[i] = value_ref[i] - value_dev[i]
-          value_dev[i] = value_dev[i] * -1
-        
+        value_dev[i] = np.int64(value_dev[i]) - np.int64(value_ref[i])
         # Calculate average
         average_dev = average_dev + value_dev[i]
       
