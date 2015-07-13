@@ -54,11 +54,11 @@ def main(argv):
   index = 0
   
   for i in device_ios:
-    help_buffer = "log/syncmon_dev_plot_io%d.log" % i
+    help_buffer = "log/%s_syncmon_dev_plot_io%d.log" % (device_names[0], i)
     dev_name_buffer = "%s (reference 0.0ns)" % str(device_names[index])
 
     # Reference device
-    if i == 0:
+    if i == device_ios[0]:
       # Get data from file
       data_ref = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
       time_ref = [row[0] for row in data_ref]

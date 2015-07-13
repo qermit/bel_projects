@@ -9,19 +9,27 @@ last=0
 dev=0
 ref_ip=0
 ref_name=0
+ref_io=0
+ref_io_found=0
 
 # Find reference device in list
 echo "ECA-Multi-PPS script started ..."
 [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
 while read name ip io lenght
 do
-  if [ $io -eq 0 ]; then
-    dev=udp/$ip
+  # First line must contain the reference IO
+  if [ $ref_io_found -ne 1 ]; then
+    ref_io=$io
+    ref_io_found=1
+  fi
+  if [ $io -eq $ref_io ]; then
+    dev=$ip
     ref_ip=$ip
     ref_name=$name
   fi
 done < $input_file
 
+# Control ECA
 while true; do
   # Try to schedule next pulse 3x a second.
   # This way we don't miss any pulses due to slow scheduling on linux.
@@ -36,9 +44,9 @@ while true; do
     [ ! -f $input_file ] && { echo "$input_file file not found"; exit 1; }
     while read name ip io lenght
     do
-      # Don't drive IOs from reference device (io0)
-      if [ $io -ne 0 ]; then
-        eca-ctl udp/$ip send $eca_pattern 0 0 $next
+      # Don't drive IOs from reference device 
+      if [ $io -ne $ref_io ]; then
+        eca-ctl $ip send $eca_pattern 0 0 $next
         if [ $? -ne 0 ]; then
           echo "Warning: $name ($ip) at IO$io is not reachable!\n"
         fi

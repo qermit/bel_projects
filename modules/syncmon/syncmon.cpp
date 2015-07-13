@@ -51,13 +51,8 @@ using namespace GSI_TLU;
 
 /* Defines */
 /* ==================================================================================================== */
-#define EXPLODER5_IOS             16
-#define EXPLODER5_LEMO_OFFSET     4
-#define EXPLODER5_OE_SETUP        0x0000
-#define LEMO_OE_OFFSET_REG        4
-#define MAX_JITTER_NS             2
-#define MAX_ALLOWED_JITTER_NS     200
-#define EXPECTED_PULSE_DIFF_NS    100000000
+#define LEMO_TOTAL_IOS            16
+#define LEMO_OE_SETUP             0
 #define TLU_ID                    0x4d78adfdU
 #define TLU_VENDOR                0x651
 #define DEBUG_MODE                0
@@ -102,7 +97,7 @@ int main (int argc, const char** argv)
   /* TLU */
   std::vector<TLU> tlus;
   std::vector<std::vector<uint64_t> > queues;
-  s_IOMeasurement a_sIOMeasurement[EXPLODER5_IOS];
+  s_IOMeasurement a_sIOMeasurement[LEMO_TOTAL_IOS];
 
   /* Format and Measurement */
   uint32_t uQueueIterator = 0;
@@ -111,7 +106,12 @@ int main (int argc, const char** argv)
   uint64_t uTimeDiff = 0;
   uint32_t uIterator = 0;
   uint64_t uEventsTemp = 0;
-  uint32_t uRefIO = 4;
+  uint32_t uRefIO = 0;
+  
+  /* Configuration */
+  char a_cDeviceName[0x100];
+  char a_cDeviceHandle[0x100];
+  char a_cReferenceIO[0x100];
   
   /* Logging */
   FILE *fp;
@@ -119,7 +119,7 @@ int main (int argc, const char** argv)
   int iSysCallRes = 0;
 
   /* Clean results */
-  for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
+  for(uIterator = 0; uIterator < LEMO_TOTAL_IOS; uIterator++)
   {
     a_sIOMeasurement[uIterator].uTotalEvents = 0;
     a_sIOMeasurement[uIterator].uLatestPrintedEvent = 0;
@@ -134,17 +134,36 @@ int main (int argc, const char** argv)
 
   /* Setup signal handler */
   signal(SIGINT, vSignalHandler); 
-
+  
+  /* Read configuration file */
+  snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "%s", argv[1]);
+  fp = fopen(a_cFileNameBuffer,"r");
+  if (fp != NULL)
+  {
+    /* Get device name for logging and handle for Etherbone */
+    fscanf(fp, "%s %s %s\n", a_cDeviceName, a_cDeviceHandle, a_cReferenceIO);
+    /* Get reference IO */
+    uRefIO = atoi(a_cReferenceIO);
+    fclose(fp);
+  }
+  else
+  {
+    fprintf(stderr, "%s: failed to open file %s\n", argv[0], argv[1]);
+    return 1;
+  }
+  
   /* Try to open a (etherbone-) socket */
   socket.open();
-  if ((status = device.open(socket, argv[1])) != EB_OK) 
+  if ((status = device.open(socket, a_cDeviceHandle)) != EB_OK) 
   {
     fprintf(stderr, "%s: failed to open %s: (status %s)\n", argv[0], argv[1], eb_status(status));
     return 1;
   }
   else
   {
+#if DEBUG_MODE
     fprintf(stdout, "%s: succeeded to open %s (status %s)\n", argv[0], argv[1], eb_status(status));
+#endif
   }
   
   /* Find the TLU */
@@ -154,7 +173,7 @@ int main (int argc, const char** argv)
   
   /* Configure the TLU to record rising edge timestamps */
   tlu.hook(-1, false);
-  tlu.set_enable(false); // no interrupts, please
+  tlu.set_enable(false); /* No interrupts */
   tlu.clear(-1);
   tlu.listen(-1, true, true, 8); /* Listen on all inputs */
   
@@ -162,8 +181,10 @@ int main (int argc, const char** argv)
   std::vector<sdb_device> devs;
   device.sdb_find_by_identity(TLU_VENDOR, TLU_ID, devs);
   assert (devs.size() == 1);
-  address_t ioconf = devs[0].sdb_component.addr_first + LEMO_OE_OFFSET_REG;
-  device.write(ioconf, EB_DATA32, EXPLODER5_OE_SETUP);
+  address_t ioconf = devs[0].sdb_component.addr_first;
+  device.write(ioconf, EB_DATA32, LEMO_OE_SETUP);
+  ioconf = devs[0].sdb_component.addr_first + 4;
+  device.write(ioconf, EB_DATA32, LEMO_OE_SETUP);
   
   /* Check TLU */
   while (true)
@@ -180,16 +201,16 @@ int main (int argc, const char** argv)
     if(s_sigint || s_dump)
     {
       /* Create debug dump */
-      for(uIterator = 0; uIterator < EXPLODER5_IOS; uIterator++)
+      for(uIterator = 0; uIterator < LEMO_TOTAL_IOS; uIterator++)
       {
         /* Did we capture any event here? */
         if(a_sIOMeasurement[uIterator].uTotalEvents)
         {
           /* Create or overwrite a log file */
-          snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+          snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/%s_syncmon_dev_io%d.log", a_cDeviceName, uIterator);
           fp = fopen(a_cFileNameBuffer, "w");
           /* Print result to file */
-          fprintf(fp, "Results for IO%d (device %d):\n", uIterator, uIterator-EXPLODER5_LEMO_OFFSET);
+          fprintf(fp, "Results for IO%d:\n", uIterator);
           fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
           
@@ -212,7 +233,7 @@ int main (int argc, const char** argv)
           if(a_sIOMeasurement[uIterator].uLatestPrintedEvent != a_sIOMeasurement[uIterator].uTotalEvents)
           {
             /* Concatenate data into plot log file */
-            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/syncmon_dev_plot_io%d.log", uIterator-EXPLODER5_LEMO_OFFSET);
+            snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/%s_syncmon_dev_plot_io%d.log", a_cDeviceName, uIterator);
             fp = fopen(a_cFileNameBuffer, "a+");
             /* Print result to file */
             fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
@@ -224,7 +245,7 @@ int main (int argc, const char** argv)
         }
       }
       /* Reset signals and maybe quit */
-      if (s_sigint != 0) { s_sigint = 0; exit(0); }
+      if (s_sigint != 0) { s_sigint = 0; return(0); }
       if (s_dump != 0)   { s_dump = 0; }
     }
     
@@ -242,7 +263,7 @@ int main (int argc, const char** argv)
       uQueneItems = queue.size(); /* Get the actual size */
       
       /* Inspect items with queue contains data */
-      if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents)
+      if(uQueneItems > a_sIOMeasurement[uRefIO].uTotalEvents)
       {
         /* Got new data, create log dump after printing */
         s_dump = 1;
@@ -252,16 +273,16 @@ int main (int argc, const char** argv)
       if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
       {
         /* Make sure that we don't have more PPS pulse form any device under test than from our reference device */
-        if(uQueneItems > a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents && uQueueIterator != EXPLODER5_LEMO_OFFSET)
+        if(uQueneItems > a_sIOMeasurement[uRefIO].uTotalEvents && uQueueIterator != uRefIO)
         {
 #if DEBUG_MODE
-          fprintf(stdout, "%s: Bad measurement or bit jitter: %d %d\n", argv[0], uQueneItems, a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uTotalEvents);
+          fprintf(stdout, "%s: Bad measurement or bit jitter: %d %d\n", argv[0], uQueneItems, a_sIOMeasurement[uRefIO].uTotalEvents);
 #endif
         }
         else
         {
           /* Calculate time difference */
-          uTimeDiff = queue[uQueneItems-1]-a_sIOMeasurement[EXPLODER5_LEMO_OFFSET].uLastTimestamp;
+          uTimeDiff = queue[uQueneItems-1]-a_sIOMeasurement[uRefIO].uLastTimestamp;
 
           /* Event seen? */
           if(uQueneItems > a_sIOMeasurement[uQueueIterator].uTotalEvents)
@@ -272,7 +293,7 @@ int main (int argc, const char** argv)
           a_sIOMeasurement[uQueueIterator].uTotalEvents++;
           a_sIOMeasurement[uQueueIterator].uLastTimestamp = queue[uQueneItems-1];
           
-          if (uQueueIterator-EXPLODER5_LEMO_OFFSET == 0)
+          if (uQueueIterator-uRefIO == 0)
           {
 #if DEBUG_MODE
             fprintf(stdout, "%s: Checking reference device ...\n", argv[0]);
@@ -344,6 +365,6 @@ int main (int argc, const char** argv)
   }
 
   /* Should never get here */
-  return 0;
+  return (1);
   
 }
