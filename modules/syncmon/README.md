@@ -13,7 +13,7 @@ Example files can be found at the cfg/ directory.
 
 <pre>[device name] [ip address] [io number/connection] [cable length in meters]</pre>
 
-The first entry has to be the measurement/reference node.
+The first entry has to be the measurement/reference node!
 
 Console Output
 --------------
@@ -42,16 +42,16 @@ ts2 ___________________________|   |________
 Example Usage
 -----------------------------------
 
-1. Configure all devices:
-  <pre>./configure.sh cfg/timing_devices_complete.cfg</pre>
+* Start test without Data Master:
+  <pre>./start_no_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
-2. Let all devices output a pulse per second (this script musst run all the time if you don't use a data master):
-  <pre>./eca-multi-pps.sh cfg/timing_devices_complete.cfg</pre>
+* Start test with Data Master:
+  <pre>./start_with_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
-3. Start the monitor:
-  <pre>./syncmon dev/ttyUSB0</pre>
+* Start Syncmon:
+  <pre>./syncmon cfg/timing_devices_complete.cfg</pre>
 
-4. Plot the results (optional):
+* Plot the results (optional): 
   <pre>./plot-results.py cfg/timing_devices_complete.cfg</pre>
 
 Log Files
