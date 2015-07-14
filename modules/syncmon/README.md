@@ -48,6 +48,9 @@ Example Usage
 * Start test with Data Master:
   <pre>./start_with_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
+* Start switch test:
+  <pre>./start_switch_test.sh cfg/timing_devices_complete.cfg</pre>
+
 * Start Syncmon:
   <pre>./syncmon cfg/timing_devices_complete.cfg</pre>
 
@@ -66,9 +69,11 @@ Node Monitoring
 Switch Monitoring
 -----------------
 
-1. Run the monitor application
+1. Run the switch test start script
 
-2. Plot data if wanted
+2. Run the monitor application
+
+3. Plot data if wanted
 
 Log Files
 ---------
