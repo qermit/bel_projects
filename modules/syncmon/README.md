@@ -4,7 +4,7 @@ Synchronization Monitor for White Rabbit
 Purpose
 -------
 
-This application is used to monitor the synchronization quality of White Rabbit nodes.
+This application is used to monitor the synchronization quality of White Rabbit nodes or switches.
 
 Configuration File Layout
 -------------------------
@@ -40,7 +40,7 @@ ts2 ___________________________|   |________
 </pre>
 
 Example Usage
------------------------------------
+-------------
 
 * Start test without Data Master:
   <pre>./start_no_data_master.sh cfg/timing_devices_complete.cfg</pre>
@@ -53,6 +53,22 @@ Example Usage
 
 * Plot the results (optional): 
   <pre>./plot-results.py cfg/timing_devices_complete.cfg</pre>
+
+Node Monitoring
+---------------
+
+1. Run start script (with or without data master)
+
+2. Run the monitor application
+
+3. Plot data if wanted
+
+Switch Monitoring
+-----------------
+
+1. Run the monitor application
+
+2. Plot data if wanted
 
 Log Files
 ---------
