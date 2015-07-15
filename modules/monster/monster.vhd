@@ -91,6 +91,7 @@ entity monster is
     g_lm32_ramsizes        : natural;
     g_lm32_shared_ramsize  : natural;
     g_lm32_init_files      : string;
+    g_lm32_profile         : string; 
     g_lm32_are_ftm         : boolean);
   port(
     -- Required: core signals
@@ -979,7 +980,7 @@ begin
       rst_sys_n_i          => rstn_sys,
       rst_lm32_n_i         => s_lm32_rstn,
       tm_tai8ns_ref_i 	   => ref_tai8ns,
-		tm_tai8ns_sys_i 	   => sys_tai8ns,
+      tm_tai8ns_sys_i 	   => sys_tai8ns,
       irq_slave_o     	   => irq_cbar_master_i(c_irqs_lm32),
       irq_slave_i     	   => irq_cbar_master_o(c_irqs_lm32),
       cluster_slave_o      => top_cbar_master_i(c_tops_lm32),
