@@ -113,7 +113,8 @@ package ftm_pkg is
    rst_sys_n_i    : in  std_logic;
    rst_lm32_n_i   : in  std_logic_vector(g_cores-1 downto 0); 
 
-   tm_tai8ns_i    : in std_logic_vector(63 downto 0);
+   tm_tai8ns_sys_i : in std_logic_vector(63 downto 0);
+   tm_tai8ns_ref_i : in std_logic_vector(63 downto 0);
 
    irq_slave_o    : out t_wishbone_slave_out; 
    irq_slave_i    : in  t_wishbone_slave_in;

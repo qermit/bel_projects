@@ -70,6 +70,7 @@ void prioQueueInit()
 void ftmInit()
 {
    pFtmIf = (t_ftmIf*)_startshared; 
+   pFtmIf->cmd = 0;
    pFtmIf->status = 0x0;
    pFtmIf->pAct = (t_ftmPage*)&(pFtmIf->pPages[0]);
    pFtmIf->pIna = (t_ftmPage*)&(pFtmIf->pPages[1]);
@@ -99,7 +100,7 @@ void ftmInit()
    prioQueueInit();
 
    // MODELSIM FIRMWARE
-   pFtmIf->cmd = CMD_START;    
+   //pFtmIf->cmd = CMD_START;    
  
    pFtmIf->debug[DBG_DISP_DUR_MIN] = 0xffffffff;
    pFtmIf->debug[DBG_DISP_DUR_MAX] = 0x0;
