@@ -57,8 +57,9 @@ port(
    rst_sys_n_i    : in  std_logic;
    rst_lm32_n_i   : in  std_logic_vector(g_cores-1 downto 0); 
 
-   tm_tai8ns_i    : in std_logic_vector(63 downto 0);
-
+   tm_tai8ns_sys_i : in std_logic_vector(63 downto 0);
+   tm_tai8ns_ref_i : in std_logic_vector(63 downto 0);
+	
    irq_slave_o    : out t_wishbone_slave_out; 
    irq_slave_i    : in  t_wishbone_slave_in;
 
@@ -151,8 +152,8 @@ architecture rtl of ftm_lm32_cluster is
           r_rst_lm32_n1 : std_logic_vector(g_cores-1 downto 0);            
    signal s_clu_info   : t_wishbone_master_in;
 
-   signal s_ftm_queue_master_out : t_wishbone_master_out;
-   signal s_ftm_queue_master_in  : t_wishbone_master_in; 
+   signal s_prio_data_in, s_prio_ctrl_in : t_wishbone_master_out;
+   signal s_prio_data_out, s_prio_ctrl_out  : t_wishbone_master_in; 
 
 
    begin
@@ -172,7 +173,7 @@ architecture rtl of ftm_lm32_cluster is
                rst_n_i        => rst_ref_n_i,
                rst_lm32_n_i   => s_rst_lm32_n(I),
 
-               tm_tai8ns_i    => tm_tai8ns_i,            
+               tm_tai8ns_i    => tm_tai8ns_ref_i,            
                
                clu_master_o   => clu_cbar_slaveport_in (I), 
                clu_master_i   => clu_cbar_slaveport_out (I),
@@ -287,8 +288,18 @@ architecture rtl of ftm_lm32_cluster is
      master_o      => irq_cbar_masterport_out);
 
    -- 1st master is cluster crossbar
-   clu_cbar_masterport_in(c_clu_irq_bridge)  <= irq_cbar_slaveport_out(0);                           
-   irq_cbar_slaveport_in(0)                  <= clu_cbar_masterport_out(c_clu_irq_bridge);
+   clu2irq : xwb_register_link
+    port map(
+      clk_sys_i     => clk_ref_i,
+      rst_n_i       => rst_ref_n_i,
+      slave_i       => clu_cbar_masterport_out(c_clu_irq_bridge),
+      slave_o       => clu_cbar_masterport_in(c_clu_irq_bridge),
+      master_i      => irq_cbar_slaveport_out(0),
+      master_o      => irq_cbar_slaveport_in(0));
+
+
+--   clu_cbar_masterport_in(c_clu_irq_bridge)  <= irq_cbar_slaveport_out(0);                           
+--   irq_cbar_slaveport_in(0)                  <= clu_cbar_masterport_out(c_clu_irq_bridge);
 
    
 
@@ -328,8 +339,18 @@ architecture rtl of ftm_lm32_cluster is
      master_o      => ram_cbar_masterport_out);
 
    -- 1st master is cluster crossbar
-   clu_cbar_masterport_in(c_clu_ram_bridge)  <= ram_cbar_slaveport_out(0);                           
-   ram_cbar_slaveport_in(0)                  <= clu_cbar_masterport_out(c_clu_ram_bridge);  
+   clu2ram : xwb_register_link
+    port map(
+      clk_sys_i     => clk_ref_i,
+      rst_n_i       => rst_ref_n_i,
+      slave_i       => clu_cbar_masterport_out(c_clu_ram_bridge),
+      slave_o       => clu_cbar_masterport_in(c_clu_ram_bridge),
+      master_i      => ram_cbar_slaveport_out(0),
+      master_o      => ram_cbar_slaveport_in(0));
+	
+
+--   clu_cbar_masterport_in(c_clu_ram_bridge)  <= ram_cbar_slaveport_out(0);                           
+--   ram_cbar_slaveport_in(0)                  <= clu_cbar_masterport_out(c_clu_ram_bridge);  
 
 --------------------------------------------------------------------------------
 -- Slave - CLUSTER INFO ROM 
@@ -406,37 +427,50 @@ architecture rtl of ftm_lm32_cluster is
       g_val_width    => 192 -- 2**7 -> 128 entries, 8 * 32b per entry (64b key, 192b value)
    )           
    port map(
-      clk_sys_i   => clk_ref_i,
-      rst_n_i     => rst_ref_n_i,
+      clk_sys_i   => clk_sys_i,
+      rst_n_i     => rst_sys_n_i,
 
-      time_sys_i  => tm_tai8ns_i,
+      time_sys_i  => tm_tai8ns_sys_i,
 
-      ctrl_i      => clu_cbar_masterport_out(c_clu_ebm_queue_c),
-      ctrl_o      => clu_cbar_masterport_in(c_clu_ebm_queue_c),
+      ctrl_i      => s_prio_ctrl_in,
+      ctrl_o      => s_prio_ctrl_out,
       
-      snk_i       => clu_cbar_masterport_out(c_clu_ebm_queue_d),
-      snk_o       => clu_cbar_masterport_in(c_clu_ebm_queue_d),
+      snk_i       => s_prio_data_in,
+      snk_o       => s_prio_data_out,
       
-      src_o       => s_ftm_queue_master_out,
-      src_i       => s_ftm_queue_master_in
+      src_o       => ftm_queue_master_o,
+      src_i       => ftm_queue_master_i
      
    );
  end generate;
  
  -- sync from REF to SYS domain
- prio_ref2sys : xwb_clock_crossing
+ prioctrl_ref2sys : xwb_clock_crossing
    port map(
       -- Slave control port
       slave_clk_i    => clk_ref_i,
       slave_rst_n_i  => rst_ref_n_i,
-      slave_i        => s_ftm_queue_master_out,
-      slave_o        => s_ftm_queue_master_in,
+      slave_i        => clu_cbar_masterport_out(c_clu_ebm_queue_c),
+      slave_o        => clu_cbar_masterport_in(c_clu_ebm_queue_c),
       -- Master reader port
       master_clk_i   => clk_sys_i,
       master_rst_n_i => rst_sys_n_i,
-      master_i       => ftm_queue_master_i,
-      master_o       => ftm_queue_master_o);
+      master_i       => s_prio_ctrl_out,
+      master_o       => s_prio_ctrl_in);
 
+		 -- sync from REF to SYS domain
+ priosink_ref2sys : xwb_clock_crossing
+   port map(
+      -- Slave control port
+      slave_clk_i    => clk_ref_i,
+      slave_rst_n_i  => rst_ref_n_i,
+      slave_i        => clu_cbar_masterport_out(c_clu_ebm_queue_d),
+      slave_o        => clu_cbar_masterport_in(c_clu_ebm_queue_d),
+      -- Master reader port
+      master_clk_i   => clk_sys_i,
+      master_rst_n_i => rst_sys_n_i,
+      master_i       => s_prio_data_out,
+      master_o       => s_prio_data_in);
 
    sync_individual_resets : process(clk_ref_i)
    begin
