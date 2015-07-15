@@ -317,7 +317,7 @@ int main(int argc, char** argv) {
    memset(pBufRead, 0, BUF_SIZE);
    
    int cpuId;
-   uint8_t firstCpu, lastCpu, overrideFWcheck;
+   uint8_t firstCpu, lastCpu, cpuIdx, overrideFWcheck;
    
    eb_status_t ebstatus;
    eb_cycle_t  cycle;
@@ -459,7 +459,7 @@ int main(int argc, char** argv) {
    
 //*****************************************************************************************************************//
 
-  printf("Connecting to FTM\n");
+  //printf("Connecting to FTM\n");
   openFtm(netaddress, pAccess, overrideFWcheck);
 
   //op for one CPU or all?
@@ -474,6 +474,59 @@ int main(int argc, char** argv) {
   } else {
     resetBits = 1 << firstCpu;
   }
+   
+  if (!strcasecmp(command, "loadfw")) {
+      printf("Putting CPU(s) into Reset for FW load\n");
+      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
+      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+  
+      
+      
+      FILE *file;
+      uint8_t* buffer;
+      unsigned long fileLen;
+
+      //Open file
+      file = fopen(filename, "rb");
+      if (!file)
+      {
+	      fprintf(stderr, "Unable to open file %s", filename);
+	      return;
+      }
+
+      //Get file length
+      fseek(file, 0, SEEK_END);
+      fileLen=ftell(file);
+      fseek(file, 0, SEEK_SET);
+
+      //Allocate memory
+      buffer=(uint8_t *)malloc(fileLen+1);
+      if (!buffer)
+      {
+	      fprintf(stderr, "Memory error!");
+                                    fclose(file);
+	      return;
+      }
+
+      //Read file contents into buffer
+      fread(buffer, fileLen, 1, file);
+      fclose(file);
+      for(cpuIdx = firstCpu; cpuIdx <= lastCpu; cpuIdx++)
+      { 
+        //Load FW
+        printf("Loading %s to CPU %u @ 0x%08x\n", filename, cpuIdx, pAccess->pCores[cpuIdx].ramAdr);  
+        ebRamWrite(buffer, pAccess->pCores[cpuIdx].ramAdr, fileLen, LITTLE_ENDIAN);
+      }
+      free(buffer);
+      
+      
+      printf("Releasing CPU(s) from Reset\n\n");
+      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
+      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
+      
+      printf("Done.\n");
+      return 0;
+    } 
    
    if(!strcasecmp(command, "duetime")) {
          if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
@@ -511,7 +564,7 @@ int main(int argc, char** argv) {
 
   
    //Cycle through selected CPUs
-   uint8_t cpuIdx;
+   
    for(cpuIdx = firstCpu; cpuIdx <= lastCpu; cpuIdx++)
    {
       //if the op is NOT fw load, verify that a valid fw is already in there
@@ -520,8 +573,8 @@ int main(int argc, char** argv) {
           fprintf(stderr, "CPU #%u NOT INITIALIZED!\nrun '%s %s -c  %u loadfw <firmware.bin>' to load fw to this core\n", cpuIdx, program, netaddress, cpuIdx);
           fprintf(stderr, "or  '%s %s -c -1 loadfw <firmware.bin>' to load fw to all core\n", program, netaddress);
           return -1;  
-       } 
-       
+         } 
+      } 
       
       /* -------------------------------------------------------------------- */
       if (!strcasecmp(command, "status")) {
@@ -618,34 +671,7 @@ int main(int argc, char** argv) {
     
     
     
-    else if (!strcasecmp(command, "loadfw")) {
-      printf("Putting CPU into Reset for FW load\n");
-      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
-      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-      
-      char cOffs[11] = "0x00000000";
-      char cmdStr[80 + FILENAME_LEN];
-
-      itoa(pAccess->pCores[cpuIdx].ramAdr, &cOffs[2], 16);
-      strcpy (cmdStr, "eb-put -p -b ");
-      strcat (cmdStr, netaddress);
-      strcat (cmdStr, " ");
-      strcat (cmdStr, cOffs);
-      strcat (cmdStr, " ");
-      strcat (cmdStr, filename);
-
-      if (verbose) {
-         printf("Loading %s to CPU %u @ %s\n", filename, cpuIdx, cOffs);  
-      } else printf("Loading Firmware to CPU %u\n", cpuIdx);
-
-      FILE* ebput = popen(cmdStr, "w");
-      pclose(ebput);
-            
-      printf("Releasing all CPUs from Reset\n\n");
-      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
-      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
     
-    }
      
      else if (!strcasecmp(command, "swap")) {
        
@@ -689,7 +715,7 @@ int main(int argc, char** argv) {
             printf("done.\n");
             if(verbose) showFtmPage(pPage);
             serPage (pPage, pBufWrite, targetOffset, cpuIdx);
-            ebRamWrite(pBufWrite, pAccess->pCores[cpuIdx].ramAdr + targetOffset, BUF_SIZE);
+            ebRamWrite(pBufWrite, pAccess->pCores[cpuIdx].ramAdr + targetOffset, BUF_SIZE, BIG_ENDIAN);
             printf("Writing %u bytes FTM Data to 0x%08x...", BUF_SIZE, pAccess->pCores[cpuIdx].ramAdr + targetOffset);
             printf("done.\n");
          } else fprintf(stderr, "No xml file specified\n");
@@ -726,7 +752,7 @@ int main(int argc, char** argv) {
     
    } 
       
-}
+   
    
   
    return 0;

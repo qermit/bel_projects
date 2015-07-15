@@ -290,11 +290,11 @@ const uint8_t* ebRamRead(uint32_t address, uint32_t len, const uint8_t* buf)
    return buf;
 }
 
-const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len)
+const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian)
 {
    eb_status_t status;
    eb_cycle_t cycle;
-   uint32_t i,j, parts, partLen, start;
+   uint32_t i,j, parts, partLen, start, data;
    uint32_t* writeout = (uint32_t*)buf;   
    
    //wrap frame buffer in EB packet
@@ -310,7 +310,10 @@ const uint8_t* ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len)
       
       for(i= start>>2; i< (start + partLen) >>2;i++)  
       {
-         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)writeout[i]); 
+         if (bufEndian == LITTLE_ENDIAN)  data = SWAP_4(writeout[i]);
+         else                             data = writeout[i];
+         
+         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)data); 
       }
       if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
       start = start + partLen;
