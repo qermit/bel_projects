@@ -12,6 +12,10 @@ extern eb_device_t device;
 extern eb_socket_t mySocket;
 extern const char* program;
 
+#define SWAP_4(x) ( ((x) << 24) | \
+         (((x) << 8) & 0x00ff0000) | \
+         (((x) >> 8) & 0x0000ff00) | \
+         ((x) >> 24) )
 
 
 #define MAX_DEVICES 20
@@ -43,7 +47,7 @@ uint32_t ftm_shared_offs;
 t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck);
 void closeFtm(void);
 const uint8_t*  ebRamRead(uint32_t address, uint32_t len, const uint8_t* buf);
-const uint8_t*  ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len);
+const uint8_t*  ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian);
 void ebRamClear(uint32_t address, uint32_t len);
 uint8_t isFwValid(struct sdb_device* ram, const char* sVerExp, const char* sName);
 int die(eb_status_t status, const char* what);
