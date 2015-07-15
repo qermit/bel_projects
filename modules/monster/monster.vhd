@@ -968,6 +968,7 @@ begin
       g_cores            => g_lm32_cores,
       g_ram_per_core     => g_lm32_ramsizes,
       g_shared_mem       => g_lm32_shared_ramsize,
+      g_profile          => g_lm32_profile,	
       g_world_bridge_sdb => c_top_bridge_sdb,
       g_init_files       => g_lm32_init_files,
       g_msi_per_core     => g_lm32_MSIs)
@@ -977,7 +978,8 @@ begin
       clk_sys_i            => clk_sys,
       rst_sys_n_i          => rstn_sys,
       rst_lm32_n_i         => s_lm32_rstn,
-      tm_tai8ns_i     	   => ref_tai8ns,
+      tm_tai8ns_ref_i 	   => ref_tai8ns,
+		tm_tai8ns_sys_i 	   => sys_tai8ns,
       irq_slave_o     	   => irq_cbar_master_i(c_irqs_lm32),
       irq_slave_i     	   => irq_cbar_master_o(c_irqs_lm32),
       cluster_slave_o      => top_cbar_master_i(c_tops_lm32),
