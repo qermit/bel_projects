@@ -3,7 +3,7 @@
 
 # Configuration
 input_file=$1
-eca_pattern=0xC0CAC01A
+eca_pattern=0xffff000000000000 # FID=MAX & GRPID=MAX
 iodir_lvds_oe_addr=0x10
 iodir_lemo_oe_addr=0x14
 io_oe_pattern=0xffffffff
@@ -47,10 +47,10 @@ function configure_eca()
   eca-ctl $2 activate -c 0
   eca-table $2 add $eca_pattern/64 +0.0 0 0x0000ffff
   eca-table $2 add $eca_pattern/64 +0.1 0 0xffff0000
-  # LEMOs/channel2 (pulse width = 204*8=1632ns ~= Switch PPS)
+  # LEMOs/channel2 (pulse width = 100ms))
   eca-ctl $2 activate -c 2
-  eca-table $2 add $eca_pattern/64 0 2 0x000fff
-  eca-table $2 add $eca_pattern/64 204 2 0xfff000
+  eca-table $2 add $eca_pattern/64 +0.0 2 0x000fff
+  eca-table $2 add $eca_pattern/64 +0.1 2 0xfff000
   eca-table $2 flip-active
   echo "done."
 }

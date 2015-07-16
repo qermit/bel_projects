@@ -3,7 +3,7 @@
 
 # Configuration
 input_file=$1
-eca_pattern=0xC0CAC01A
+eca_pattern=0xffff000000000000 # FID=MAX & GRPID=MAX
 period=125000000
 last=0
 dev=0

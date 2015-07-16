@@ -57,49 +57,53 @@ def main(argv):
     help_buffer = "log/%s_syncmon_dev_plot_io%d.log" % (device_names[0], i)
     dev_name_buffer = "%s (reference 0.0ns)" % str(device_names[index])
 
-    # Reference device
-    if i == device_ios[0]:
-      # Get data from file
-      data_ref = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
-      time_ref = [row[0] for row in data_ref]
-      value_ref = [row[1] for row in data_ref]
-      value_refz = range(len(value_ref))
-      # Set value(s) to zero, we only care about the time difference (not the timestamp)
-      for i in range (0, len(value_refz)):
-        value_refz[i] = 0;
-      ax1.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
-      ax2.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
-      
-    # Device under test
-    else:
-      # Get data from file
-      data_dev = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
-      time_dev = [row[0] for row in data_dev]
-      value_dev = [row[1] for row in data_dev]
-      average_dev = 0.0
-      
-      # Get the max possible lenght of the plot
-      ref_elements = len(value_ref)
-      dev_elements = len(value_dev)
-      if ref_elements < dev_elements:
-        min_elements = ref_elements
+    # Check if the log file exists
+    if os.path.isfile(help_buffer):
+      # Reference device
+      if i == device_ios[0]:
+        # Get data from file
+        data_ref = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
+        time_ref = [row[0] for row in data_ref]
+        value_ref = [row[1] for row in data_ref]
+        value_refz = range(len(value_ref))
+        # Set value(s) to zero, we only care about the time difference (not the timestamp)
+        for i in range (0, len(value_refz)):
+          value_refz[i] = 0;
+        ax1.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
+        ax2.plot(time_ref,value_refz,lw=2, linestyle='-', label=dev_name_buffer)
+        
+      # Device under test
       else:
-        min_elements = dev_elements
-      
-      # Calculate difference be reference and device under test
-      for i in range (0, min_elements):
-        value_dev[i] = np.int64(value_dev[i]) - np.int64(value_ref[i])
-        # Calculate average
-        average_dev = average_dev + value_dev[i]
-      
-      # Create legend with average note and plot it
-      average_dev = average_dev/len(value_dev)
-      dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
-      ax1.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
-      ax2.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
-      
-    # Go for next device in list
-    index = index + 1
+        # Get data from file
+        data_dev = np.genfromtxt(help_buffer,delimiter=' ', dtype=np.int64)
+        time_dev = [row[0] for row in data_dev]
+        value_dev = [row[1] for row in data_dev]
+        average_dev = 0.0
+        
+        # Get the max possible lenght of the plot
+        ref_elements = len(value_ref)
+        dev_elements = len(value_dev)
+        if ref_elements < dev_elements:
+          min_elements = ref_elements
+        else:
+          min_elements = dev_elements
+        
+        # Calculate difference be reference and device under test
+        for i in range (0, min_elements):
+          value_dev[i] = np.int64(value_dev[i]) - np.int64(value_ref[i])
+          # Calculate average
+          average_dev = average_dev + value_dev[i]
+        
+        # Create legend with average note and plot it
+        average_dev = average_dev/len(value_dev)
+        dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
+        ax1.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
+        ax2.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
+        
+      # Go for next device in list
+      index = index + 1
+    else:
+      print "Log file %s does not exist!" % help_buffer
     
   # Plot settings (-200ns to 200ns)
   ax1.set_title('Synchronization Monitor for White Rabbit (-200ns to 200ns range)')
