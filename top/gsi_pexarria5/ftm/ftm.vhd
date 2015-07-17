@@ -225,7 +225,8 @@ architecture rtl of ftm is
 
   constant c_family  : string := "Arria V"; 
   constant c_project : string := "ftm";
-  constant c_initf   : string :=  c_project & "_stub.mif" & ';' & c_project & "_stub.mif" & ';' & c_project & "_stub.mif" & ';' & c_project & "_stub.mif";
+  --constant c_initf   : string :=  c_project & "_stub.mif" & ';' & c_project & "_stub.mif" & ';' & c_project & "_stub.mif" & ';' & c_project & "_stub.mif";
+  constant c_initf   : string :=  c_project & ".mif" & ';' & c_project & ".mif" & ';' & c_project & ".mif" & ';' & c_project & ".mif";
   -- projectname is standard to ensure a stub mif that prevents unwanted scanning of the bus 
   -- multiple init files for n processors are to be seperated by semicolon ';'
 
