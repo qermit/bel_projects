@@ -173,7 +173,7 @@ architecture rtl of ftm_lm32_cluster is
                rst_n_i        => rst_ref_n_i,
                rst_lm32_n_i   => s_rst_lm32_n(I),
 
-               tm_tai8ns_i    => tm_tai8ns_i,            
+               tm_tai8ns_i    => tm_tai8ns_ref_i,            
                
                clu_master_o   => clu_cbar_slaveport_in (I), 
                clu_master_i   => clu_cbar_slaveport_out (I),
