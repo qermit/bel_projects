@@ -15,4 +15,5 @@ do
   else
     echo "okay."
   fi
+  sleep 0.5
 done < $input_file

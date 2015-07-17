@@ -56,7 +56,8 @@ def main(argv):
   for i in device_ios:
     help_buffer = "log/%s_syncmon_dev_plot_io%d.log" % (device_names[0], i)
     dev_name_buffer = "%s (reference 0.0ns)" % str(device_names[index])
-
+    print "Reading log file: %s" % help_buffer
+    
     # Check if the log file exists
     if os.path.isfile(help_buffer):
       # Reference device
@@ -99,12 +100,14 @@ def main(argv):
         dev_name_buffer = "%s (%fns)" % (str(device_names[index]), average_dev)
         ax1.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
         ax2.plot(time_dev,value_dev,lw=2, linestyle='-', label=dev_name_buffer)
-        
-      # Go for next device in list
-      index = index + 1
+    
+    # If the file does not exist
     else:
       print "Log file %s does not exist!" % help_buffer
     
+    # Go for next device in list
+    index = index + 1
+      
   # Plot settings (-200ns to 200ns)
   ax1.set_title('Synchronization Monitor for White Rabbit (-200ns to 200ns range)')
   ax1.set_ylabel('Time Difference [ns]')

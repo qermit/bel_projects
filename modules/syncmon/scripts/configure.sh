@@ -71,6 +71,7 @@ do
     configure_iodir $name $ip
     configure_eca   $name $ip
   fi
+  sleep 0.5
 done < $input_file
 
 # Delete old log files

@@ -23,9 +23,9 @@ The output will look like this:
 <pre>
 ./syncmon: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast  Average
 ./syncmon: ----------------------------------------------------------------------------------------------------
-./syncmon: ts0: 0000075263000000140  00000200
+./syncmon: ts0: 0000075264000000140  00000200
 ./syncmon: ts1: 0000075264000000060  00000200  -080ns      -080ns     -079ns     +000ns   +000ns   -79.889999ns
-./syncmon: ts2: 0000075264000000120  00000200  +060ns      +000ns     +000ns     +060ns   +059ns   +59.775333ns
+./syncmon: ts2: 0000075264000000200  00000200  +060ns      +000ns     +000ns     +060ns   +059ns   +59.775333ns
 </pre>
 
 The according signals will look like this:
@@ -46,7 +46,7 @@ Example Usage
   <pre>./start_no_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start test with Data Master:
-  <pre>./start_with_data_master.sh cfg/timing_devices_complete.cfg</pre>
+  <pre>./start_with_data_master.sh cfg/timing_devices_complete.cfg udp/dev/data.master</pre>
 
 * Start switch test:
   <pre>./start_switch_test.sh cfg/timing_devices_complete.cfg</pre>

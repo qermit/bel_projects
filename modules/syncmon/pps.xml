@@ -1,0 +1,34 @@
+<page>
+   <meta>
+      <startplan>A</startplan>
+      <altplan>A</altplan>
+   </meta>
+   <plan>
+      <!-- Plan A, normal operation -->
+      <meta>
+         <starttime>___STARTTIME___</starttime>
+         <lastjump>idle</lastjump>
+      </meta>  
+      <chain>
+         <!-- Cycle A0, entry -->
+         <meta>
+            <rep>-1</rep>
+            <period>1000000000</period>
+            <branchpoint>yes</branchpoint>
+         </meta>
+         <msg>
+           <!-- Msg A0A -->
+           <id>
+             <FID>0xf</FID>
+             <GID>0xfff</GID>
+             <EVTNO>0</EVTNO>
+             <SID>0</SID>
+             <BPID>0</BPID>
+           </id>
+           <par>0x01234567890abcdef</par>
+           <tef>0</tef>
+           <offs>0</offs>
+         </msg> 
+      </chain>
+   </plan>
+</page>
