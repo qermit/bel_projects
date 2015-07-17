@@ -7,6 +7,7 @@
 #define BUF_SIZE            FTM_PAGESIZE
 
 #define FTM_RST_FPGA        0x0
+#define FTM_RST_FPGA_CMD    0xDEADBEEF
 #define FTM_RST_GET         (FTM_RST_FPGA + 4)
 #define FTM_RST_SET         (FTM_RST_GET  + 4)
 #define FTM_RST_CLR         (FTM_RST_SET  + 4)

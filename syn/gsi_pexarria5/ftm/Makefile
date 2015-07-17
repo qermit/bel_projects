@@ -5,7 +5,7 @@ SPI_LANES	= ASx4
 RAM_SIZE	= 65536
 SHARED_SIZE     = 8K
 USRCPUCLK       = 125000
-VERSION         = 0.2.0
+VERSION         = 0.2.1
 
 PATHFTM   = ../../../modules/ftm
 PATHFW    = $(PATHFTM)/ftmfw

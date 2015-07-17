@@ -126,13 +126,13 @@ void cmdEval()
       
       
       if(cmd & CMD_RST)          { showId(); mprintf("Ftm Init done\n"); stat = 0; ftmInit(); }
-      if(cmd & CMD_START)        { showId(); mprintf("Starting, IP: 0x%08x, SP: 0x%08x\n", &pFtmIf->idle, pFtmIf->pAct->pStart); 
+      if(cmd & CMD_START)        { showId(); mprintf("Run\n"); 
                                    pFtmIf->pAct->pBp = pFtmIf->pAct->pStart;
                                    stat = (stat & STAT_ERROR) | STAT_RUNNING;
                                  }
       if(cmd & CMD_IDLE)         { pFtmIf->pAct->pBp = (t_ftmChain*)&pFtmIf->idle; showId(); mprintf("Going to Idle\n");}
       if(cmd & CMD_STOP_REQ)     { stat |= STAT_STOP_REQ; }
-      if(cmd & CMD_STOP_NOW)     { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; showId(); mprintf("Stopped (forced)\n");} 
+      if(cmd & CMD_STOP_NOW)     { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; showId(); mprintf("Stop (forced)\n");} 
       
       if(cmd & CMD_COMMIT_PAGE)  {//showId(); mprintf("Page Commit\n");
                                   pTmp = pFtmIf->pIna;
@@ -154,7 +154,7 @@ void cmdEval()
    
    if(pCurrentChain == &pFtmIf->idle)  {stat |=  STAT_IDLE;}
    else                       {stat &= ~STAT_IDLE;}
-   if(pCurrentChain == &pFtmIf->idle && (stat & STAT_STOP_REQ)) { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; mprintf("Stopped\n");}
+   if(pCurrentChain == &pFtmIf->idle && (stat & STAT_STOP_REQ)) { stat = (stat & STAT_ERROR) & ~STAT_RUNNING; showId(); mprintf("Stop\n");}
    
    pFtmIf->status = stat;
    
