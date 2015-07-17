@@ -109,11 +109,13 @@ int insertFpqEntry()
 void main(void) {
    
    int j;
-   
+
    init();
    uint32_t test = &pFtmIf->tPrep;
    
-   //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+   
+   // wait 1s + cpuIdx * 1/10s
+   for (j = 0; j < ((125000000/4)+(cpuId*300000)); ++j) { asm("nop"); }
    atomic_on();
       
    mprintf("#%02u: Rdy\n", cpuId);
