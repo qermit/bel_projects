@@ -1,8 +1,14 @@
 #include "access.h"
 
+
+/// Expected Firmware Version ///
+const char myVer[] = "0.2.1\n";
+const char myName[] = "ftm\n";
+////////////////////////////////
+
+
 const uint64_t vendID_CERN       = 0x000000000000ce42;
 const uint64_t vendID_GSI        = 0x0000000000000651;
-
 
 const uint32_t devID_Reset       = 0x3a362063;
 const uint32_t devID_RAM         = 0x66cfeb52;
@@ -14,6 +20,10 @@ const uint32_t devID_ClusterCB   = 0x10041000;
 const uint32_t devID_Ebm         = 0x00000815;
 const uint32_t devID_Prioq       = 0x10040200;
 
+const char     devName_RAM_pre[] = "WB4-BlockRAM_";
+
+
+
 t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck)
 {
   eb_cycle_t cycle;
@@ -24,8 +34,7 @@ t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWc
   struct sdb_device devices[MAX_DEVICES];
   char              devName_RAM_post[4];
   struct sdb_bridge CluCB;
-  const char myVer[] = "1.0.0\n";
-  const char myName[] = "ftm\n";
+  
   
   eb_data_t tmpRead[4];
   
@@ -105,7 +114,7 @@ t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWc
   
   //Old or new Gateware ?
   //FIXME: the cumbersome legacy code has to go sometime
-  if(overrideFWcheck) printf("Gate-/firmware check disabled by override option\n");
+  //if(overrideFWcheck) printf("Gate-/firmware check disabled by override option\n");
   
   if(num_devices > 0) {
     //new
@@ -120,9 +129,9 @@ t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWc
     //Old
     ftm_shared_offs = FTM_SHARED_OFFSET_OLD;
     if(!overrideFWcheck) {
-      printf("ERROR: FTM is using old gate-/firmware. Sure this is the FTM you want ? Use option '-o' if you want to override\n");
+      printf("ERROR: FTM is using old gateware. Sure this is the FTM you want ? Use option '-o' if you want to override\n");
       goto error;
-    } else printf("WARNING: FTM is using old gateware. Be sure you know what you're doing\n");
+    }
     
     for(cpuIdx = 0; cpuIdx < p->cpuQty; cpuIdx++) {
       devName_RAM_post[0] = '0';
@@ -157,7 +166,7 @@ t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWc
       p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[1];
       p->pCores[cpuIdx].sharedOffs  = (uint32_t) tmpRead[2];
     
-    } else printf("Core #%u: Can't read core offsets - no valid firmware present.\n", cpuIdx);
+    } else printf("Core #%u: Can't read schedule data offsets - no valid firmware present.\n", cpuIdx);
   }
 
 
@@ -219,14 +228,14 @@ uint8_t isFwValid(struct  sdb_device* ram, const char* sVerExp, const char* sNam
    
   //check for magic word
   if(strncmp(cBuff, "UserLM32", 8)) {validity = 0;} 
-  if(!validity) printf("No firmware found!\n");
+  if(!validity) { printf("No firmware found!\n"); return 0; }
 
   //check project
   pos = strstr(cBuff, "Project     : ");
   if(pos != NULL) {
     pos += 14;
     if(strncmp(pos, sName, strlen(sName))) {validity = 0;} 
-  } else { printf("This is no ftm firmware, name does not match!\n");}
+  } else { printf("This is no ftm firmware, name does not match!\n"); return 0;}
   
   //check version
   pos = strstr(cBuff, "Version     : ");
@@ -243,10 +252,12 @@ uint8_t isFwValid(struct  sdb_device* ram, const char* sVerExp, const char* sNam
   
   if(verExp > verFnd ) {
     validity = 0;
-    printf("WARNING:  Expected firmware version %u.%u.%u, but found only %u.%u.%u!\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);  
+    printf("ERROR: Expected firmware %u.%u.%u, but found only %u.%u.%u! If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
+    return 0;  
   }
   if(verExp < verFnd ) {
-    printf("WARNING:  Expected firmware version %u.%u.%u is lower than found version %u.%u.%u\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
+    printf("ERROR: Expected firmware %u.%u.%u is lower than found %u.%u.%u. If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
+    return 0;
   }
   
   //no fwid found. try legacy

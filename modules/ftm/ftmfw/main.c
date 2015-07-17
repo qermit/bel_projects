@@ -116,7 +116,7 @@ void main(void) {
    //for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
    atomic_on();
       
-   mprintf("#%02u: Core ready. Hi! \n", cpuId);
+   mprintf("#%02u: Rdy\n", cpuId);
    #if DEBUGLEVEL != 0
       mprintf("#%02u: Debuglevel %u. Don't expect timeley delivery with console outputs on!\n", cpuId, DEBUGLEVEL);
    #endif   
@@ -128,7 +128,7 @@ void main(void) {
    #endif
     
    atomic_off();
-   mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
+   //mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
    //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
    /*
    t_time now, later;
