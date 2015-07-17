@@ -299,7 +299,7 @@ begin
       gpio_oen_o(2 downto 0) => s_lemo_oen(2 downto 0),
       -- gpio out
       gpio_o(1 downto 0)     => lvds_out_o(1 downto 0),
-      gpio_o(2)              => lemo_o,
+      --gpio_o(2)              => lemo_o,
       gpio_o(5 downto 3)     => s_lemo_addOn(2 downto 0),
       gpio_o(8 downto 6)     => s_lemo_addOn_io(2 downto 0),
       gpio_o(9)              => hdmi_o,
@@ -452,5 +452,8 @@ begin
   -- OUTPUT LEMOs
   -- Orange => Activity LEDs
   s_leds_lemo_addOn(2 downto 0) <= not(s_lemo_addOn(2 downto 0));
+  
+  -- PPS
+  lemo_o <= s_led_pps;
   
 end rtl;

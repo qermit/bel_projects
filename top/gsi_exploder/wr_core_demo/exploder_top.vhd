@@ -335,7 +335,8 @@ begin
       gpio_o(15 downto 12)   => de_o  (4 downto 1),
       gpio_o(11 downto  8)   => ecl_o (4 downto 1),
       gpio_o( 7 downto  4)   => lvds_o(4 downto 1),
-      gpio_o( 3 downto  0)   => lemo_o(4 downto 1),
+      --gpio_o( 3 downto  0)   => lemo_o(4 downto 1),
+      gpio_o( 3 downto  1)   => lemo_o(4 downto 2),
       gpio_i(15 downto 12)   => rc_i  (16 downto 13),
       gpio_i(11 downto  8)   => rc_i  (8 downto 5),
       --gpio_i( 7 downto  4)   => any_i (4 downto 1),
@@ -459,5 +460,8 @@ begin
   
   -- RES is unused for now
   res_io(8 downto 1) <= (others => 'Z');
+  
+  -- Output PPS
+  lemo_o(1) <= led_pps;
   
 end rtl;
