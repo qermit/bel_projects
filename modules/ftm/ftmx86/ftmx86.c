@@ -7,7 +7,6 @@
 #include "access.h"
 
 extern uint8_t cpuIdx;
-extern bool bigEndian = true;
 extern t_ftmAccess* pAccess;
 uint16_t getIdFID(uint64_t id)     {return ((uint16_t)(id >> ID_FID_POS))     & (ID_MSK_B16 >> (16 - ID_FID_LEN));}
 uint16_t getIdGID(uint64_t id)     {return ((uint16_t)(id >> ID_GID_POS))     & (ID_MSK_B16 >> (16 - ID_GID_LEN));}
@@ -58,9 +57,7 @@ const t_ftmChain Idle = { .tStart         = 0,
 static uint8_t* uint32ToBytes(uint8_t* pBuf, uint32_t val)
 {
    uint8_t i;
-   if(bigEndian)  
    for(i=0;i<FTM_WORD_SIZE;   i++) pBuf[i]  = val >> (8*i) & 0xff;
-   else           for(i=0;i<FTM_WORD_SIZE;   i++) pBuf[i]  = val >> (8*(FTM_WORD_SIZE - 1 -i)) & 0xff;
    
    return pBuf+4;
 }
@@ -98,7 +95,6 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    uint8_t*    pBuf;
    t_ftmChain* pChain;
    uint32_t    pBufPlans[FTM_PLAN_MAX];
-   if(bigEndian) printf("BIGENDIAN FOUND!\n");
    pBuf = pBufStart + FTM_PAGEMETA;
    //leave space for page meta info, write all plans to pBuffer
    for(planIdx = 0; planIdx < pPage->planQty; planIdx++)
@@ -126,12 +122,10 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    if( pPage->idxStart == 0xdeadbeef) pPage->pStart = ftm_shared_offs + FTM_IDLE_OFFSET;
    else pPage->pStart  = pBufPlans[pPage->idxStart];
    
-   printf("BP: %08x, Start: %08x\n", pPage->pBp, pPage->pStart);
+   //printf("BP: %08x, Start: %08x\n", pPage->pBp, pPage->pStart);
    
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_BP],         pPage->pBp);
    uint32ToBytes(&pBufStart[FTM_PAGE_PTR_START],      pPage->pStart);
-   //printf ("Shared mem will be at %08x", pPage->ppAccess->sharedAdr);
-   //uint32ToBytes(&pBufStart[FTM_PAGE_PTR_pAccess->sharedAdr],  pPage->ppAccess->sharedAdr);
    
    return pBuf;   
 }
@@ -182,7 +176,7 @@ static uint8_t* serChain(t_ftmChain* pChain, uint32_t pPlanStart, uint8_t* pBufS
  
    pBuf += FTM_CHAIN_END_;
    for(msgIdx = 0; msgIdx < pChain->msgQty; msgIdx++) pBuf = serMsg(&pMsg[msgIdx], pBuf);   
-   printf("Chain placed @ 0x%08x\n", pBuf-pBufStart);
+   //printf("Chain placed @ 0x%08x\n", pBuf-pBufStart);
    return pBuf;   
 
 }
@@ -226,7 +220,7 @@ t_ftmPage* deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs
       pPage->plans[j].pStart = pChain;
       //deserialise (pBufStart +  offset) to pChain and fix pChains next ptr
       pBuf = deserChain(pChain, pNext, pBufPlans[j], pBufStart, embeddedOffs);
-      printf("PChain %p Start %p offs %08x\n", pChain, pBufStart, embeddedOffs);
+      //printf("PChain %p Start %p offs %08x\n", pChain, pBufStart, embeddedOffs);
       //printf("Plan %u Chain 0 @ %08x\n", j, pBufStart-pBuf);
       //deserialise chains until we reached the end or we reached max
       
