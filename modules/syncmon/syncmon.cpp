@@ -153,9 +153,9 @@ int main (int argc, const char** argv)
   {
     /* Get device name for logging and handle for Etherbone */
     iSysCallRes = fscanf(fp, "%s %s %s\n", a_cDeviceName, a_cDeviceHandle, a_cReferenceIO);
-    if (iSysCallRes)
+    if (iSysCallRes != 3) /* Expecting 3 arguments */
     {
-      fprintf(stdout, "%s: System call error!\n", argv[0]);
+      fprintf(stdout, "%s: Can't open configuration file (code: %d)! \n", argv[0], iSysCallRes);
       exit(1);
     }
     /* Get reference IO */
@@ -202,6 +202,9 @@ int main (int argc, const char** argv)
   ioconf = devs[0].sdb_component.addr_first + 4;
   device.write(ioconf, EB_DATA32, LEMO_OE_SETUP);
   
+  /* Reset variable */
+  iSysCallRes = 0;
+  
   /* Check TLU */
   while (true)
   {
@@ -209,7 +212,7 @@ int main (int argc, const char** argv)
     /* Check for system call error */
     if (iSysCallRes)
     { 
-      fprintf(stdout, "%s: System call error!\n", argv[0]);
+      fprintf(stdout, "%s: System call error (code: %d)!\n", argv[0], iSysCallRes);
       exit(1);
     }
     
