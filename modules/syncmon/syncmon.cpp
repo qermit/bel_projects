@@ -10,11 +10,8 @@
  * @bug No know bugs.
  * 
  * TBD:
- * - Check int/uint conversation
- * - Check failure cases (ts0 lost, ...)
  * - LONG LONG runtime? Integer overflow(s)?
  * - Fix "format ‘%lld’ expects argument" warnings for raspberry pi and std linux/x84_64
- * - Std. Deviation
  *
  * *****************************************************************************
  * This library is free software; you can redistribute it and/or
@@ -100,7 +97,7 @@ int main (int argc, const char** argv)
 #elif TP == TARGET_PLATFORM_ARM
   #warning "Compiling for arm..."
 #else
-  #error "Please specify ARCH=XXX (x86, ARM, ...)"
+  #error "Please specify ARCH=XXX (x86, arm, ...)"
 #endif
 
   /* Etherbone */
@@ -155,7 +152,12 @@ int main (int argc, const char** argv)
   if (fp != NULL)
   {
     /* Get device name for logging and handle for Etherbone */
-    fscanf(fp, "%s %s %s\n", a_cDeviceName, a_cDeviceHandle, a_cReferenceIO);
+    iSysCallRes = fscanf(fp, "%s %s %s\n", a_cDeviceName, a_cDeviceHandle, a_cReferenceIO);
+    if (iSysCallRes)
+    {
+      fprintf(stdout, "%s: System call error!\n", argv[0]);
+      exit(1);
+    }
     /* Get reference IO */
     uRefIO = atoi(a_cReferenceIO);
     fclose(fp);
@@ -163,7 +165,7 @@ int main (int argc, const char** argv)
   else
   {
     fprintf(stderr, "%s: failed to open file %s\n", argv[0], argv[1]);
-    return 1;
+    exit(1);
   }
   
   /* Try to open a (etherbone-) socket */
@@ -171,7 +173,7 @@ int main (int argc, const char** argv)
   if ((status = device.open(socket, a_cDeviceHandle)) != EB_OK) 
   {
     fprintf(stderr, "%s: failed to open %s: (status %s)\n", argv[0], argv[1], eb_status(status));
-    return 1;
+    exit(1);
   }
   else
   {
@@ -225,12 +227,26 @@ int main (int argc, const char** argv)
           fp = fopen(a_cFileNameBuffer, "w");
           /* Print result to file */
           fprintf(fp, "Results for IO%d:\n", uIterator);
+#if TP == TARGET_PLATFORM_X86
+          fprintf(fp, "  Events:               %lu\n", a_sIOMeasurement[uIterator].uTotalEvents);
+          fprintf(fp, "  Latest Timestamp:     %lu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
+#elif TP == TARGET_PLATFORM_ARM
           fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
-          
+#endif
           /* Only for non ref devices */
           if (uIterator != uRefIO)
           {
+#if TP == TARGET_PLATFORM_X86
+            fprintf(fp, "  Latest Printed Event: %lu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
+            fprintf(fp, "  Late Difference:      %lu\n", a_sIOMeasurement[uIterator].iLastDiff);
+            fprintf(fp, "  Max. Past:            %ldns\n", a_sIOMeasurement[uIterator].iMaxPast);
+            fprintf(fp, "  Min. Past:            %ldns\n", a_sIOMeasurement[uIterator].iMinPast);
+            fprintf(fp, "  Max. Future:          %ldns\n", a_sIOMeasurement[uIterator].iMaxFuture);
+            fprintf(fp, "  Min. Future:          %ldns\n", a_sIOMeasurement[uIterator].iMinFuture);
+            /* Calculate statistics */
+            fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+#elif TP == TARGET_PLATFORM_ARM
             fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
             fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
             fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
@@ -239,6 +255,7 @@ int main (int argc, const char** argv)
             fprintf(fp, "  Min. Future:          %lldns\n", a_sIOMeasurement[uIterator].iMinFuture);
             /* Calculate statistics */
             fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
+#endif
           }
           /* Close file */
           fclose(fp);
@@ -250,7 +267,11 @@ int main (int argc, const char** argv)
             snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/%s_syncmon_dev_plot_io%d.log", a_cDeviceName, uIterator);
             fp = fopen(a_cFileNameBuffer, "a+");
             /* Print result to file */
+#if TP == TARGET_PLATFORM_X86
+            fprintf(fp, "%lu %lu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
+#elif TP == TARGET_PLATFORM_ARM
             fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
+#endif
             /* Close file */
             fclose(fp);
             /* Increase printed counter */
@@ -362,11 +383,25 @@ int main (int argc, const char** argv)
       uEventsTemp = a_sIOMeasurement[uQueueIterator].uTotalEvents;
       if (uQueueIterator == uRefIO)
       {
+#if TP == TARGET_PLATFORM_X86
+        fprintf(stdout, "%s: ts%02d: %019lu  %08lu\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+#elif TP == TARGET_PLATFORM_ARM
         fprintf(stdout, "%s: ts%02d: %019llu  %08d\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+#endif
+
       }
       if (uEventsTemp && uQueueIterator > uRefIO)
       {
         /* Print old status */
+#if TP == TARGET_PLATFORM_X86
+        fprintf(stdout, "%s: ts%02d: %019lu  %08lu", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+        fprintf(stdout, "  %+04ldns       %+04ldns     %+04ldns     %+04ldns   %+04ldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMaxFuture,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMinFuture,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMaxPast,
+                                                                                                         a_sIOMeasurement[uQueueIterator].iMinPast,
+                                                                                                         (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
+#elif TP == TARGET_PLATFORM_ARM
         fprintf(stdout, "%s: ts%02d: %019llu  %08d", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
         fprintf(stdout, "  %+04lldns       %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxFuture,
@@ -374,6 +409,7 @@ int main (int argc, const char** argv)
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxPast,
                                                                                                          a_sIOMeasurement[uQueueIterator].iMinPast,
                                                                                                          (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
+#endif
       }
     }
   }
