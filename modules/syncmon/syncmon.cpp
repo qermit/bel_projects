@@ -389,7 +389,7 @@ int main (int argc, const char** argv)
 #if TP == TARGET_PLATFORM_X86
         fprintf(stdout, "%s: ts%02d: %019lu  %08lu\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
 #elif TP == TARGET_PLATFORM_ARM
-        fprintf(stdout, "%s: ts%02d: %019llu  %08d\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+        fprintf(stdout, "%s: ts%02d: %019llu  %08llu\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
 #endif
 
       }
@@ -405,7 +405,7 @@ int main (int argc, const char** argv)
                                                                                                          a_sIOMeasurement[uQueueIterator].iMinPast,
                                                                                                          (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
 #elif TP == TARGET_PLATFORM_ARM
-        fprintf(stdout, "%s: ts%02d: %019llu  %08d", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
+        fprintf(stdout, "%s: ts%02d: %019llu  %08llu", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
         fprintf(stdout, "  %+04lldns       %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxFuture,
                                                                                                          a_sIOMeasurement[uQueueIterator].iMinFuture,
