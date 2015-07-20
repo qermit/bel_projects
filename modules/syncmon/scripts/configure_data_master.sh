@@ -11,6 +11,7 @@ schedule_keyword="___STARTTIME___"
 start_offset=0x0000000030000000
 start_time=0x0
 period=125000000
+wait_time=0
 
 # Copy old schedule
 cp "$schedule" "$schedule_next"
@@ -57,8 +58,13 @@ cd ..
 
 # Wait until Data Master should start
 while [ $start_time -ge  $time ]; do
+  wait_time="$(($start_time-$time))"
+  printf "\rData Master will start in %dns...                         " "$wait_time"
   time=`eca-ctl $data_master -n | grep time | cut -d: -f2`
   time="$(($time+0))" # To dec
-  printf "Current time at Data Master: 0x%x (%d)\n" $time $time
-  printf "Start time at Data Master:   0x%x (%d)\n" $start_time $start_time
+  #printf "Current time at Data Master: 0x%x (%d)\n" $time $time
+  #printf "Start time at Data Master:   0x%x (%d)\n" $start_time $start_time
 done
+
+printf "\rData Master will start in 0ns...                         \n" 
+echo "Data Master started!"
