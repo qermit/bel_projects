@@ -56,6 +56,11 @@ using namespace GSI_TLU;
 #define TLU_ID                    0x4d78adfdU
 #define TLU_VENDOR                0x651
 #define DEBUG_MODE                0
+#define TARGET_PLATFORM_X86       0
+#define TARGET_PLATFORM_ARM       1
+#ifndef TP
+  #define TP                      TARGET_PLATFORM_X86
+#endif
 
 /* Structures */
 /* ==================================================================================================== */
@@ -88,6 +93,15 @@ void vSignalHandler(int sig)
 /* ==================================================================================================== */
 int main (int argc, const char** argv)
 {
+  
+  /* Compiler check */
+#if TP == TARGET_PLATFORM_X86
+  #warning "Compiling for x86..."
+#elif TP == TARGET_PLATFORM_ARM
+  #warning "Compiling for arm..."
+#else
+  #error "Please specify ARCH=XXX (x86, ARM, ...)"
+#endif
 
   /* Etherbone */
   Socket socket;
