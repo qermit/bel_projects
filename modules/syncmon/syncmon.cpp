@@ -53,10 +53,17 @@ using namespace GSI_TLU;
 #define TLU_ID                    0x4d78adfdU
 #define TLU_VENDOR                0x651
 #define DEBUG_MODE                0
-#define TARGET_PLATFORM_X86       0
-#define TARGET_PLATFORM_ARM       1
-#ifndef TP
-  #define TP                      TARGET_PLATFORM_X86
+#define TARGET_PLATFORM_UNKNOWN   0
+#define TARGET_PLATFORM_32        1
+#define TARGET_PLATFORM_64        2
+#ifdef ARCH_32_BIT
+  #define TP                      TARGET_PLATFORM_32
+#else
+  #ifdef ARCH_64_BIT
+    #define TP                    TARGET_PLATFORM_64
+  #else
+    #define TP                    TARGET_PLATFORM_UNKNOWN
+  #endif
 #endif
 
 /* Structures */
@@ -92,12 +99,12 @@ int main (int argc, const char** argv)
 {
   
   /* Compiler check */
-#if TP == TARGET_PLATFORM_X86
-  #warning "Compiling for x86..."
-#elif TP == TARGET_PLATFORM_ARM
-  #warning "Compiling for arm..."
+#if TP == TARGET_PLATFORM_32
+  #warning "Compiling for 32-bit target..."
+#elif TP == TARGET_PLATFORM_64
+  #warning "Compiling for 64-bit target..."
 #else
-  #error "Please specify ARCH=XXX (x86, arm, ...)"
+  #error "Please define TP (32/64-bit)!"
 #endif
 
   /* Etherbone */
@@ -230,17 +237,17 @@ int main (int argc, const char** argv)
           fp = fopen(a_cFileNameBuffer, "w");
           /* Print result to file */
           fprintf(fp, "Results for IO%d:\n", uIterator);
-#if TP == TARGET_PLATFORM_X86
+#if TP == TARGET_PLATFORM_64
           fprintf(fp, "  Events:               %lu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %lu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
-#elif TP == TARGET_PLATFORM_ARM
+#elif TP == TARGET_PLATFORM_32
           fprintf(fp, "  Events:               %llu\n", a_sIOMeasurement[uIterator].uTotalEvents);
           fprintf(fp, "  Latest Timestamp:     %llu\n", a_sIOMeasurement[uIterator].uLastTimestamp);
 #endif
           /* Only for non ref devices */
           if (uIterator != uRefIO)
           {
-#if TP == TARGET_PLATFORM_X86
+#if TP == TARGET_PLATFORM_64
             fprintf(fp, "  Latest Printed Event: %lu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
             fprintf(fp, "  Late Difference:      %lu\n", a_sIOMeasurement[uIterator].iLastDiff);
             fprintf(fp, "  Max. Past:            %ldns\n", a_sIOMeasurement[uIterator].iMaxPast);
@@ -249,7 +256,7 @@ int main (int argc, const char** argv)
             fprintf(fp, "  Min. Future:          %ldns\n", a_sIOMeasurement[uIterator].iMinFuture);
             /* Calculate statistics */
             fprintf(fp, "  Average:              %fns\n\n", (double)a_sIOMeasurement[uIterator].iDiffSum/(double)a_sIOMeasurement[uIterator].uTotalEvents);
-#elif TP == TARGET_PLATFORM_ARM
+#elif TP == TARGET_PLATFORM_32
             fprintf(fp, "  Latest Printed Event: %llu\n", a_sIOMeasurement[uIterator].uLatestPrintedEvent);
             fprintf(fp, "  Late Difference:      %llu\n", a_sIOMeasurement[uIterator].iLastDiff);
             fprintf(fp, "  Max. Past:            %lldns\n", a_sIOMeasurement[uIterator].iMaxPast);
@@ -270,9 +277,9 @@ int main (int argc, const char** argv)
             snprintf(a_cFileNameBuffer, sizeof(a_cFileNameBuffer), "log/%s_syncmon_dev_plot_io%d.log", a_cDeviceName, uIterator);
             fp = fopen(a_cFileNameBuffer, "a+");
             /* Print result to file */
-#if TP == TARGET_PLATFORM_X86
+#if TP == TARGET_PLATFORM_64
             fprintf(fp, "%lu %lu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
-#elif TP == TARGET_PLATFORM_ARM
+#elif TP == TARGET_PLATFORM_32
             fprintf(fp, "%llu %llu\n", a_sIOMeasurement[uIterator].uTotalEvents, a_sIOMeasurement[uIterator].uLastTimestamp);
 #endif
             /* Close file */
@@ -386,9 +393,9 @@ int main (int argc, const char** argv)
       uEventsTemp = a_sIOMeasurement[uQueueIterator].uTotalEvents;
       if (uQueueIterator == uRefIO)
       {
-#if TP == TARGET_PLATFORM_X86
+#if TP == TARGET_PLATFORM_64
         fprintf(stdout, "%s: ts%02d: %019lu  %08lu\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
-#elif TP == TARGET_PLATFORM_ARM
+#elif TP == TARGET_PLATFORM_32
         fprintf(stdout, "%s: ts%02d: %019llu  %08llu\n", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
 #endif
 
@@ -396,7 +403,7 @@ int main (int argc, const char** argv)
       if (uEventsTemp && uQueueIterator > uRefIO)
       {
         /* Print old status */
-#if TP == TARGET_PLATFORM_X86
+#if TP == TARGET_PLATFORM_64
         fprintf(stdout, "%s: ts%02d: %019lu  %08lu", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
         fprintf(stdout, "  %+04ldns       %+04ldns     %+04ldns     %+04ldns   %+04ldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxFuture,
@@ -404,7 +411,7 @@ int main (int argc, const char** argv)
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxPast,
                                                                                                          a_sIOMeasurement[uQueueIterator].iMinPast,
                                                                                                          (double)a_sIOMeasurement[uQueueIterator].iDiffSum/(double)a_sIOMeasurement[uQueueIterator].uTotalEvents);
-#elif TP == TARGET_PLATFORM_ARM
+#elif TP == TARGET_PLATFORM_32
         fprintf(stdout, "%s: ts%02d: %019llu  %08llu", argv[0], uQueueIterator, a_sIOMeasurement[uQueueIterator].uLastTimestamp, uEventsTemp);
         fprintf(stdout, "  %+04lldns       %+04lldns     %+04lldns     %+04lldns   %+04lldns   %+fns\n", a_sIOMeasurement[uQueueIterator].iLastDiff, 
                                                                                                          a_sIOMeasurement[uQueueIterator].iMaxFuture,

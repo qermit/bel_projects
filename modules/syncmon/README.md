@@ -15,6 +15,15 @@ Example files can be found at the cfg/ directory.
 
 The first entry has to be the measurement/reference node!
 
+Compiling
+---------
+
+To compile the syncmon application just use the makefile:
+
+<pre>
+  make all
+</pre>
+
 Console Output
 --------------
 
@@ -31,18 +40,18 @@ The output will look like this:
 The according signals will look like this:
 
 <pre>
-                      ___                   
-ts0 _________________|   |__________________
-          ___                               
-ts1 _____|   |______________________________
-                                ___         
-ts2 ___________________________|   |________
+                        ___                   
+  ts0 _________________|   |__________________
+            ___                               
+  ts1 _____|   |______________________________
+                                  ___         
+  ts2 ___________________________|   |________
 </pre>
 
 Example Usage
 -------------
 
-* Start test without Data Master:
+* Start test without Data Master (reference node will be a fake data mater):
   <pre>./start_fake_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start test with Data Master:
