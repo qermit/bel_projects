@@ -13,6 +13,7 @@
 
 #define FILENAME_LEN   256
 #define UINT64_STR_LEN 24
+#define DUMP_STR_LEN 65536
 
 const char* program;
 eb_device_t device;
@@ -20,7 +21,7 @@ eb_socket_t mySocket;
 t_ftmAccess ftmAccess;
 t_ftmAccess* pAccess = &ftmAccess;
 
-eb_data_t tmpRead[3];
+
 volatile uint32_t targetOffset, clusterOffset;
 uint8_t error, verbose, readonly;
 
@@ -39,7 +40,7 @@ static void ebPeripheryStatus()
   uint32_t cfg;
   uint64_t tmp;
    
-  ebRamRead(pAccess->ebmAdr + EBM_REG_STATUS, EBM_REG_LAST, &buff[EBM_REG_STATUS]);
+  ftmRamRead(pAccess->ebmAdr + EBM_REG_STATUS, EBM_REG_LAST, &buff[EBM_REG_STATUS]);
   printf ("EBM||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
   printf ("Status\t\t: 0x%08x\n",  bytesToUint32(&buff[EBM_REG_STATUS]));
   printf ("Src Mac\t\t: 0x%08x%04x\n", bytesToUint32(&buff[EBM_REG_SRC_MAC_HI]),  bytesToUint32(&buff[EBM_REG_SRC_MAC_LO]));
@@ -53,8 +54,8 @@ static void ebPeripheryStatus()
   printf ("Ops Max\t\t: %u\n", bytesToUint32(&buff[EBM_REG_OPS_MAX]));
   printf ("EB Opt\t\t: 0x%08x\n\n", bytesToUint32(&buff[EBM_REG_EB_OPT]));
 
-  ebRamRead(pAccess->prioQAdr + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
-  ebRamRead(pAccess->prioQAdr + r_FPQ.dstAdr, r_FPQ.ebmAdr - r_FPQ.dstAdr +4, &buff[r_FPQ.dstAdr]);
+  ftmRamRead(pAccess->prioQAdr + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
+  ftmRamRead(pAccess->prioQAdr + r_FPQ.dstAdr, r_FPQ.ebmAdr - r_FPQ.dstAdr +4, &buff[r_FPQ.dstAdr]);
   printf ("FPQ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
   cfg = bytesToUint32(&buff[r_FPQ.cfgGet]);
   printf("-----------------------------------------------------------------------------------\n");
@@ -181,7 +182,7 @@ int main(int argc, char** argv) {
    // cpu access related
    int cpuId = 0;
    uint8_t firstCpu, lastCpu, cpuIdx, overrideFWcheck;
-   uint32_t resetBits;
+   uint32_t targetCpus;
    
    overrideFWcheck = 0;
    error    = 0;
@@ -200,7 +201,7 @@ int main(int argc, char** argv) {
    uint8_t*    pBufWrite = &bufWrite[0];
    memset(pBufWrite, 0, BUF_SIZE);
    memset(pBufRead, 0, BUF_SIZE);
-   t_ftmPage*  pPage    = NULL;
+   
    t_ftmPage*  pNewPage = NULL;
    
    
@@ -293,7 +294,7 @@ int main(int argc, char** argv) {
 //*****************************************************************************************************************//
 
   //printf("Connecting to FTM\n");
-  openFtm(netaddress, pAccess, overrideFWcheck);
+  validCpus = ftmOpen(netaddress, pAccess, overrideFWcheck);
 
   //op for one CPU or all?
   if(cpuId < 0) { firstCpu   = 0; 
@@ -303,274 +304,107 @@ int main(int argc, char** argv) {
   }  
    
   if(cpuId < 0) {
-    resetBits = (1 << pAccess->cpuQty) -1;
+    targetCpus = (1 << pAccess->cpuQty) -1;
   } else {
-    resetBits = 1 << firstCpu;
+    targetCpus = 1 << firstCpu;
   }
-   
+  
+  validTargetCpus = validCpus & targetCpus;
+
+
+// DM prioQ Operations   
+  if(!strcasecmp(command, "duetime")) {
+    return ftmSetDuetime(uint64val);
+  }
+ 
+  if(!strcasecmp(command, "trntime")) {
+    return ftmSetTrntime(uint64val);
+  }
+ 
+  if(!strcasecmp(command, "maxmsg")) {
+    return ftmSetMaxMsgs(uint64val);
+  }
+ 
+//DM CPU Operations
   if (!strcasecmp(command, "loadfw")) {
-      printf("Putting CPU(s) into Reset for FW load\n");
-      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
-      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
+    return ftmFwLoad(targetCpus, filename); // all selected, not just the ones with valid firmware !
+  }      
+        
+  /* -------------------------------------------------------------------- */
+  if (!strcasecmp(command, "status")) {
+    char* bufString = (char*)malloc(DUMP_STR_LEN, 1); 
+    ftmGetStatus(validTargetCpus, bufState);
+    printf("%s", ftmShowStatus(bufState, bufString, verbose));
+    free(pBufDump);
+  }
+
+  /* -------------------------------------------------------------------- */
+  else if (!strcasecmp(command, "run")) {
+    ftmCommand(validTargetCpus, CMD_START);
+  }
+
+  else if (!strcasecmp(command, "stop")) {
+     ftmCommand(validTargetCpus, CMD_STOP_REQ);
+  }
+
+  else if (!strcasecmp(command, "idle")) {
+   ftmCommand(validTargetCpus, CMD_IDLE);
+  }
+  else if (!strcasecmp(command, "fstop")) {
+   ftmCommand(validTargetCpus, CMD_STOP_NOW) 
+  } 
+
+  else if (!strcasecmp(command, "swap")) {
+   ftmCommand(validTargetCpus, CMD_COMMIT_PAGE);
+  } 
+
+  else if (!strcasecmp(command, "condump")) {
+   ftmCommand(validTargetCpus, CMD_SHOW_ACT);
+  } 
   
-      FILE *file;
-      uint8_t* buffer;
-      unsigned long fileLen;
+  else if (!strcasecmp(command, "clear")) {
+   ftmClear(validTargetCpus, BUF_SIZE);
+  }
 
-      //Open file
-      file = fopen(filename, "rb");
-      if (!file)
-      {
-	      fprintf(stderr, "Unable to open file %s", filename);
-	      return -1;
-      }
-
-      //Get file length
-      fseek(file, 0, SEEK_END);
-      fileLen=ftell(file);
-      fseek(file, 0, SEEK_SET);
-
-      //Allocate memory
-      buffer=(uint8_t *)malloc(fileLen+1);
-      if (!buffer)
-      {
-	      fprintf(stderr, "Memory error!");
-                                    fclose(file);
-	      return -2;
-      }
-
-      //Read file contents into buffer
-      fileLen = fread(buffer, 1, fileLen, file);
-      fclose(file);
-      for(cpuIdx = firstCpu; cpuIdx <= lastCpu; cpuIdx++)
-      { 
-        //Load FW
-        printf("Loading %s to CPU %u @ 0x%08x\n", filename, cpuIdx, pAccess->pCores[cpuIdx].ramAdr);  
-        ebRamWrite(buffer, pAccess->pCores[cpuIdx].ramAdr, fileLen, LITTLE_ENDIAN);
-      }
-      free(buffer);
-      
-      
-      printf("Releasing CPU(s) from Reset\n\n");
-      ebstatus = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)resetBits, 0, eb_block);
-      if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
-      
-      printf("Done.\n");
-      return 0;
-    } 
-   
-   if(!strcasecmp(command, "duetime")) {
-         if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
-         eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tDueHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(uint64val>>32)));
-         eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tDueLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val));
-         if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
-         return 0;
-   }
-   
-   
-   if(!strcasecmp(command, "trntime")) 
-   {
-         if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
-         eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tTrnHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(uint64val>>32)));
-         eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tTrnLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val));
-         if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
-         return 0;
-   }
-   
-   if(!strcasecmp(command, "maxmsg")) 
-   {
-         ebstatus = eb_device_write(device, (eb_address_t)(pAccess->prioQAdr + r_FPQ.msgMax), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val), 0, eb_block);
-         return 0;
-   }
-   
-   if (!strcasecmp(command, "status")) { printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM); 
-     if (verbose) {
-        ebPeripheryStatus();
-     }
-   }
-   
-   //Cycle through selected CPUs
-   
-   for(cpuIdx = firstCpu; cpuIdx <= lastCpu; cpuIdx++)
-   {
-      if(pAccess->pCores[cpuIdx].hasValidFW){
-        
-        
-        /* -------------------------------------------------------------------- */
-        if (!strcasecmp(command, "status")) {
-           status(cpuIdx);
-        }
-
-        /* -------------------------------------------------------------------- */
-        else if (!strcasecmp(command, "run")) {
-         
-           if (verbose) {
-              printf("Starting FTM Core %u\n", cpuIdx);
-           }
-           ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_START, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-
-        }
-       
-        else if (!strcasecmp(command, "stop")) {
-           if (verbose) {
-              printf("Requesting FTM Core %u to stop\n", cpuIdx);
-           }
-           ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_REQ, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-        }
-
-        else if (!strcasecmp(command, "idle")) {
-         
-           if (verbose) {
-              printf("Setting BP of FTM COre %u to idle\n", cpuIdx);
-           }
-           ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_IDLE, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-
-        }
-
-        else if (!strcasecmp(command, "fstop")) {
-         
-           if (verbose) {
-              printf("Forcing FTM Core %u to stop\n", cpuIdx);
-           }
-           ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_STOP_NOW, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");
-        } 
-
-        else if (!strcasecmp(command, "reset")) {
-           if (verbose) {
-              printf("Resetting FTM Core %u\n", cpuIdx);
-           }
-           ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_RST, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
-        }
-       
-        else if (!strcasecmp(command, "preptime")) {
-           if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
-           eb_cycle_write(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +0), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(uint64val>>32));
-           eb_cycle_write(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)uint64val);
-           if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  die(ebstatus, "failed to close write cycle");
-      }
-       
-       else if (!strcasecmp(command, "setbp")) {
-         int planIdx, planQty;
-         eb_cycle_t cycle;
-         uint32_t bp;
-         
-        if(!strcasecmp(bpstr, "idle")) planIdx = -1;
-        else {planIdx = strtol(bpstr, 0, 10);}   
-        
-        //user gave us a planIdx. load corresponding ptr
-        if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(ebstatus, "failed to create cycle"); 
-        eb_cycle_read(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + pAccess->pCores[cpuIdx].actOffs + FTM_PAGE_PLANQTY_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
-        //if the user wanted to go to idle, read idle ptr from interface, else read plan ptr
-        if(planIdx == -1)
-        {eb_cycle_read(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_IDLE_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
-        else 
-        {eb_cycle_read(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + pAccess->pCores[cpuIdx].actOffs + FTM_PAGE_PLANS_OFFSET + 4*planIdx), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
-        if((ebstatus = eb_cycle_close(cycle)) != EB_OK) die(ebstatus, "failed to close read cycle"); 
-    
-        planQty  = (uint32_t)tmpRead[0];
-        bp       = (uint32_t)tmpRead[1];
-        // Check and write to BP
-        if(bp != FTM_NULL && planIdx < planQty) 
-        {
-           printf("Writing plan %d @ 0x%08x to BP\n", planIdx, bp);
-           ebstatus = eb_device_write(device, (uint32_t)pAccess->pCores[cpuIdx].ramAdr + pAccess->pCores[cpuIdx].actOffs + FTM_PAGE_BP_OFFSET, EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)bp, 0, eb_block);
-           if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle");  
-        } else
-        { 
-           if (planIdx >= planQty) printf ("Sorry, but the plan index is neither idle nor 0 <= %d (planIdx) <  %u (planQty)\n", planIdx, planQty);
-           else printf ("Found a NULL ptr at plan idx %d, something is wrong\n", planIdx);
-        }
-         
-       }
-          
-       else if (!strcasecmp(command, "swap")) {
-         
-         if (verbose) {
-           printf("Swapping Active/Inactive page on CPU %u\n", cpuIdx);
-         }
-         ebstatus = eb_device_write(device, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET), EB_BIG_ENDIAN | EB_DATA32, 
-                                      (eb_data_t)CMD_COMMIT_PAGE, 0, eb_block);
-        if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
-
-       } 
-       
-       else if (!strcasecmp(command, "condump")) {
-         
-         if (verbose) {
-           printf("Commanding FTM CPU %u to show FTM Data on console\n", cpuIdx);
-         }
-         ebstatus = eb_device_write(device, pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET, EB_BIG_ENDIAN | EB_DATA32, CMD_SHOW_ACT, 0, eb_block) ;
-         if (ebstatus != EB_OK) die(ebstatus, "failed to create cycle"); 
-         sleep(1); 
-       } 
-       
-       else if (!strcasecmp(command, "clear")) {
-         
-         if (verbose) {
-           printf("Clearing all pages on FTM CPU %u \n", cpuIdx);
-         }
-         ebRamClear(pAccess->pCores[cpuIdx].ramAdr + pAccess->pCores[cpuIdx].inaOffs, BUF_SIZE);
-         ebRamClear(pAccess->pCores[cpuIdx].ramAdr + pAccess->pCores[cpuIdx].actOffs, BUF_SIZE);
-         sleep(1); 
-       } 
-       
-       else if ((!strcasecmp(command, "put")) || (!strcasecmp(command, "get")) || (!strcasecmp(command, "dump"))) {
-         
-         targetOffset = pAccess->pCores[cpuIdx].inaOffs;
-         
-         if(!strcasecmp(command, "put")) {
-            if(!readonly) {
-              printf("Parsing %s ...", filename);
-              pPage = parseXmlFile(filename);
-              printf("done.\n");
-              if(verbose) showFtmPage(pPage);
-              serPage (pPage, pBufWrite, targetOffset, cpuIdx);
-              ebRamWrite(pBufWrite, pAccess->pCores[cpuIdx].ramAdr + targetOffset, BUF_SIZE, BIG_ENDIAN);
-              printf("Writing %u bytes FTM Data to 0x%08x...", BUF_SIZE, pAccess->pCores[cpuIdx].ramAdr + targetOffset);
-              printf("done.\n");
-           } else fprintf(stderr, "No xml file specified\n");
-           
-        }
-        
-        if(!strcasecmp(command, "dump")) targetOffset = pAccess->pCores[cpuIdx].actOffs;
-        ebRamRead(pAccess->pCores[cpuIdx].ramAdr + targetOffset, BUF_SIZE, pBufRead);
-        printf("Reading %u bytes FTM Data from 0x%08x...", BUF_SIZE, pAccess->pCores[cpuIdx].ramAdr + targetOffset);
-        printf("done.\n");
-        
-        //verify
-        if(!readonly) {
-           uint32_t i;
-           for(i = 0; i<BUF_SIZE; i++) {
-              if(!(pBufRead[i] == pBufWrite[i])) { 
-                 fprintf(stderr, "!ERROR! Verify of written ftmpage failed at offset 0x%08x\n", pAccess->pCores[cpuIdx].ramAdr + targetOffset +( i & ~0x3) );
-                 exit(1);
-              }
-           }
-           printf("Verify OK.\n\n");   
-        }
-        
-        pNewPage = deserPage(calloc(1, sizeof(t_ftmPage)), pBufRead, targetOffset);
-        if(pNewPage != NULL)
-        {  
-           printf("Deserialization successful.\n\n");
-           if(verbose || (!strcasecmp(command, "get")) || (!strcasecmp(command, "dump")) ) showFtmPage(pNewPage);
-        }   
-        else printf("Deserialization FAILED! Corrupt/No Data ?\n");
-      }   
-      else  printf("Unknown command: %s\n", command);  
-
-      
-     } 
-   }   
-   
-   
   
-   return 0;
+  else if (!strcasecmp(command, "reset")) {
+     ftmCpuRst(targetCpus);
+  }
+
+  else if (!strcasecmp(command, "preptime")) {
+     ftmSetPreptime(validTargetCpus, uint64val);
+  }
+  
+  else if(!strcasecmp(command, "put")) {
+    if(!readonly) {
+      return ftmPutFile(validTargetCpus, filename, pBufWrite, BUF_SIZE);   
+    } else { fprintf(stderr, "No xml file specified\n"); return -1;}
+  }
+  
+  else if(!strcasecmp(command, "dump")) {
+    char* pBufDump = (char*)malloc(DUMP_STR_LEN, 1); 
+    ftmDump(validTargetCpus, BUF_SIZE, ACTIVE, pBufDump, DUMP_STR_LEN);
+    printf("%s\n", pBufDump);
+    free(pBufDump);
+    return 0;
+  }   
+  
+  else if(!strcasecmp(command, "get")) {
+    char* pBufDump = (char*)malloc(DUMP_STR_LEN, 1); 
+    ftmDump(validTargetCpus, BUF_SIZE, INAACTIVE, pBufDump, DUMP_STR_LEN);
+    printf("%s\n", pBufDump);
+    free(pBufDump);
+    return 0; 
+  }
+
+  else if (!strcasecmp(command, "setbp")) {
+    return ftmSetBp(validTargetCpus, bpStr);
+  }
+     
+  else  printf("Unknown command: %s\n", command);  
+
+
+  return 0;
 }
 
 

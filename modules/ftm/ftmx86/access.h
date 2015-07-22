@@ -19,6 +19,9 @@
 #define PACKET_SIZE  500
 #define CMD_LM32_RST 0x2
 
+#define ACTIVE    1
+#define INACTIVE  2
+
 #define EBM_REG_CLEAR         0                         
 #define EBM_REG_FLUSH         (EBM_REG_CLEAR        +4)        
 #define EBM_REG_STATUS        (EBM_REG_FLUSH        +4)         
@@ -135,13 +138,32 @@ typedef struct {
 
 uint32_t ftm_shared_offs;
 
-t_ftmAccess* openFtm(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck);
-void closeFtm(void);
-const uint8_t*  ebRamRead(uint32_t address, uint32_t len, const uint8_t* buf);
-const uint8_t*  ebRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian);
-void ebRamClear(uint32_t address, uint32_t len);
-uint8_t isFwValid(struct sdb_device* ram, const char* sVerExp, const char* sName);
 int die(eb_status_t status, const char* what);
+
+uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
+const uint8_t*  ftmRamRead(uint32_t address, uint32_t len, const uint8_t* buf);
+const uint8_t*  ftmRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian);
+void ftmRamClear(uint32_t address, uint32_t len);
+void ftmClose(void);
+
+int ftmRst();
+int ftmCommand(uint64_t dstBitField, uint32_t command);
+
+int ftmPutFile(uint64_t dstBitField, const uint8_t* buf);
+int ftmPutString(uint64_t dstBitField, const char* sXml);
+
+char* ftmDump(uint64_t dstBitField, char* str);
+char* ftmGet(uint64_t dstBitField, char* str);
+
+int ftmCpuRst(uint32_t resetBits);
+int ftmThrRst(uint64_t dstBitField);
+
+int ftmFwLoad(uint32_t dstBitField, const char* filename);
+ftmState* ftmGetStatus(uint32_t cpuDstBitField, ftmState* state);
+
+uint8_t isFwValid(struct sdb_device* ram, const char* sVerExp, const char* sName);
+
+
 
 
 #endif
