@@ -127,6 +127,11 @@ def main(argv):
   ax2.legend(loc=2)
   
   # Show plot
+  #mng = plt.get_current_fig_manager()
+  #mng.frame.Maximize(True)
+  mng = plt.get_current_fig_manager()
+  mng.resize(*mng.window.maxsize())
+
   plt.show()
   
 if __name__ == "__main__":

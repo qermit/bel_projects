@@ -13,11 +13,14 @@ ref_name=""
 # $1 = IP of target device
 function configure_iodir()
 {
-  ./oe-config $ip
+  echo -n "Setting OE for device $name ($ip) ... "
+  ./oe-config $ip > /dev/null 2>&1
   if [ $? -ne 0 ]; then
-    echo "failed!"
-    exit 1
+    echo "failed! ($name ($ip) is not reachable!)"
+  else
+    echo "okay."
   fi
+  sleep 0.5
 }
 
 # Function configure_eca
