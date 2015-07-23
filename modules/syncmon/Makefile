@@ -21,7 +21,7 @@ LIBS        ?= -L $(EB) -L $(ECA) -L $(TLU) -Wl,-rpath,$(PREFIX)/lib -letherbone
 
 # Target(s)
 # --------------------------------------------------------------------------------------------------
-TARGETS := syncmon
+TARGETS := syncmon oe-config
 
 all:	$(TARGETS)
 

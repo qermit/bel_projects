@@ -4,9 +4,6 @@
 # Configuration
 input_file=$1
 eca_pattern=0xffff000000000000 # FID=MAX & GRPID=MAX
-iodir_lvds_oe_addr=0x10
-iodir_lemo_oe_addr=0x14
-io_oe_pattern=0xffffffff
 ref_io=0
 ref_io_found=0
 ref_name=""
@@ -16,18 +13,7 @@ ref_name=""
 # $1 = IP of target device
 function configure_iodir()
 {
-  echo -n "Configuring output enable at $1 ($2) ... "
-  eb-write $2 $iodir_lvds_oe_addr/4 $io_oe_pattern
-  if [ $? -ne 0 ]; then
-   echo "failed!"
-   exit 1
-  fi
-  eb-write $2 $iodir_lemo_oe_addr/4 $io_oe_pattern
-  if [ $? -ne 0 ]; then
-   echo "failed!"
-   exit 1
-  fi
-  echo "done."
+  ./oe-config $ip
 }
 
 # Function configure_eca

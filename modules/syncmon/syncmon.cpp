@@ -179,13 +179,13 @@ int main (int argc, const char** argv)
   socket.open();
   if ((status = device.open(socket, a_cDeviceHandle)) != EB_OK) 
   {
-    fprintf(stderr, "%s: failed to open %s: (status %s)\n", argv[0], argv[1], eb_status(status));
+    fprintf(stderr, "%s: failed to open %s: (status %s)\n", argv[0], a_cDeviceHandle, eb_status(status));
     exit(1);
   }
   else
   {
 #if DEBUG_MODE
-    fprintf(stdout, "%s: succeeded to open %s (status %s)\n", argv[0], argv[1], eb_status(status));
+    fprintf(stdout, "%s: succeeded to open %s (status %s)\n", argv[0], a_cDeviceHandle, eb_status(status));
 #endif
   }
   
