@@ -144,31 +144,42 @@ t_ftmAccess ftmAccess;
 eb_device_t device;
 eb_socket_t mySocket;
 
-
+uint64_t cpus2thrs(uint32_t cpus);
+uint32_t thrs2cpus(uint64_t thrs);
 
 uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
 void ftmClose(void);
 
+//per DM
 int ftmRst(void);
-int ftmCpuRst(uint32_t dstCpus);
-int ftmThrRst(uint64_t dstBitField);
-int ftmFwLoad(uint32_t dstCpus, const char* filename);
-
-int ftmCommand(uint32_t dstCpus, uint32_t command);
-int ftmPutString(uint32_t dstCpus, const char* sXml);
-int ftmPutFile(uint32_t dstCpus, const char* filename);
-int ftmClear(uint32_t dstCpus);
-uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
-
-int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
 int ftmSetDuetime(uint64_t tdue);
 int ftmSetTrntime(uint64_t ttrn);
 int ftmSetMaxMsgs(uint64_t maxmsg);
-int ftmSetBp(uint32_t dstCpus, const char* bpStr);
 
+//per CPU
+int ftmCpuRst(uint32_t dstCpus);
+int ftmFwLoad(uint32_t dstCpus, const char* filename);
+int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
 int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
 void ftmShowStatus(uint32_t* status, uint8_t verbose);
 
+//per thread
+int ftmThrRst(uint64_t dstBitField);
+//these need wrappers to per thread access for future version compatibility
+
+int v02FtmCommand(uint32_t dstCpus, uint32_t command);
+int v02FtmPutString(uint32_t dstCpus, const char* sXml);
+int v02FtmPutFile(uint32_t dstCpus, const char* filename);
+int v02FtmClear(uint32_t dstCpus);
+uint32_t v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
+int v02FtmSetBp(uint32_t dstCpus, const char* bpStr);
+
+int ftmCommand(uint64_t dstThr, uint32_t command);
+int ftmPutString(uint64_t dstThr, const char* sXml);
+int ftmPutFile(uint64_t dstThr, const char* filename);
+int ftmClear(uint64_t dstThr);
+uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
+int ftmSetBp(uint64_t dstThr, const char* bpStr);
 
 
 

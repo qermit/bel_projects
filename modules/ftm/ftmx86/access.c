@@ -496,7 +496,7 @@ int ftmThrRst(uint64_t dstBitField) {
 }
 
 
-int ftmCommand(uint32_t dstCpus, uint32_t command) {
+int v02FtmCommand(uint32_t dstCpus, uint32_t command) {
 
   eb_status_t status;
   eb_cycle_t cycle;
@@ -515,7 +515,7 @@ int ftmCommand(uint32_t dstCpus, uint32_t command) {
   return 0;
 }
 
-int ftmPutString(uint32_t dstCpus, const char* sXml) {
+int v02FtmPutString(uint32_t dstCpus, const char* sXml) {
   uint8_t    bufWrite[BUF_SIZE];
   t_ftmPage*  pPage;
   pPage = parseXmlString(sXml);
@@ -523,7 +523,7 @@ int ftmPutString(uint32_t dstCpus, const char* sXml) {
   return ftmPut(dstCpus, pPage, (uint8_t*)&bufWrite, BUF_SIZE);
 }
   
-int ftmPutFile(uint32_t dstCpus, const char* filename) {
+int v02FtmPutFile(uint32_t dstCpus, const char* filename) {
   uint8_t    bufWrite[BUF_SIZE];
   t_ftmPage*  pPage = parseXmlFile(filename);
   
@@ -533,7 +533,7 @@ int ftmPutFile(uint32_t dstCpus, const char* filename) {
 
 
 
-uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) {
+uint32_t v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) {
   uint32_t baseAddr, offs, cpuIdx;  
   t_ftmPage* pPage;
   uint8_t* bufRead = (uint8_t *)malloc(len);
@@ -559,7 +559,7 @@ uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf
   return (uint32_t)(bufStr - stringBuf); // return number of characters
 }
 
-int ftmClear(uint32_t dstCpus) {
+int v02FtmClear(uint32_t dstCpus) {
   uint32_t baseAddr, offs, cpuIdx; 
   
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
@@ -621,7 +621,7 @@ int ftmSetMaxMsgs(uint64_t maxmsg) {
   return 0;    
 }
 
-int ftmSetBp(uint32_t dstCpus, const char* bpStr) {
+int v02FtmSetBp(uint32_t dstCpus, const char* bpStr) {
 
   int planIdx, planQty;
   eb_cycle_t cycle;
@@ -803,4 +803,30 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
       SNTPRINTF(pSB ,"\u2514"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   }
   printf("%s", (const char*)strBuff);
-}  
+}
+
+uint64_t cpus2thrs(uint32_t cpus) {
+  uint32_t i;
+  uint64_t res=0;
+  
+  for(i=0;i<8;i++) res |= (((cpus >> i) & 1) << (i*8));
+  return res;
+}
+uint32_t thrs2cpus(uint64_t thrs) {
+  uint32_t i;
+  uint64_t res=0;
+  
+  for(i=0;i<64;i++) res |= (((thrs >> i) & 1) << (i/8));
+  return res;
+  
+}
+
+
+int ftmCommand(uint64_t dstThr, uint32_t command)     { return v02FtmCommand(thrs2cpus(dstThr),command);}
+int ftmPutString(uint64_t dstThr, const char* sXml)   { return v02FtmPutString(thrs2cpus(dstThr), sXml);}
+int ftmPutFile(uint64_t dstThr, const char* filename) { return v02FtmPutFile(thrs2cpus(dstThr), filename);}
+int ftmClear(uint64_t dstThr)                         { return v02FtmClear(thrs2cpus(dstThr));}
+uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) 
+                                                      { return v02FtmDump(thrs2cpus(srcThr), len, actIna, stringBuf, lenStringBuf);}
+int ftmSetBp(uint64_t dstThr, const char* bpStr)      { return v02FtmSetBp(thrs2cpus(dstThr), bpStr);}
+  

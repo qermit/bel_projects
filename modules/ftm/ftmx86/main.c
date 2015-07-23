@@ -62,6 +62,7 @@ int main(int argc, char** argv) {
    int cpuId = 0;
    uint8_t overrideFWcheck;
    uint32_t targetCpus, validCpus, validTargetCpus;
+   uint64_t validTargetThrs; //validTargetThrs is there for compatibility with future versions of access library
    
    overrideFWcheck = 0;
    error = 0;
@@ -166,8 +167,8 @@ int main(int argc, char** argv) {
   }  
   
   validTargetCpus = validCpus & targetCpus;
-
-
+  validTargetThrs = cpus2thrs(validTargetCpus);
+         
 // DM prioQ Operations   
   if(!strcasecmp(command, "duetime")) {
     return ftmSetDuetime(uint64val);
@@ -198,30 +199,30 @@ int main(int argc, char** argv) {
 
   /* -------------------------------------------------------------------- */
   else if (!strcasecmp(command, "run")) {
-    ftmCommand(validTargetCpus, CMD_START);
+    ftmCommand(validTargetThrs, CMD_START);
   }
 
   else if (!strcasecmp(command, "stop")) {
-     ftmCommand(validTargetCpus, CMD_STOP_REQ);
+     ftmCommand(validTargetThrs, CMD_STOP_REQ);
   }
 
   else if (!strcasecmp(command, "idle")) {
-   ftmCommand(validTargetCpus, CMD_IDLE);
+   ftmCommand(validTargetThrs, CMD_IDLE);
   }
   else if (!strcasecmp(command, "fstop")) {
-   ftmCommand(validTargetCpus, CMD_STOP_NOW); 
+   ftmCommand(validTargetThrs, CMD_STOP_NOW); 
   } 
 
   else if (!strcasecmp(command, "swap")) {
-   ftmCommand(validTargetCpus, CMD_COMMIT_PAGE);
+   ftmCommand(validTargetThrs, CMD_COMMIT_PAGE);
   } 
 
   else if (!strcasecmp(command, "condump")) {
-   ftmCommand(validTargetCpus, CMD_SHOW_ACT);
+   ftmCommand(validTargetThrs, CMD_SHOW_ACT);
   } 
   
   else if (!strcasecmp(command, "clear")) {
-   ftmClear(validTargetCpus);
+   ftmClear(validTargetThrs);
   }
   
   else if (!strcasecmp(command, "reset")) {
@@ -229,18 +230,18 @@ int main(int argc, char** argv) {
   }
 
   else if (!strcasecmp(command, "preptime")) {
-     ftmSetPreptime(validTargetCpus, uint64val);
+     ftmSetPreptime(validTargetThrs, uint64val);
   }
   
   else if(!strcasecmp(command, "put")) {
     if(!readonly) {
-      return ftmPutFile(validTargetCpus, filename);   
+      return ftmPutFile(validTargetThrs, filename);   
     } else { fprintf(stderr, "No xml file specified\n"); return -1;}
   }
   
   else if(!strcasecmp(command, "dump")) {
     char* pBufDump = (char*)malloc(DUMP_STR_LEN); 
-    ftmDump(validTargetCpus, BUF_SIZE, ACTIVE, pBufDump, DUMP_STR_LEN);
+    ftmDump(validTargetThrs, BUF_SIZE, ACTIVE, pBufDump, DUMP_STR_LEN);
     printf("%s\n", pBufDump);
     free(pBufDump);
     return 0;
@@ -248,14 +249,14 @@ int main(int argc, char** argv) {
   
   else if(!strcasecmp(command, "get")) {
     char* pBufDump = (char*)malloc(DUMP_STR_LEN); 
-    ftmDump(validTargetCpus, BUF_SIZE, INACTIVE, pBufDump, DUMP_STR_LEN);
+    ftmDump(validTargetThrs, BUF_SIZE, INACTIVE, pBufDump, DUMP_STR_LEN);
     printf("%s\n", pBufDump);
     free(pBufDump);
     return 0; 
   }
 
   else if (!strcasecmp(command, "setbp")) {
-    return ftmSetBp(validTargetCpus, bpstr);
+    return ftmSetBp(validTargetThrs, bpstr);
   }
      
   else  printf("Unknown command: %s\n", command);  
