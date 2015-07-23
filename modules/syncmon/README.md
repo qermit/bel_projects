@@ -63,8 +63,8 @@ Example Usage
 * Start Syncmon:
   <pre>./syncmon cfg/timing_devices_complete.cfg</pre>
 
-* Plot the results (optional): 
-  <pre>./plot-results.py cfg/timing_devices_complete.cfg</pre>
+* Plot the results (optional, refresh rate in seconds == 0 => plot only once): 
+  <pre>./plot-results.py cfg/timing_devices_complete.cfg (refresh rate in seconds)</pre>
 
 Node Monitoring
 ---------------

@@ -4,45 +4,11 @@ import matplotlib.pyplot as plt
 import subprocess
 import sys, getopt
 import os.path
+import time
 
-# Function main(...)
+# Function plot(...)
 # --------------------------------------------------------------------------------
-def main(argv):
-  # Helpers
-  global device_count # Total devices to plot
-  global device_names # List of all device names
-  global device_ios   # List of all device ios
-  global device_pps_total
-  global device_pps_ids
-  global device_time_stamps
-  global deivce_time_diffs
-  global value_refz;
-  
-  # Check if a file name was given as argument
-  if (len(sys.argv) == 2):
-    filename = sys.argv[1]
-  else:
-    print "Missing configuration file!"
-    help_buffer = "Try %s cfg/test.cfg ..." % sys.argv[0]
-    print help_buffer
-    exit(1)
-  
-  # Check if the file is readable
-  if os.path.isfile(filename) and os.access(filename, os.R_OK):
-    print "Configuration File exists and is readable ..."
-  else:
-    print "Either configuration file is missing or is not readable!"
-    exit(1)
-  
-  # Check how many entries the file has
-  device_count = 0
-  with open(filename) as f:
-    for i, l in enumerate(f):
-      pass
-  device_count = i + 1
-  help_buffer = "%d device(s) found in configuration file ..." % device_count
-  print help_buffer
-  
+def plot():
   # Read configuration file (get name and io number)
   data_ref = np.genfromtxt(filename,delimiter=' ', dtype=np.str)
   device_names = [row[0] for row in data_ref]
@@ -132,7 +98,57 @@ def main(argv):
   mng = plt.get_current_fig_manager()
   mng.resize(*mng.window.maxsize())
 
-  plt.show()
+# Function main(...)
+# --------------------------------------------------------------------------------
+def main(argv):
+  # Helpers
+  global device_count # Total devices to plot
+  global device_names # List of all device names
+  global device_ios   # List of all device ios
+  global device_pps_total
+  global device_pps_ids
+  global device_time_stamps
+  global deivce_time_diffs
+  global value_refz
+  global filename
+  global update_rate
+  
+  # Check if a file name was given as argument
+  if (len(sys.argv) == 3):
+    filename = sys.argv[1]
+    update_rate = int(sys.argv[2])
+  else:
+    print "Missing configuration file!"
+    help_buffer = "Try %s cfg/test.cfg (refresh rate in seconds)..." % sys.argv[0]
+    print help_buffer
+    exit(1)
+  
+  # Check if the file is readable
+  if os.path.isfile(filename) and os.access(filename, os.R_OK):
+    print "Configuration File exists and is readable ..."
+  else:
+    print "Either configuration file is missing or is not readable!"
+    exit(1)
+  
+  # Check how many entries the file has
+  device_count = 0
+  with open(filename) as f:
+    for i, l in enumerate(f):
+      pass
+  device_count = i + 1
+  help_buffer = "%d device(s) found in configuration file ..." % device_count
+  print help_buffer
   
 if __name__ == "__main__":
-   main(sys.argv[1:])
+  main(sys.argv[1:])
+
+  # Refresh plot
+  while (update_rate != 0):
+    plot()
+    plt.show(block=False)
+    time.sleep(update_rate)
+    plt.close()
+  
+  # Plot only once
+  plot()
+  plt.show(block=True)

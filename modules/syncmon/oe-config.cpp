@@ -1,17 +1,13 @@
 /* Synopsis */
 /* ==================================================================================================== */
 /* @file syncmon.cpp
- * @brief Simple monitor for timing nodes
+ * @brief Enables every output on the target device
  *
  * Copyright (C) 2014 GSI Helmholtz Centre for Heavy Ion Research GmbH 
  *
  * @author A. Hahn <a.hahn@gsi.de>
  *
  * @bug No know bugs.
- * 
- * TBD:
- * - LONG LONG runtime? Integer overflow(s)?
- * - Fix "format ‘%lld’ expects argument" warnings for raspberry pi and std linux/x84_64
  *
  * *****************************************************************************
  * This library is free software; you can redistribute it and/or
@@ -48,50 +44,8 @@ using namespace GSI_TLU;
 
 /* Defines */
 /* ==================================================================================================== */
-#define LEMO_TOTAL_IOS            16
-#define LEMO_OE_SETUP             0
 #define TLU_ID                    0x4d78adfdU
 #define TLU_VENDOR                0x651
-#define DEBUG_MODE                0
-#define TARGET_PLATFORM_UNKNOWN   0
-#define TARGET_PLATFORM_32        1
-#define TARGET_PLATFORM_64        2
-#ifdef ARCH_32_BIT
-  #define TP                      TARGET_PLATFORM_32
-#else
-  #ifdef ARCH_64_BIT
-    #define TP                    TARGET_PLATFORM_64
-  #else
-    #define TP                    TARGET_PLATFORM_UNKNOWN
-  #endif
-#endif
-
-/* Structures */
-/* ==================================================================================================== */
-typedef struct
-{
-  uint64_t uTotalEvents;
-  uint64_t uLastTimestamp;
-  uint64_t uLatestPrintedEvent;
-  int64_t iLastDiff;
-  int64_t iMaxPast;
-  int64_t iMinPast;
-  int64_t iMaxFuture;
-  int64_t iMinFuture;
-  int64_t iDiffSum;
-} s_IOMeasurement;
-
-/* Global */
-/* ==================================================================================================== */
-volatile sig_atomic_t s_sigint = 0;
-volatile sig_atomic_t s_dump = 0;
-
-/* Function vSignalHandler */
-/* ==================================================================================================== */
-void vSignalHandler(int sig)
-{
-  s_sigint = 1;
-}
 
 /* Function main */
 /* ==================================================================================================== */
