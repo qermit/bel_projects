@@ -167,7 +167,7 @@ int ftmSetMaxMsgs(uint64_t maxmsg);
 int ftmSetBp(uint32_t dstCpus, const char* bpStr);
 
 int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
-void ftmShowStatus(uint32_t* status);
+void ftmShowStatus(uint32_t* status, uint8_t verbose);
 
 
 

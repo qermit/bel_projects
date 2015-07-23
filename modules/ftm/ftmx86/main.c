@@ -192,7 +192,7 @@ int main(int argc, char** argv) {
     uint32_t* stateBuff = (uint32_t*)malloc(128 + p->cpuQty*16);
     ftmGetStatus(targetCpus, stateBuff);
     printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM);
-    ftmShowStatus(stateBuff);
+    ftmShowStatus(stateBuff, verbose);
     free(stateBuff);
   }
 

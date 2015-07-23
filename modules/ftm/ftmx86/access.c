@@ -703,7 +703,7 @@ int ftmGetStatus(uint32_t srcCpus, uint32_t* buff) {
 
 //this is horrible code, but harmless. Does the job for now.
 //TODO: replace this with something more sensible
-void ftmShowStatus(uint32_t* status) {
+void ftmShowStatus(uint32_t* status, uint8_t verbose) {
   uint32_t cpuIdx, i;
   uint32_t ftmStatus, mySharedMem, sharedMem;
   uint32_t cfg;
@@ -716,59 +716,61 @@ void ftmShowStatus(uint32_t* status) {
   char strBuff[65536];
   char* pSB = (char*)&strBuff;
 
-  //Generate EBM Status
-  SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
-  SNTPRINTF(pSB ,"\u2502 %sEBM%s                                                                           \u2502\n", KCYN, KNRM);
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-  SNTPRINTF(pSB ,"\u2502 Status       \u2502 0x%08x",  buffEbm[EBM_REG_STATUS>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Src Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_SRC_MAC_HI>>2],  buffEbm[EBM_REG_SRC_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Src IP       \u2502 0x%08x", buffEbm[EBM_REG_SRC_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Src Port     \u2502 0x%04x", buffEbm[EBM_REG_SRC_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n"); 
-  SNTPRINTF(pSB ,"\u2502 Dst Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_DST_MAC_HI>>2],  buffEbm[EBM_REG_DST_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Dst IP       \u2502 0x%08x", buffEbm[EBM_REG_DST_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Dst Port     \u2502 0x%04x", buffEbm[EBM_REG_DST_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-  SNTPRINTF(pSB ,"\u2502 MTU          \u2502 %10u", buffEbm[EBM_REG_MTU>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Adr Hi       \u2502 0x%08x", buffEbm[EBM_REG_ADR_HI>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 Ops Max      \u2502 %10u", buffEbm[EBM_REG_OPS_MAX>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 EB Opt       \u2502 0x%08x", buffEbm[EBM_REG_EB_OPT>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
-  
-  //Generate PrioQ Status
-  SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
-  SNTPRINTF(pSB ,"\u2502 %sFPQ%s                                                                           \u2502\n", KCYN, KNRM);
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-  cfg = buffPrioq[r_FPQ.cfgGet>>2];
-  SNTPRINTF(pSB ,"\u2502 Flags        \u2502 ");
-  if(cfg & r_FPQ.cfg_ENA)            SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
-  if(cfg & r_FPQ.cfg_FIFO)           SNTPRINTF(pSB ,"   FIFO   ");  else SNTPRINTF(pSB ,"     -    ");
-  if(cfg & r_FPQ.cfg_AUTOPOP)        SNTPRINTF(pSB ,"   APOP   ");  else SNTPRINTF(pSB ,"     -    ");
-  if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
-  if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");
-  if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
-  SNTPRINTF(pSB ,"   \u2502\n", KCYN, KNRM);
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  if(verbose) {
 
-  SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[r_FPQ.dstAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[r_FPQ.ebmAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 ts Adr       \u2502         0x%08x", buffPrioq[r_FPQ.tsAdr>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 ts Ch        \u2502         0x%08x", buffPrioq[r_FPQ.tsCh>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-  SNTPRINTF(pSB ,"\u2502 Heap Count   \u2502 %18u", buffPrioq[r_FPQ.heapCnt>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 msg CntO     \u2502 %18u", buffPrioq[r_FPQ.msgCntO>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 msg CntI     \u2502 %18u", buffPrioq[r_FPQ.msgCntI>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");  
-  tmp = (((uint64_t)buffPrioq[r_FPQ.tTrnHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tTrnLo>>2]); 
-  SNTPRINTF(pSB ,"\u2502 TTrn         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  tmp = (((uint64_t)buffPrioq[r_FPQ.tDueHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tDueLo>>2]);
-  SNTPRINTF(pSB ,"\u2502 TDue         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-  SNTPRINTF(pSB ,"\u2502 Capacity     \u2502 %18u", buffPrioq[r_FPQ.capacity>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[r_FPQ.msgMax>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-  SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+    //Generate EBM Status
+    SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+    SNTPRINTF(pSB ,"\u2502 %sEBM%s                                                                           \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 Status       \u2502 0x%08x",  buffEbm[EBM_REG_STATUS>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_SRC_MAC_HI>>2],  buffEbm[EBM_REG_SRC_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src IP       \u2502 0x%08x", buffEbm[EBM_REG_SRC_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src Port     \u2502 0x%04x", buffEbm[EBM_REG_SRC_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n"); 
+    SNTPRINTF(pSB ,"\u2502 Dst Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_DST_MAC_HI>>2],  buffEbm[EBM_REG_DST_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst IP       \u2502 0x%08x", buffEbm[EBM_REG_DST_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst Port     \u2502 0x%04x", buffEbm[EBM_REG_DST_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 MTU          \u2502 %10u", buffEbm[EBM_REG_MTU>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Adr Hi       \u2502 0x%08x", buffEbm[EBM_REG_ADR_HI>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Ops Max      \u2502 %10u", buffEbm[EBM_REG_OPS_MAX>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 EB Opt       \u2502 0x%08x", buffEbm[EBM_REG_EB_OPT>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+    
+    //Generate PrioQ Status
+    SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+    SNTPRINTF(pSB ,"\u2502 %sFPQ%s                                                                           \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    cfg = buffPrioq[r_FPQ.cfgGet>>2];
+    SNTPRINTF(pSB ,"\u2502 Flags        \u2502 ");
+    if(cfg & r_FPQ.cfg_ENA)            SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & r_FPQ.cfg_FIFO)           SNTPRINTF(pSB ,"   FIFO   ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & r_FPQ.cfg_AUTOPOP)        SNTPRINTF(pSB ,"   APOP   ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
+    SNTPRINTF(pSB ,"   \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+
+    SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[r_FPQ.dstAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[r_FPQ.ebmAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 ts Adr       \u2502         0x%08x", buffPrioq[r_FPQ.tsAdr>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 ts Ch        \u2502         0x%08x", buffPrioq[r_FPQ.tsCh>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 Heap Count   \u2502 %18u", buffPrioq[r_FPQ.heapCnt>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 msg CntO     \u2502 %18u", buffPrioq[r_FPQ.msgCntO>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 msg CntI     \u2502 %18u", buffPrioq[r_FPQ.msgCntI>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");  
+    tmp = (((uint64_t)buffPrioq[r_FPQ.tTrnHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tTrnLo>>2]); 
+    SNTPRINTF(pSB ,"\u2502 TTrn         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    tmp = (((uint64_t)buffPrioq[r_FPQ.tDueHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tDueLo>>2]);
+    SNTPRINTF(pSB ,"\u2502 TDue         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 Capacity     \u2502 %18u", buffPrioq[r_FPQ.capacity>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[r_FPQ.msgMax>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   
-  
+  }
 
 
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
