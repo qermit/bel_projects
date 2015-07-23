@@ -1,6 +1,7 @@
 #include "access.h"
 
 
+
 /// Expected Firmware Version ///
 const char myVer[] = "0.2.1\n";
 const char myName[] = "ftm\n";
@@ -22,19 +23,221 @@ const uint32_t devID_Prioq       = 0x10040200;
 
 const char     devName_RAM_pre[] = "WB4-BlockRAM_";
 
-static uint32_t getCpuFromThr(uint64_t thr) {
-  
-  uint64_t mask = (pAccess->cpuQty<<1)-1;
-  uint32_t res;
-  
-  for(i=0;i < ((64 + pAccess->cpuQty - 1)/pAccess->cpuQty),i++)
-    if(thr & (mask << (i*pAccess->cpuQty))) res |= 1<<i;
-  return res;  
+static uint32_t bytesToUint32(uint8_t* pBuf)
+{
+   uint8_t i;
+   uint32_t val=0;
+   
+   for(i=0;i<FTM_WORD_SIZE;   i++) val |= (uint32_t)pBuf[i] << (8*i);
+   return val;
+}
+
+static int die(eb_status_t status, const char* what)
+{  
+  fprintf(stderr, "%s: %s -- %s\n", program, what, eb_status(status));
+  return -1;
+}
+
+static const uint8_t* ftmRamRead(uint32_t address, const uint8_t* buf, uint32_t len, uint32_t bufEndian)
+{
+   
+   eb_status_t status;
+   eb_cycle_t cycle;
+   uint32_t i,j, parts, partLen, start;
+   uint32_t* readin = (uint32_t*)buf;
+   eb_data_t tmpReadin[BUF_SIZE/2];   
+
+   //wrap frame buffer in EB packet
+   parts = (len/PACKET_SIZE)+1;
+   start = 0;
+   
+   for(j=0; j<parts; j++)
+   {
+      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
+      else partLen = PACKET_SIZE;
+      
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK)  die(status, "failed to create cycle");
+      for(i= start>>2; i< (start + partLen) >>2;i++)  
+      {
+         //printf("%4u %08x -> %p\n", i, (address+(i<<2)), &readin[i]);
+         eb_cycle_read(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, &tmpReadin[i]);
+      }
+      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close read cycle");
+      for(i= start>>2; i< (start + partLen) >>2;i++) {
+        
+        if (bufEndian == LITTLE_ENDIAN)  readin[i] = SWAP_4((uint32_t)tmpReadin[i]);
+        else                             readin[i] = (uint32_t)tmpReadin[i];
+        
+      } //this is important caus eb_data_t is 64b wide!
+      start = start + partLen;
+   }
+      
+   return buf;
+}
+
+static const uint8_t* ftmRamWrite(uint32_t address, const uint8_t* buf, uint32_t len, uint32_t bufEndian)
+{
+   eb_status_t status;
+   eb_cycle_t cycle;
+   uint32_t i,j, parts, partLen, start, data;
+   uint32_t* writeout = (uint32_t*)buf;   
+   
+   //wrap frame buffer in EB packet
+   parts = (len/PACKET_SIZE)+1;
+   start = 0;
+   
+   for(j=0; j<parts; j++)
+   {
+      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
+      else partLen = PACKET_SIZE;
+      
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
+      
+      for(i= start>>2; i< (start + partLen) >>2;i++)  
+      {
+         if (bufEndian == LITTLE_ENDIAN)  data = SWAP_4(writeout[i]);
+         else                             data = writeout[i];
+         
+         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)data); 
+      }
+      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
+      start = start + partLen;
+   }
+   
+   return buf;
+}
+
+static void ftmRamClear(uint32_t address, uint32_t len)
+{
+   eb_status_t status;
+   eb_cycle_t cycle;
+   uint32_t i,j, parts, partLen, start;  
+   
+   //wrap frame buffer in EB packet
+   parts = (len/PACKET_SIZE)+1;
+   start = 0;
+   
+   for(j=0; j<parts; j++)
+   {
+      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
+      else partLen = PACKET_SIZE;
+      
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
+      
+      for(i= start>>2; i< (start + partLen) >>2;i++)  
+      {
+         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, 0); 
+      }
+      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
+      start = start + partLen;
+   }
 }
 
 
+static uint8_t isFwValid(struct  sdb_device* ram, const char* sVerExp, const char* sName)
+{
+  uint8_t validity = 1;
+  uint32_t len = FWID_LEN/4;
+  eb_data_t fwdata[FWID_LEN/4];
+  char cBuff[FWID_LEN];
+  char* pos;
+  
+  eb_cycle_t cycle;
+  eb_status_t status;
+  
+  uint8_t verExpMaj, verExpMin, verExpRev;
+  uint8_t verFndMaj=0, verFndMin=0, verFndRev=0;
+  uint32_t verExp, verFnd;
+  verExpMaj = sVerExp[0] - '0';
+  verExpMin = sVerExp[2] - '0';
+  verExpRev = sVerExp[4] - '0';
+  
+  uint32_t i, j;
+  //RAM Big enough to actually contain a FW ID?
+  if ((ram->sdb_component.addr_last - ram->sdb_component.addr_first + 1) >= (FWID_LEN + BOOTL_LEN)) {
+    if ((status = eb_cycle_open(device, 0, 0, &cycle)) != EB_OK)
+      die(status, "eb_cycle_open");
+    for (j = 0; j < len; ++j)
+      eb_cycle_read(cycle, ram->sdb_component.addr_first + BOOTL_LEN + j*4, EB_DATA32|EB_BIG_ENDIAN, &fwdata[j]);
+    if ((status = eb_cycle_close(cycle)) != EB_OK)
+      die(status, "eb_cycle_close");
 
-uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck)
+   for (j = 0; j < len; ++j) {
+      for (i = 0; i < 4; i++) {
+        cBuff[j*4+i] = (char)(fwdata[j] >> (8*(3-i)) & 0xff);
+      }  
+    }
+   
+  //check for magic word
+  if(strncmp(cBuff, "UserLM32", 8)) {validity = 0;} 
+  if(!validity) { printf("No firmware found!\n"); return 0; }
+
+  //check project
+  pos = strstr(cBuff, "Project     : ");
+  if(pos != NULL) {
+    pos += 14;
+    if(strncmp(pos, sName, strlen(sName))) {validity = 0;} 
+  } else { printf("This is no ftm firmware, name does not match!\n"); return 0;}
+  
+  //check version
+  pos = strstr(cBuff, "Version     : ");
+  if(pos != NULL) {
+    pos += 14;
+    verFndMaj = pos[0] - '0';
+    verFndMin = pos[2] - '0';
+    verFndRev = pos[4] - '0';
+  } else {validity = 0;}
+  } else {validity = 0;}
+  
+  verExp = (verExpMaj *100 + verExpMin *10 + verExpRev);
+  verFnd = (verFndMaj *100 + verFndMin *10 + verFndRev);
+  
+  if(verExp > verFnd ) {
+    validity = 0;
+    printf("ERROR: Expected firmware %u.%u.%u, but found only %u.%u.%u! If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
+    return 0;  
+  }
+  if(verExp < verFnd ) {
+    printf("ERROR: Expected firmware %u.%u.%u is lower than found %u.%u.%u. If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
+    return 0;
+  }
+  
+  //no fwid found. try legacy  
+  return validity;
+    
+}
+
+static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32_t len) {
+  uint32_t baseAddr, offs, cpuIdx, i; 
+  uint8_t* bufRead = (uint8_t *)malloc(len);
+  
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
+    if((dstCpus >> cpuIdx) & 0x1) {
+      baseAddr  = p->pCores[cpuIdx].ramAdr;
+      offs      = p->pCores[cpuIdx].inaOffs;
+      memset(bufWrite, 0, len);
+      serPage (pPage, bufWrite, offs, cpuIdx);
+      ftmRamWrite(baseAddr + offs, bufWrite, len, BIG_ENDIAN);
+      printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
+      printf("Verify..."); 
+      ftmRamRead(baseAddr + offs, bufRead, len, BIG_ENDIAN);
+      for(i = 0; i<len; i++) {
+        if(!(bufRead[i] == bufWrite[i])) { 
+          fprintf(stderr, "!ERROR! \nVerify failed for CPU %u at offset 0x%08x\n", cpuIdx, baseAddr + offs +( i & ~0x3) );
+          free(bufRead);
+          return -1;
+        }
+      }
+      printf("OK\n");
+    }
+  }
+  free(bufRead);
+  printf("done.\n");
+  return 0;  
+
+}
+
+uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 {
   eb_cycle_t cycle;
   eb_status_t status;
@@ -51,6 +254,8 @@ uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck
   
   attempts   = 3;
   idx        = -1;
+  p = (t_ftmAccess* )&ftmAccess;
+
 
   /* open EB socket and device */
   if ((status = eb_socket_open(EB_ABI_CODE, 0, EB_ADDR32 | EB_DATA32, &mySocket))               != EB_OK) die(status, "failed to open Etherbone socket");
@@ -135,8 +340,9 @@ uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck
       //check for valid firmware
       uint8_t isValid = 0;
       if(overrideFWcheck) isValid = 1;
-      else                isValid = isFwValid(&devices[cpuIdx], &myVer[0], &myName[0]);
+      else                { isValid = isFwValid(&devices[cpuIdx], &myVer[0], &myName[0]);}
       validCpus |= (isValid << cpuIdx);
+      p->pCores[cpuIdx].hasValidFW = isValid;
     }
   } else {
     //Old
@@ -183,7 +389,6 @@ uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck
     } else printf("Core #%u: Can't read schedule data offsets - no valid firmware present.\n", cpuIdx);
   }
 
-
   return validCpus;
 
   error:
@@ -198,188 +403,20 @@ void ftmClose(void)
   if ((status = eb_socket_close(mySocket)) != EB_OK) die(status, "failed to close Etherbone socket");
 }
 
-int die(eb_status_t status, const char* what)
-{  
-  fprintf(stderr, "%s: %s -- %s\n", program, what, eb_status(status));
-  return -1;
-}
-
-
-uint8_t isFwValid(struct  sdb_device* ram, const char* sVerExp, const char* sName)
-{
-  uint8_t validity = 1;
-  uint32_t len = FWID_LEN/4;
-  eb_data_t fwdata[FWID_LEN/4];
-  char cBuff[FWID_LEN];
-  char* pos;
-  
-  eb_cycle_t cycle;
-  eb_status_t status;
-  
-  uint8_t verExpMaj, verExpMin, verExpRev;
-  uint8_t verFndMaj=0, verFndMin=0, verFndRev=0;
-  uint32_t verExp, verFnd;
-  verExpMaj = sVerExp[0] - '0';
-  verExpMin = sVerExp[2] - '0';
-  verExpRev = sVerExp[4] - '0';
-  
-  uint32_t i, j;
-  //RAM Big enough to actually contain a FW ID?
-  if ((ram->sdb_component.addr_last - ram->sdb_component.addr_first + 1) >= (FWID_LEN + BOOTL_LEN)) {
-    if ((status = eb_cycle_open(device, 0, 0, &cycle)) != EB_OK)
-      die(status, "eb_cycle_open");
-    for (j = 0; j < len; ++j)
-      eb_cycle_read(cycle, ram->sdb_component.addr_first + BOOTL_LEN + j*4, EB_DATA32|EB_BIG_ENDIAN, &fwdata[j]);
-    if ((status = eb_cycle_close(cycle)) != EB_OK)
-      die(status, "eb_cycle_close");
-
-   for (j = 0; j < len; ++j) {
-      for (i = 0; i < 4; i++) {
-        cBuff[j*4+i] = (char)(fwdata[j] >> (8*(3-i)) & 0xff);
-      }  
-    }
-   
-  //check for magic word
-  if(strncmp(cBuff, "UserLM32", 8)) {validity = 0;} 
-  if(!validity) { printf("No firmware found!\n"); return 0; }
-
-  //check project
-  pos = strstr(cBuff, "Project     : ");
-  if(pos != NULL) {
-    pos += 14;
-    if(strncmp(pos, sName, strlen(sName))) {validity = 0;} 
-  } else { printf("This is no ftm firmware, name does not match!\n"); return 0;}
-  
-  //check version
-  pos = strstr(cBuff, "Version     : ");
-  if(pos != NULL) {
-    pos += 14;
-    verFndMaj = pos[0] - '0';
-    verFndMin = pos[2] - '0';
-    verFndRev = pos[4] - '0';
-  } else {validity = 0;}
-  } else {validity = 0;}
-  
-  verExp = (verExpMaj *100 + verExpMin *10 + verExpRev);
-  verFnd = (verFndMaj *100 + verFndMin *10 + verFndRev);
-  
-  if(verExp > verFnd ) {
-    validity = 0;
-    printf("ERROR: Expected firmware %u.%u.%u, but found only %u.%u.%u! If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
-    return 0;  
-  }
-  if(verExp < verFnd ) {
-    printf("ERROR: Expected firmware %u.%u.%u is lower than found %u.%u.%u. If you are sure, use -o to override.\n", verExpMaj, verExpMin, verExpRev, verFndMaj, verFndMin, verFndRev);
-    return 0;
-  }
-  
-  //no fwid found. try legacy
-        
-  return validity;
-    
-}
 
 
 
 
-const uint8_t* ftmRamRead(uint32_t address, const uint8_t* buf, uint32_t len, uint32_t bufEndian)
-{
-   
-   eb_status_t status;
-   eb_cycle_t cycle;
-   uint32_t i,j, parts, partLen, start;
-   uint32_t* readin = (uint32_t*)buf;
-   eb_data_t tmpReadin[BUF_SIZE/2];   
 
-   //wrap frame buffer in EB packet
-   parts = (len/PACKET_SIZE)+1;
-   start = 0;
-   
-   for(j=0; j<parts; j++)
-   {
-      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
-      else partLen = PACKET_SIZE;
-      
-      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK)  die(status, "failed to create cycle");
-      for(i= start>>2; i< (start + partLen) >>2;i++)  
-      {
-         //printf("%4u %08x -> %p\n", i, (address+(i<<2)), &readin[i]);
-         eb_cycle_read(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, &tmpReadin[i]);
-      }
-      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close read cycle");
-      for(i= start>>2; i< (start + partLen) >>2;i++) {
-        if (bufEndian == LITTLE_ENDIAN)  readin[i] = SWAP_4((uint32_t)tmpReadin[i]);
-        else                             readin[i] = (uint32_t)tmpReadin[i];
-         
-      } //this is important caus eb_data_t is 64b wide!
-      start = start + partLen;
-   }
-      
-   return buf;
-}
 
-const uint8_t* ftmRamWrite(uint32_t address, const uint8_t* buf, uint32_t len, uint32_t bufEndian)
-{
-   eb_status_t status;
-   eb_cycle_t cycle;
-   uint32_t i,j, parts, partLen, start, data;
-   uint32_t* writeout = (uint32_t*)buf;   
-   
-   //wrap frame buffer in EB packet
-   parts = (len/PACKET_SIZE)+1;
-   start = 0;
-   
-   for(j=0; j<parts; j++)
-   {
-      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
-      else partLen = PACKET_SIZE;
-      
-      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
-      
-      for(i= start>>2; i< (start + partLen) >>2;i++)  
-      {
-         if (bufEndian == LITTLE_ENDIAN)  data = SWAP_4(writeout[i]);
-         else                             data = writeout[i];
-         
-         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)data); 
-      }
-      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
-      start = start + partLen;
-   }
-   
-   return buf;
-}
 
-void ftmRamClear(uint32_t address, uint32_t len)
-{
-   eb_status_t status;
-   eb_cycle_t cycle;
-   uint32_t i,j, parts, partLen, start;  
-   
-   //wrap frame buffer in EB packet
-   parts = (len/PACKET_SIZE)+1;
-   start = 0;
-   
-   for(j=0; j<parts; j++)
-   {
-      if(j == parts-1 && (len % PACKET_SIZE != 0)) partLen = len % PACKET_SIZE;
-      else partLen = PACKET_SIZE;
-      
-      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle"); 
-      
-      for(i= start>>2; i< (start + partLen) >>2;i++)  
-      {
-         eb_cycle_write(cycle, (eb_address_t)(address+(i<<2)), EB_BIG_ENDIAN | EB_DATA32, 0); 
-      }
-      if ((status = eb_cycle_close(cycle)) != EB_OK)  die(status, "failed to close write cycle");
-      start = start + partLen;
-   }
-}
+
 
 
 
 int ftmRst(void) {
-    status = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_FPGA), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)FTM_RST_FPGA_CMD, 0, eb_block);
+  eb_status_t status;
+    status = eb_device_write(device, (eb_address_t)(p->resetAdr + FTM_RST_FPGA), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)FTM_RST_FPGA_CMD, 0, eb_block);
     if (status != EB_OK) die(status, "failed to create cycle"); 
     return 0;
 }
@@ -389,21 +426,23 @@ int ftmCpuRst(uint32_t dstCpus) {
   eb_status_t status;
   
   printf("Resetting CPU(s)...\n");
-  status = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
-  if (status != EB_OK) die(status, "failed to create cycle");
-  status = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
-  if (status != EB_OK) die(status, "failed to create cycle"); 
+  status = eb_device_write(device, (eb_address_t)(p->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
+  if (status != EB_OK) return die(status, "failed to create cycle");
+  status = eb_device_write(device, (eb_address_t)(p->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
+  if (status != EB_OK) return die(status, "failed to create cycle"); 
   printf("Done.\n\n");
-
+  return 0;
 }
 
-int ftmFwLoad(uint32_t dstCpu, const char* filename) {
+int ftmFwLoad(uint32_t dstCpus, const char* filename) {
   
 
   FILE *file;
   uint8_t* buffer;
   unsigned long fileLen;
   eb_status_t status;
+  
+  uint32_t cpuIdx;
   
   //Open file
   file = fopen(filename, "rb");
@@ -430,20 +469,20 @@ int ftmFwLoad(uint32_t dstCpu, const char* filename) {
   fclose(file);
   
   printf("Putting CPU(s) into Reset for FW load\n");
-  status = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpu, 0, eb_block);
+  status = eb_device_write(device, (eb_address_t)(p->resetAdr + FTM_RST_SET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
   if (status != EB_OK) die(status, "failed to create cycle");
   
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
-    if((dstCpu >> cpuIdx) & 0x1) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
+    if((dstCpus >> cpuIdx) & 0x1) {
       //Load FW
-      printf("Loading %s to CPU %u @ 0x%08x\n", filename, cpuIdx, pAccess->pCores[cpuIdx].ramAdr);  
-      ftmRamWrite(buffer, pAccess->pCores[cpuIdx].ramAdr, fileLen, LITTLE_ENDIAN);
+      printf("Loading %s to CPU %u @ 0x%08x\n", filename, cpuIdx, p->pCores[cpuIdx].ramAdr);  
+      ftmRamWrite(p->pCores[cpuIdx].ramAdr, buffer, fileLen, LITTLE_ENDIAN);
     }
   }
   free(buffer);
 
   printf("Releasing CPU(s) from Reset\n\n");
-  status = eb_device_write(device, (eb_address_t)(pAccess->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpu, 0, eb_block);
+  status = eb_device_write(device, (eb_address_t)(p->resetAdr + FTM_RST_CLR), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)dstCpus, 0, eb_block);
   if (status != EB_OK) die(status, "failed to create cycle"); 
 
   printf("Done.\n");
@@ -453,7 +492,7 @@ int ftmFwLoad(uint32_t dstCpu, const char* filename) {
 
 
 int ftmThrRst(uint64_t dstBitField) {
-
+  return 0;
 }
 
 
@@ -466,9 +505,9 @@ int ftmCommand(uint32_t dstCpus, uint32_t command) {
   if(dstCpus) {if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) die(status, "failed to create cycle");}
   else return 0;
   
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
-      eb_cycle_write(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)command);
+      eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)command);
     }
   }
   
@@ -476,65 +515,43 @@ int ftmCommand(uint32_t dstCpus, uint32_t command) {
   return 0;
 }
 
-int ftmPutString(uint32_t dstCpus, const char* sXml, uint8_t* bufWrite, uint32_t len) {
-  t_ftmPage*  pPage = parseXmlString(sXml);
-  return ftmPut(dstCpus, pPage, bufWrite, len);
+int ftmPutString(uint32_t dstCpus, const char* sXml) {
+  uint8_t    bufWrite[BUF_SIZE];
+  t_ftmPage*  pPage;
+  pPage = parseXmlString(sXml);
+    
+  return ftmPut(dstCpus, pPage, (uint8_t*)&bufWrite, BUF_SIZE);
+}
   
-int ftmPutFile(uint32_t dstCpus, const char* filename, uint8_t* bufWrite, uint32_t len) {
+int ftmPutFile(uint32_t dstCpus, const char* filename) {
+  uint8_t    bufWrite[BUF_SIZE];
+  t_ftmPage*  pPage = parseXmlFile(filename);
   
-  t_ftmPage*  pPage = parseXmlFile(sXml);
-  return ftmPut(dstCpus, pPage, bufWrite, len);
+  return ftmPut(dstCpus, pPage, (uint8_t*)&bufWrite, BUF_SIZE);
   
 }
 
-int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32_t len) {
-  t_ftmPage*  pPage = parseXmlString(sXml);
-  uint32_t baseAddr, offs, cpuIdx, i; 
-  uint8_t* bufRead = (uint8_t *)malloc(len);
-  
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
-    if((dstCpus >> cpuIdx) & 0x1) {
-      baseAddr  = pAccess->pCores[cpuIdx].ramAdr;
-      offs      = pAccess->pCores[cpuIdx].inaOffs;
-      memset(bufWrite, 0, len);
-      serPage (pPage, bufWrite, offs, cpuIdx);
-      ftmRamWrite(bufWrite, baseAddr + offs, len, BIG_ENDIAN);
-      printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
-      printf("Verify..."); 
-      ftmRamRead(baseAddr + offs, len, bufRead);
-      for(i = 0; i<len; i++) {
-        if(!(bufRead[i] == pBufWrite[i])) { 
-          fprintf(stderr, "!ERROR! \nVerify failed for CPU %u at offset 0x%08x\n", cpuIdx, baseAddr + offs +( i & ~0x3) );
-          free(bufRead);
-          return -1;
-        }
-      }
-      printf("OK\n");
-    }
-  }
-  free(bufRead);
-  printf("done.\n");
-  return 0;  
 
-}
 
 uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) {
-  uint32_t baseAddr, offs, cpuIdx, i;  
+  uint32_t baseAddr, offs, cpuIdx;  
   t_ftmPage* pPage;
   uint8_t* bufRead = (uint8_t *)malloc(len);
   char* bufStr = stringBuf;
   
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((srcCpus >> cpuIdx) & 0x1) {
-      baseAddr  = pAccess->pCores[cpuIdx].ramAdr;
-      if(actIna == ACTIVE)  offs = pAccess->pCores[cpuIdx].actOffs; 
-      else              offs = pAccess->pCores[cpuIdx].inaOffs;
+      baseAddr  = p->pCores[cpuIdx].ramAdr;
+      if(actIna == ACTIVE)  offs = p->pCores[cpuIdx].actOffs; 
+      else              offs = p->pCores[cpuIdx].inaOffs;
+      
+      ftmRamRead( baseAddr + offs, bufRead, len, BIG_ENDIAN);
       pPage = deserPage(calloc(1, sizeof(t_ftmPage)), bufRead, offs);
       if(pPage != NULL) {  
          printf("Deserialization successful.\n\n");
          if (lenStringBuf - (bufStr - stringBuf) < 2048) {printf("String buffer running too low, aborting.\n"); return (uint32_t)(bufStr - stringBuf);}
-         bufStr += (sprintf("---CPU %u %s page---\n", cpuIdx, "active") -1); //don't do zero termination in between dumps
-         bufStr += showFtmPage(pPage, bufStr) -1; //don't do zero termination in between dumps
+         SNTPRINTF(bufStr, "---CPU %u %s page---\n", cpuIdx, "active"); //don't do zero termination in between dumps
+         bufStr += showFtmPage(pPage, bufStr); //don't do zero termination in between dumps
       } else printf("Deserialization for CPU %u FAILED! Corrupt/No Data ?\n", cpuIdx);
     }
   }
@@ -542,15 +559,16 @@ uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf
   return (uint32_t)(bufStr - stringBuf); // return number of characters
 }
 
-int ftmClear(uint32_t dstCpus, uint32_t len) {
+int ftmClear(uint32_t dstCpus) {
   uint32_t baseAddr, offs, cpuIdx; 
   
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
-      baseAddr  = pAccess->pCores[cpuIdx].ramAdr;
-      offs      = pAccess->pCores[cpuIdx].inaOffs;
-      ftmRamClear(baseAddr + offs, len);
-      printf("Cleared %u bytes in inactive page of CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
+      baseAddr  = p->pCores[cpuIdx].ramAdr;
+      offs      = p->pCores[cpuIdx].inaOffs;
+      ftmRamClear(baseAddr + offs, BUF_SIZE);
+      printf("Cleared %u bytes in inactive page of CPU %u at 0x%08x.", BUF_SIZE, cpuIdx, baseAddr + offs);
+    }  
   }
   printf("done.\n");
   return 0;  
@@ -558,41 +576,52 @@ int ftmClear(uint32_t dstCpus, uint32_t len) {
 }
 
 int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep) {
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  eb_cycle_t cycle;
+  eb_status_t status;
+  uint32_t cpuIdx; 
+  
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
-      baseAddr  = pAccess->pCores[cpuIdx].ramAdr;
-      if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(ebstatus, "failed to create cycle"); 
-      eb_cycle_write(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +0), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(tprep>>32));
-      eb_cycle_write(cycle, (eb_address_t)(pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)tprep);
-      if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  return die(ebstatus, "failed to close write cycle");
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+      eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +0), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(tprep>>32));
+      eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)tprep);
+      if ((status = eb_cycle_close(cycle)) != EB_OK)  return die(status, "failed to close write cycle");
     }
   }
   return 0;    
 }
 
 int ftmSetDuetime(uint64_t tdue) {
-  if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(ebstatus, "failed to create cycle"); 
-  eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tDueHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(tdue>>32)));
-  eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tDueLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue));
-  if ((ebstatus = eb_cycle_close(cycle)) != EB_OK)  return die(ebstatus, "failed to close write cycle");
+  eb_cycle_t cycle;
+  eb_status_t status;
+  
+  if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tDueHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(tdue>>32)));
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tDueLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue));
+  if ((status = eb_cycle_close(cycle)) != EB_OK)  return die(status, "failed to close write cycle");
   return 0;    
 }
 
 int ftmSetTrntime(uint64_t ttrn) {
-  if ((ebstatus = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(ebstatus, "failed to create cycle"); 
-  eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tTrnHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(ttrn>>32)));
-  eb_cycle_write(cycle, (eb_address_t)(pAccess->prioQAdr + r_FPQ.tTrnLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)ttrn));
-  if ((ebstatus = eb_cycle_close(cycle)) != EB_OK) return die(ebstatus, "failed to close write cycle");
+  eb_cycle_t cycle;
+  eb_status_t status;
+  
+  if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tTrnHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(ttrn>>32)));
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tTrnLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)ttrn));
+  if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close write cycle");
   return 0;    
 }
 
 int ftmSetMaxMsgs(uint64_t maxmsg) {
-  if ((ebstatus =  eb_device_write(device, (eb_address_t)(pAccess->prioQAdr + r_FPQ.msgMax), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)uint64val), 0, eb_block); != EB_OK) 
-    return die(ebstatus, "failed to create cycle"); 
+  eb_status_t status;
+  
+  if ((status = eb_device_write(device, (eb_address_t)(p->prioQAdr + r_FPQ.msgMax), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)maxmsg), 0, eb_block))  != EB_OK) 
+    return die(status, "failed to create cycle"); 
   return 0;    
 }
 
-int ftmSetBp(const char* bpStr) {
+int ftmSetBp(uint32_t dstCpus, const char* bpStr) {
 
   int planIdx, planQty;
   eb_cycle_t cycle;
@@ -605,20 +634,20 @@ int ftmSetBp(const char* bpStr) {
   if(!strcasecmp(bpStr, "idle")) planIdx = -1;
   else {planIdx = strtol(bpStr, 0, 10);}   
   
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
-      baseAddr  = pAccess->pCores[cpuIdx].ramAdr;
-      offs      = pAccess->pCores[cpuIdx].actOffs;
+      baseAddr  = p->pCores[cpuIdx].ramAdr;
+      offs      = p->pCores[cpuIdx].actOffs;
       
       //user gave us a planIdx. load corresponding ptr
-      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(ebstatus, "failed to create cycle"); 
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
       eb_cycle_read(cycle, (eb_address_t)(baseAddr + offs + FTM_PAGE_PLANQTY_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
       //if the user wanted to go to idle, read idle ptr from interface, else read plan ptr
       if(planIdx == -1)
       {eb_cycle_read(cycle, (eb_address_t)(baseAddr + ftm_shared_offs + FTM_IDLE_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
       else 
       {eb_cycle_read(cycle, (eb_address_t)(baseAddr + offs + FTM_PAGE_PLANS_OFFSET + 4*planIdx), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
-      if((ebstatus = eb_cycle_close(cycle)) != EB_OK) return die(ebstatus, "failed to close read cycle"); 
+      if((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle"); 
 
       planQty  = (uint32_t)tmpRead[0];
       bp       = (uint32_t)tmpRead[1];
@@ -626,7 +655,7 @@ int ftmSetBp(const char* bpStr) {
       if(bp != FTM_NULL && planIdx < planQty) {
         printf("Writing plan %d @ 0x%08x to BP\n", planIdx, bp);
         status = eb_device_write(device, (eb_address_t)(baseAddr + offs + FTM_PAGE_BP_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)bp, 0, eb_block);
-        if (status != EB_OK) return die(ebstatus, "failed to create cycle");  
+        if (status != EB_OK) return die(status, "failed to create cycle");  
       } else { 
         if (planIdx >= planQty) printf ("Sorry, but the plan index is neither idle nor 0 <= %d (planIdx) <  %u (planQty)\n", planIdx, planQty);
         else printf ("Found a NULL ptr at plan idx %d, something is wrong\n", planIdx);
@@ -638,23 +667,30 @@ int ftmSetBp(const char* bpStr) {
 
 
 
-int ftmGetStatus(uint32_t srcCpus, uint32* buff) {
-  uint32_t cpuIdx, offset;
+int ftmGetStatus(uint32_t srcCpus, uint32_t* buff) {
+  uint32_t cpuIdx, offset, i;
   eb_address_t tmpAdr;
-  eb_data_t tmpRd[4];
-  
+  eb_data_t tmpRead[4];
+  eb_cycle_t cycle;
+  eb_status_t status;
   
   // read EBM status
-  ftmRamRead(pAccess->ebmAdr + EBM_REG_STATUS, EBM_REG_LAST, &buff[EBM_REG_STATUS]);
-  ftmRamRead(pAccess->prioQAdr + r_FPQ.cfgGet, 4, &buff[r_FPQ.cfgGet]);
+ 
+  ftmRamRead(p->ebmAdr + EBM_REG_STATUS, (const uint8_t*)&buff[EBM_REG_STATUS>>2], EBM_REG_LAST, BIG_ENDIAN);
+   
+  ftmRamRead(p->prioQAdr + r_FPQ.cfgGet, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.cfgGet)>>2], 4, BIG_ENDIAN);
   
   // read PrioQ status
-  ftmRamRead(pAccess->prioQAdr + r_FPQ.dstAdr, r_FPQ.ebmAdr - r_FPQ.dstAdr +4, &buff[r_FPQ.dstAdr]);
-  offset = r_FPQ.tsCh;
+  ftmRamRead(p->prioQAdr + r_FPQ.dstAdr, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.dstAdr)>>2], r_FPQ.ebmAdr - r_FPQ.dstAdr +4, BIG_ENDIAN);
+ 
+  
+  
+  offset = (EBM_REG_LAST + r_FPQ.tsCh)>>2;
+  
   // read CPU status'
-  for(cpuIdx=0;cpuIdx < pAccess->cpuQty;cpuIdx++) {
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((srcCpus >> cpuIdx) & 0x1) {
-      tmpAdr = pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs;
+      tmpAdr = p->pCores[cpuIdx].ramAdr + ftm_shared_offs;
       
       
       if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
@@ -663,100 +699,110 @@ int ftmGetStatus(uint32_t srcCpus, uint32* buff) {
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]);
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET+4,      EB_BIG_ENDIAN | EB_DATA32, &tmpRead[3]);
       if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
-      for(i=0;i<4;i++) buff[offset + cpuIdx * 4 + i] = (uint32_t)tmpRead[i];
-      
+      for(i=0;i<4;i++) buff[offset + cpuIdx*4  + i] = (uint32_t)tmpRead[i];
     } else {
-      memset(&buff[offset + cpuIdx * 4 + 0], 0, 4*4);
+      memset((const uint8_t*)&buff[offset + cpuIdx*4  + 0], 0, 4*4);
     }
+  }  
   return 0;
 }
 
-tatic void status(uint8_t cpuIdx)
-{
+void ftmShowStatus(uint32_t* status) {
+  uint32_t cpuIdx, i;
   uint32_t ftmStatus, mySharedMem, sharedMem;
-  eb_status_t status;
   uint32_t cfg;
   uint64_t tmp;
-  eb_cycle_t cycle;
-  eb_address_t tmpAdr = pAccess->pCores[cpuIdx].ramAdr + ftm_shared_offs;
   long long unsigned int ftmTPrep;
-  uint32_t* buffEbm   = buff ;
+  uint32_t* buffEbm   = status;
   uint32_t* buffPrioq = buffEbm + (EBM_REG_LAST>>2);
   uint32_t* buffCpu   = buffPrioq + (r_FPQ.tsCh>>2);
 
+  char strBuff[65536];
+  char* pSB = (char*)&strBuff;
+
   //Generate EBM Status
-  printf ("EBM||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
-  printf ("Status\t\t: 0x%08x\n",  buffEbm[EBM_REG_STATUS]);
-  printf ("Src Mac\t\t: 0x%08x%04x\n", buffEbm[EBM_REG_SRC_MAC_HI],  buffEbm[EBM_REG_SRC_MAC_LO]);
-  printf ("Src IP\t\t: 0x%08x\n", buffEbm[EBM_REG_SRC_IPV4]);
-  printf ("Src Port\t: 0x%04x\n\n", buffEbm[EBM_REG_SRC_UDP_PORT]); 
-  printf ("Dst Mac\t\t: 0x%08x%04x\n", buffEbm[EBM_REG_DST_MAC_HI],  buffEbm[EBM_REG_DST_MAC_LO]);
-  printf ("Dst IP\t\t: 0x%08x\n", buffEbm[EBM_REG_DST_IPV4]);
-  printf ("Dst Port\t: 0x%04x\n\n", buffEbm[EBM_REG_DST_UDP_PORT]);
-  printf ("MTU\t\t: %u\n", buffEbm[EBM_REG_MTU]);
-  printf ("Adr Hi\t\t: 0x%08x\n", buffEbm[EBM_REG_ADR_HI]);
-  printf ("Ops Max\t\t: %u\n", buffEbm[EBM_REG_OPS_MAX]);
-  printf ("EB Opt\t\t: 0x%08x\n\n", buffEbm[EBM_REG_EB_OPT]);
-
-  //Generate PrioQ Status
-  printf ("FPQ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n");
-  cfg = &buffPrioq[r_FPQ.cfgGet];
-  printf("-----------------------------------------------------------------------------------\n");
-  if(cfg & r_FPQ.cfg_ENA)            printf("    ENA   ");  else printf("     -    ");
-  if(cfg & r_FPQ.cfg_FIFO)           printf("   FIFO   ");  else printf("     -    ");
-  if(cfg & r_FPQ.cfg_AUTOPOP)        printf("   APOP   ");  else printf("     -    ");
-  if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) printf(" AFL_TIME ");  else printf("     -    ");
-  if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) printf(" AFL_MSGS ");  else printf("     -    ");
-  if(cfg & r_FPQ.cfg_MSG_ARR_TS)     printf("  TS_ARR  ");  else printf("     -    ");
-  printf("\n");
-  printf("-----------------------------------------------------------------------------------\n");
-  printf ("Dst Adr\t\t: 0x%08x\n\n", buffPrioq[r_FPQ.dstAdr]);
-  printf ("Heap Cnt\t: %u\n", buffPrioq[r_FPQ.heapCnt]);
-  printf ("msg CntO\t: %u\n", buffPrioq[r_FPQ.msgCntO]);
-  printf ("msg CntI\t: %u\n\n", buffPrioq[r_FPQ.msgCntI]);  
-  tmp = (((uint64_t)buffPrioq[r_FPQ.tTrnHi]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tTrnLo]);
-  printf ("TTrn\t\t: %llu\n", (long long unsigned int)tmp<<3);
-  tmp = (((uint64_t)buffPrioq[r_FPQ.tDueHi]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tDueLo]);
-  printf ("TDue\t\t: %llu\n\n", (long long unsigned int)tmp<<3);
-  printf ("Capacity\t: %u\n", buffPrioq[r_FPQ.capacity]));
-  printf ("msg max\t\t: %u\n\n", buffPrioq[r_FPQ.msgMax]));
-  printf ("EBM Adr\t\t: 0x%08x\n", buffPrioq[r_FPQ.ebmAdr]));
-  printf ("ts Adr\t\t: 0x%08x\n", buffPrioq[r_FPQ.tsAdr]));
-  printf ("ts Ch\t\t: 0x%08x\n\n", buffPrioq[r_FPQ.tsCh]));
-
-
-
+  SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+  SNTPRINTF(pSB ,"\u2502 %sEBM%s                                                                           \u2502\n", KCYN, KNRM);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  SNTPRINTF(pSB ,"\u2502 Status       \u2502 0x%08x\n",  buffEbm[EBM_REG_STATUS>>2]);
+  SNTPRINTF(pSB ,"\u2502 Src Mac      \u2502 0x%08x%04x\n", buffEbm[EBM_REG_SRC_MAC_HI>>2],  buffEbm[EBM_REG_SRC_MAC_LO>>2]);
+  SNTPRINTF(pSB ,"\u2502 Src IP       \u2502 0x%08x\n", buffEbm[EBM_REG_SRC_IPV4>>2]);
+  SNTPRINTF(pSB ,"\u2502 Src Port     \u2502 0x%04x\n", buffEbm[EBM_REG_SRC_UDP_PORT>>2]);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n"); 
+  SNTPRINTF(pSB ,"\u2502 Dst Mac      \u2502 0x%08x%04x\n", buffEbm[EBM_REG_DST_MAC_HI>>2],  buffEbm[EBM_REG_DST_MAC_LO>>2]);
+  SNTPRINTF(pSB ,"\u2502 Dst IP       \u2502 0x%08x\n", buffEbm[EBM_REG_DST_IPV4>>2]);
+  SNTPRINTF(pSB ,"\u2502 Dst Port     \u2502 0x%04x\n", buffEbm[EBM_REG_DST_UDP_PORT>>2]);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  SNTPRINTF(pSB ,"\u2502 MTU          \u2502 %u\n", buffEbm[EBM_REG_MTU>>2]);
+  SNTPRINTF(pSB ,"\u2502 Adr Hi       \u2502 0x%08x\n", buffEbm[EBM_REG_ADR_HI>>2]);
+  SNTPRINTF(pSB ,"\u2502 Ops Max      \u2502 %u\n", buffEbm[EBM_REG_OPS_MAX>>2]);
+  SNTPRINTF(pSB ,"\u2502 EB Opt       \u2502 0x%08x\n", buffEbm[EBM_REG_EB_OPT>>2]);
+  SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   
-  ftmStatus = (uint32_t) tmpRd[0];
-  sharedMem = tmpRd[1]; //convert lm32's view to pcie's view
-  mySharedMem = pAccess->clusterAdr + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
-  ftmTPrep = (long long unsigned int)(((uint64_t)tmpRd[2]) << 32 | ((uint64_t)tmpRd[3]));
+  //Generate PrioQ Status
+  SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+  SNTPRINTF(pSB ,"\u2502 %sFPQ%s                                                                           \u2502\n", KCYN, KNRM);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  cfg = buffPrioq[r_FPQ.cfgGet>>2];
+  SNTPRINTF(pSB ,"\u2502 Flags        \u2502 ");
+  if(cfg & r_FPQ.cfg_ENA)            SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
+  if(cfg & r_FPQ.cfg_FIFO)           SNTPRINTF(pSB ,"   FIFO   ");  else SNTPRINTF(pSB ,"     -    ");
+  if(cfg & r_FPQ.cfg_AUTOPOP)        SNTPRINTF(pSB ,"   APOP   ");  else SNTPRINTF(pSB ,"     -    ");
+  if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
+  if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");
+  if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
+  SNTPRINTF(pSB ,"   \u2502\n", KCYN, KNRM);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
 
-  uint8_t i;
-     
-  printf("\u2552"); for(i=0;i<79;i++) printf("\u2550"); printf("\u2555\n");
-  printf("\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
-  printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u252C"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
-  printf("\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
-   (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), (uint16_t)(ftmStatus >> 16), ftmTPrep<<3);
-  printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u253C"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
-  printf("\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*0x0C);
-  if(pAccess->pCores[cpuIdx].actOffs < pAccess->pCores[cpuIdx].inaOffs) printf("   Act Page: A 0x%08x  Inact Page: B 0x%08x", pAccess->pCores[cpuIdx].actOffs, pAccess->pCores[cpuIdx].inaOffs);
-  else                      printf("   Act Page: B 0x%08x  Inact Page: A 0x%08x", pAccess->pCores[cpuIdx].actOffs, pAccess->pCores[cpuIdx].inaOffs);
-  printf("   \u2502\n");
-  printf("\u251C"); for(i=0;i<24;i++) printf("\u2500"); printf("\u2534"); for(i=0;i<54;i++) printf("\u2500"); printf("\u2524\n");
-  printf("\u2502       ");
-
-  if(ftmStatus & STAT_RUNNING)    printf("   %sRUNNING%s   ", KGRN, KNRM);  else printf("   %sSTOPPED%s   ", KRED, KNRM);
-  if(ftmStatus & STAT_IDLE)       printf("     %sIDLE%s    ", KYEL, KNRM);  else printf("     %sBUSY%s    ", KGRN, KNRM);
-  if(ftmStatus & STAT_STOP_REQ)   printf("   STOP_REQ  ");  else printf("      -      ");
-  if(ftmStatus & STAT_ERROR)      printf("     %sERROR%s   ", KRED, KNRM);  else printf("     %sOK%s      ", KGRN, KNRM);
-  if(ftmStatus & STAT_WAIT)       printf("  WAIT_COND  ");  else printf("      -      ");
-  printf("       \u2502\n");
-  printf("\u2514"); for(i=0;i<79;i++) printf("\u2500"); printf("\u2518\n");
-
-}
+  SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502 0x%08x\n", buffPrioq[r_FPQ.dstAdr>>2]);
+  SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502 0x%08x\n", buffPrioq[r_FPQ.ebmAdr>>2]);
+  SNTPRINTF(pSB ,"\u2502 ts Adr       \u2502 0x%08x\n", buffPrioq[r_FPQ.tsAdr>>2]);
+  SNTPRINTF(pSB ,"\u2502 ts Ch        \u2502 0x%08x\n", buffPrioq[r_FPQ.tsCh>>2]);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  SNTPRINTF(pSB ,"\u2502 Heap Count   \u2502 %u\n", buffPrioq[r_FPQ.heapCnt>>2]);
+  SNTPRINTF(pSB ,"\u2502 msg CntO     \u2502 %u\n", buffPrioq[r_FPQ.msgCntO>>2]);
+  SNTPRINTF(pSB ,"\u2502 msg CntI     \u2502 %u\n", buffPrioq[r_FPQ.msgCntI>>2]);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");  
+  tmp = (((uint64_t)buffPrioq[r_FPQ.tTrnHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tTrnLo>>2]);
+  SNTPRINTF(pSB ,"\u2502 TTrn         \u2502 %llu\n", (long long unsigned int)tmp<<3);
+  tmp = (((uint64_t)buffPrioq[r_FPQ.tDueHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tDueLo>>2]);
+  SNTPRINTF(pSB ,"\u2502 TDue         \u2502 %llu\n", (long long unsigned int)tmp<<3);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  SNTPRINTF(pSB ,"\u2502 Capacity     \u2502 %u\n", buffPrioq[r_FPQ.capacity>>2]);
+  SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %u\n", buffPrioq[r_FPQ.msgMax>>2]);
+  SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+  
+  
 
 
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
+      ftmStatus = buffCpu[cpuIdx*4+0];
+      sharedMem = buffCpu[cpuIdx*4+1]; //convert lm32's view to pcie's view
+      mySharedMem = p->clusterAdr + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
+      ftmTPrep = (long long unsigned int)(((uint64_t)buffCpu[cpuIdx*4+2]) << 32 | ((uint64_t)buffCpu[cpuIdx*4+3]));
 
- if (!strcasecmp(command, "status")) { printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM); 
+      
+         
+      SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+      SNTPRINTF(pSB ,"\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
+      SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+      SNTPRINTF(pSB ,"\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
+       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), (uint16_t)(ftmStatus >> 16), ftmTPrep<<3);
+      SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+      SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*0x0C);
+      if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) SNTPRINTF(pSB ,"   Act Page: A 0x%08x  Inact Page: B 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
+      else                      SNTPRINTF(pSB ,"   Act Page: B 0x%08x  Inact Page: A 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
+      SNTPRINTF(pSB ,"   \u2502\n");
+      SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+      SNTPRINTF(pSB ,"\u2502       ");
+
+      if(ftmStatus & STAT_RUNNING)    SNTPRINTF(pSB ,"   %sRUNNING%s   ", KGRN, KNRM);  else SNTPRINTF(pSB ,"   %sSTOPPED%s   ", KRED, KNRM);
+      if(ftmStatus & STAT_IDLE)       SNTPRINTF(pSB ,"     %sIDLE%s    ", KYEL, KNRM);  else SNTPRINTF(pSB ,"     %sBUSY%s    ", KGRN, KNRM);
+      if(ftmStatus & STAT_STOP_REQ)   SNTPRINTF(pSB ,"   STOP_REQ  ");  else SNTPRINTF(pSB ,"      -      ");
+      if(ftmStatus & STAT_ERROR)      SNTPRINTF(pSB ,"     %sERROR%s   ", KRED, KNRM);  else SNTPRINTF(pSB ,"     %sOK%s      ", KGRN, KNRM);
+      if(ftmStatus & STAT_WAIT)       SNTPRINTF(pSB ,"  WAIT_COND  ");  else SNTPRINTF(pSB ,"      -      ");
+      SNTPRINTF(pSB ,"       \u2502\n");
+      SNTPRINTF(pSB ,"\u2514"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+  }
+  printf("%s", (const char*)strBuff);
+}  

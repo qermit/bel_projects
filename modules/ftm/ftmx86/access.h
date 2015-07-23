@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include <etherbone.h>
 #include "ftmx86.h"
+#include "xmlaux.h"
+#include "fancy.h"
+
 
 #define SWAP_4(x) ( ((x) << 24) | \
          (((x) << 8) & 0x00ff0000) | \
@@ -107,8 +110,7 @@ static const struct {
 
 
 
-extern eb_device_t device;
-extern eb_socket_t mySocket;
+
 extern const char* program;
 
 
@@ -137,31 +139,36 @@ typedef struct {
 
 
 uint32_t ftm_shared_offs;
+t_ftmAccess* p;
+t_ftmAccess ftmAccess;
+eb_device_t device;
+eb_socket_t mySocket;
 
-int die(eb_status_t status, const char* what);
 
-uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
-const uint8_t*  ftmRamRead(uint32_t address, uint32_t len, const uint8_t* buf);
-const uint8_t*  ftmRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian);
-void ftmRamClear(uint32_t address, uint32_t len);
+
+uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
 void ftmClose(void);
 
-int ftmRst();
-int ftmCommand(uint64_t dstBitField, uint32_t command);
-
-int ftmPutFile(uint64_t dstBitField, const uint8_t* buf);
-int ftmPutString(uint64_t dstBitField, const char* sXml);
-
-char* ftmDump(uint64_t dstBitField, char* str);
-char* ftmGet(uint64_t dstBitField, char* str);
-
-int ftmCpuRst(uint32_t resetBits);
+int ftmRst(void);
+int ftmCpuRst(uint32_t dstCpus);
 int ftmThrRst(uint64_t dstBitField);
+int ftmFwLoad(uint32_t dstCpus, const char* filename);
 
-int ftmFwLoad(uint32_t dstBitField, const char* filename);
-ftmState* ftmGetStatus(uint32_t cpuDstBitField, ftmState* state);
+int ftmCommand(uint32_t dstCpus, uint32_t command);
+int ftmPutString(uint32_t dstCpus, const char* sXml);
+int ftmPutFile(uint32_t dstCpus, const char* filename);
+int ftmClear(uint32_t dstCpus);
+uint32_t ftmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
 
-uint8_t isFwValid(struct sdb_device* ram, const char* sVerExp, const char* sName);
+int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
+int ftmSetDuetime(uint64_t tdue);
+int ftmSetTrntime(uint64_t ttrn);
+int ftmSetMaxMsgs(uint64_t maxmsg);
+int ftmSetBp(uint32_t dstCpus, const char* bpStr);
+
+int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
+void ftmShowStatus(uint32_t* status);
+
 
 
 
