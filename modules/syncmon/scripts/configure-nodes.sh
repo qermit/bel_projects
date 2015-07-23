@@ -14,6 +14,10 @@ ref_name=""
 function configure_iodir()
 {
   ./oe-config $ip
+  if [ $? -ne 0 ]; then
+    echo "failed!"
+    exit 1
+  fi
 }
 
 # Function configure_eca
