@@ -26,6 +26,9 @@
 
 bool bigEndian;
 
+#define SNTPRINTF(b, ...) ((b) += sprintf((b), __VA_ARGS__))
+//#define SNTPRINTF(b, ...) (printf( __VA_ARGS__))
+
 typedef struct {
    uint64_t id;
    uint64_t par;
@@ -76,7 +79,7 @@ typedef struct {
 
 t_ftmPage*  deserPage(t_ftmPage* pPage, uint8_t* pBufStart, uint32_t embeddedOffs);
 uint8_t*    serPage  (t_ftmPage* pPage, uint8_t* pBufStart, uint32_t offset, uint8_t cpuId);
-void showFtmPage(t_ftmPage* pPage);
+int showFtmPage(t_ftmPage* pPage, char* buff);
 
 t_ftmChain* getChain(t_ftmPage* pPage, uint32_t planIdx, uint32_t chainIdx);
 t_ftmMsg* getMsg(t_ftmChain* pChain, uint32_t msgIdx);
