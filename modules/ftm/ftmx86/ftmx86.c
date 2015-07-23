@@ -413,7 +413,7 @@ int showFtmPage(t_ftmPage* pPage, char* buff)
          if(pChain->flags & FLAGS_IS_ENDLOOP)   SNTPRINTF(sB , "      IS_LOOP    "); else SNTPRINTF(sB , "%s", noFlag);
          SNTPRINTF(sB , "\n");
          
-         SNTPRINTF(sB , "\t\tStart:\t\t%018llu\n\t\tperiod:\t\t%018llu\n\t\trep:\t\t\t%10u\n\t\tmsg:\t\t\t%10u\n", 
+         SNTPRINTF(sB , "\t\tStart:\t\t%18llu\n\t\tperiod:\t\t%18llu\n\t\trep:\t\t\t%10u\n\t\tmsg:\t\t\t%10u\n", 
          pChain->tStart, pChain->tPeriod, pChain->repQty, pChain->msgQty);
        
          SNTPRINTF(sB , "\t\tCondVal:\t\t0x%08x\n\t\tCondMsk:\t\t0x%08x\n\t\tSigDst:\t\t\t0x%08x\n\t\tSigVal:\t\t\t0x%08x\n", 
@@ -432,7 +432,7 @@ int showFtmPage(t_ftmPage* pPage, char* buff)
             getIdEVTNO(pMsg[msgIdx].id), getIdSID(pMsg[msgIdx].id), getIdBPID(pMsg[msgIdx].id), getIdSCTR(pMsg[msgIdx].id));
             SNTPRINTF(sB , "\t\t\tpar:\t0x%08x%08x\n\t\t\ttef:\t\t0x%08x\n", 
             (uint32_t)(pMsg[msgIdx].par>>32), (uint32_t)pMsg[msgIdx].par, pMsg[msgIdx].tef);
-            SNTPRINTF(sB , "\t\t\toffs:\t%018llu \n", pMsg[msgIdx].offs<<3);  
+            SNTPRINTF(sB , "\t\t\toffs:\t%18llu \n", pMsg[msgIdx].offs<<3);  
          }
          pChain = (t_ftmChain*)pChain->pNext;
       }
