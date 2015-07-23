@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include <etherbone.h>
 #include "ftmx86.h"
+#include "xmlaux.h"
+#include "fancy.h"
+
 
 #define SWAP_4(x) ( ((x) << 24) | \
          (((x) << 8) & 0x00ff0000) | \
@@ -107,8 +110,7 @@ static const struct {
 
 
 
-extern eb_device_t device;
-extern eb_socket_t mySocket;
+
 extern const char* program;
 
 
@@ -137,31 +139,47 @@ typedef struct {
 
 
 uint32_t ftm_shared_offs;
+t_ftmAccess* p;
+t_ftmAccess ftmAccess;
+eb_device_t device;
+eb_socket_t mySocket;
 
-int die(eb_status_t status, const char* what);
+uint64_t cpus2thrs(uint32_t cpus);
+uint32_t thrs2cpus(uint64_t thrs);
 
-uint32_t ftmOpen(const char* netaddress, t_ftmAccess* p, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
-const uint8_t*  ftmRamRead(uint32_t address, uint32_t len, const uint8_t* buf);
-const uint8_t*  ftmRamWrite(const uint8_t* buf, uint32_t address, uint32_t len, uint32_t bufEndian);
-void ftmRamClear(uint32_t address, uint32_t len);
+uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck); //returns bitField showing CPUs with valid DM firmware
 void ftmClose(void);
 
-int ftmRst();
-int ftmCommand(uint64_t dstBitField, uint32_t command);
+//per DM
+int ftmRst(void);
+int ftmSetDuetime(uint64_t tdue);
+int ftmSetTrntime(uint64_t ttrn);
+int ftmSetMaxMsgs(uint64_t maxmsg);
 
-int ftmPutFile(uint64_t dstBitField, const uint8_t* buf);
-int ftmPutString(uint64_t dstBitField, const char* sXml);
+//per CPU
+int ftmCpuRst(uint32_t dstCpus);
+int ftmFwLoad(uint32_t dstCpus, const char* filename);
+int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
+int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
+void ftmShowStatus(uint32_t* status, uint8_t verbose);
 
-char* ftmDump(uint64_t dstBitField, char* str);
-char* ftmGet(uint64_t dstBitField, char* str);
-
-int ftmCpuRst(uint32_t resetBits);
+//per thread
 int ftmThrRst(uint64_t dstBitField);
+//these need wrappers to per thread access for future version compatibility
 
-int ftmFwLoad(uint32_t dstBitField, const char* filename);
-ftmState* ftmGetStatus(uint32_t cpuDstBitField, ftmState* state);
+int v02FtmCommand(uint32_t dstCpus, uint32_t command);
+int v02FtmPutString(uint32_t dstCpus, const char* sXml);
+int v02FtmPutFile(uint32_t dstCpus, const char* filename);
+int v02FtmClear(uint32_t dstCpus);
+uint32_t v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
+int v02FtmSetBp(uint32_t dstCpus, const char* bpStr);
 
-uint8_t isFwValid(struct sdb_device* ram, const char* sVerExp, const char* sName);
+int ftmCommand(uint64_t dstThr, uint32_t command);
+int ftmPutString(uint64_t dstThr, const char* sXml);
+int ftmPutFile(uint64_t dstThr, const char* filename);
+int ftmClear(uint64_t dstThr);
+uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
+int ftmSetBp(uint64_t dstThr, const char* bpStr);
 
 
 
