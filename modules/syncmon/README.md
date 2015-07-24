@@ -9,16 +9,18 @@ This application is used to monitor the synchronization quality of White Rabbit 
 Configuration File Layout
 -------------------------
 
-Example files can be found at the cfg/ directory.
+Example files can be found at the cfg/ directory. A configuration file has to look like this:
 
-<pre>[device name] [ip address] [io number/connection] [cable length in meters]</pre>
+<pre>
+  [device name] [ip/device address] [io number/connection] [cable length in meters]
+</pre>
 
 The first entry has to be the measurement/reference node!
 
 Compiling
 ---------
 
-To compile the syncmon application just use the makefile:
+To compile the syncmon and oe-config application just use the makefile:
 
 <pre>
   make all
@@ -27,14 +29,14 @@ To compile the syncmon application just use the makefile:
 Console Output
 --------------
 
-The output will look like this:
+The output of syncmon will look like this:
 
 <pre>
-./syncmon: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast  Average
-./syncmon: ----------------------------------------------------------------------------------------------------
-./syncmon: ts0: 0000075264000000140  00000200
-./syncmon: ts1: 0000075264000000060  00000200  -080ns      -080ns     -079ns     +000ns   +000ns   -79.889999ns
-./syncmon: ts2: 0000075264000000200  00000200  +060ns      +000ns     +000ns     +060ns   +059ns   +59.775333ns
+  ./syncmon: Latest TS                 Count     Offset ts0  MaxFuture  MinFuture  MaxPast  MinPast  Average
+  ./syncmon: ----------------------------------------------------------------------------------------------------
+  ./syncmon: ts0: 0000075264000000140  00000200
+  ./syncmon: ts1: 0000075264000000060  00000200  -080ns      -080ns     -079ns     +000ns   +000ns   -79.889999ns
+  ./syncmon: ts2: 0000075264000000200  00000200  +060ns      +000ns     +000ns     +060ns   +059ns   +59.775333ns
 </pre>
 
 The according signals will look like this:
@@ -51,13 +53,13 @@ The according signals will look like this:
 Example Usage
 -------------
 
-* Start test without Data Master (reference node will be a fake data mater):
+* Start test with a fake Data Master (reference node will become a fake Data Master):
   <pre>./start_fake_data_master.sh cfg/timing_devices_complete.cfg</pre>
 
-* Start test with Data Master:
+* Start test with an external Data Master:
   <pre>./start_external_data_master.sh cfg/timing_devices_complete.cfg udp/dev/data.master</pre>
 
-* Start test with a Data master that is already running:
+* Start test with a Data Master that is already running:
   <pre>./start_node_test.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start switch test:
@@ -66,8 +68,8 @@ Example Usage
 * Start Syncmon:
   <pre>./syncmon cfg/timing_devices_complete.cfg</pre>
 
-* Plot the results (optional, refresh rate in seconds == 0 => plot only once): 
-  <pre>./plot-results.py cfg/timing_devices_complete.cfg (refresh rate in seconds)</pre>
+* Plot the results (optional, n = refresh rate in seconds, 0 => plot only once): 
+  <pre>./plot-results.py cfg/timing_devices_complete.cfg n</pre>
 
 Node Monitoring
 ---------------
