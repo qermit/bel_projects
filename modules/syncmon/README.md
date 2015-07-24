@@ -57,6 +57,9 @@ Example Usage
 * Start test with Data Master:
   <pre>./start_external_data_master.sh cfg/timing_devices_complete.cfg udp/dev/data.master</pre>
 
+* Start test with a Data master that is already running:
+  <pre>./start_node_test.sh cfg/timing_devices_complete.cfg</pre>
+
 * Start switch test:
   <pre>./start_switch_test.sh cfg/timing_devices_complete.cfg</pre>
 
@@ -69,7 +72,7 @@ Example Usage
 Node Monitoring
 ---------------
 
-1. Run start script (real or fake data master)
+1. Run start script (external or fake data master or node test)
 
 2. Run the monitor application
 

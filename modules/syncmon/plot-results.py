@@ -119,7 +119,7 @@ def main(argv):
     update_rate = int(sys.argv[2])
   else:
     print "Missing configuration file!"
-    help_buffer = "Try %s cfg/test.cfg (refresh rate in seconds)..." % sys.argv[0]
+    help_buffer = "Try \"%s cfg/test.cfg n\" (n = refresh rate in seconds)..." % sys.argv[0]
     print help_buffer
     exit(1)
   
