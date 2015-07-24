@@ -54,16 +54,16 @@ Example Usage
 -------------
 
 * Start test with a fake Data Master (reference node will become a fake Data Master):
-  <pre>./start_fake_data_master.sh cfg/timing_devices_complete.cfg</pre>
+  <pre>./start-fake-data-master.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start test with an external Data Master:
-  <pre>./start_external_data_master.sh cfg/timing_devices_complete.cfg udp/dev/data.master</pre>
+  <pre>./start-external-data-master.sh cfg/timing_devices_complete.cfg udp/dev/data.master</pre>
 
 * Start test with a Data Master that is already running:
-  <pre>./start_node_test.sh cfg/timing_devices_complete.cfg</pre>
+  <pre>./start-node-test.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start switch test:
-  <pre>./start_switch_test.sh cfg/timing_devices_complete.cfg</pre>
+  <pre>./start-switch-test.sh cfg/timing_devices_complete.cfg</pre>
 
 * Start Syncmon:
   <pre>./syncmon cfg/timing_devices_complete.cfg</pre>
