@@ -1,6 +1,6 @@
 FLAGS   = -fPIC -Wall -O2 -g -I/usr/include/libxml2
 CFLAGS  = $(FLAGS) -Wmissing-declarations -Wmissing-prototypes -DPLATFORM=$(BUILD) -std=gnu99
-SOURCES	= main.c ftmx86.c xmlaux.c access.c
+SOURCES	= ftmx86.c xmlaux.c access.c
 LIBS    = -Wl,-rpath,/usr/local/lib -letherbone -lxml2
 LIBRARY = libetherbone.so libxml2.so
 EXTRA   = libetherbone.so.*
@@ -13,13 +13,19 @@ CXX     = $(TARGET)g++
 
 all: ftm-ctl
 
-ftm-ctl:	$(SOURCES)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
+libftm.a: $(SOURCES)
+	$(CC) $(CFLAGS) -c $(SOURCES) $(LIBS)
+	ar rcsv $@ *.o 
 
+ftm-ctl:	libftm.a 
+	$(CC) $(CFLAGS) -o $@ main.c $^ $(LIBS)
+
+install: ftm-ctl
+	cp ./ftm-ctl /usr/local/bin
 
 clean:
-	        rm -f *.o *.elf *.bin ftm-ctl
+	        rm -f *.o *.a *.elf *.bin ftm-ctl
 
 
 
