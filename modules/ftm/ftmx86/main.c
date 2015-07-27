@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <wait.h>
 #include "access.h"
+#include "../ftm_common.h"
+#include "fancy.h"
 
 
 #define FILENAME_LEN   256
@@ -32,7 +34,8 @@ static void help(void) {
   fprintf(stderr, "  bpset                     set branchpoint. accepts 0..n or 'idle'\n");
   fprintf(stderr, "  idle                      request idle state on this core\n");
   fprintf(stderr, "  swap                      swap active and inactive page on this core\n");
-  fprintf(stderr, "  put    <filename>         puts ftm data from xml file to inactive page on this core\n");
+  fprintf(stderr, "  put <filename>            puts ftm data from xml file to inactive page on this core\n");
+  fprintf(stderr, "  sig <offset><value><mask> Writes to FTM's shared memory area for this core. Mask is optional, default is 64b\n");
   fprintf(stderr, "  clear                     clears all pages on this core\n");
   fprintf(stderr, "  get                       gets ftm data from inactive page and displays it\n");
   fprintf(stderr, "  dump                      gets ftm data from active page and displays it\n");
@@ -58,6 +61,8 @@ int main(int argc, char** argv) {
    char     bpstr[10];
    uint64_t uint64val = 0;
    
+   uint64_t sigOffset, sigValue, sigMask = 0;
+   
    // cpu access related
    int cpuId = 0;
    uint8_t overrideFWcheck;
@@ -65,10 +70,13 @@ int main(int argc, char** argv) {
    uint64_t validTargetThrs; //validTargetThrs is there for compatibility with future versions of access library
    
    overrideFWcheck = 0;
-   error = 0;
-   verbose  = 0;
-   readonly = 1;
-   
+   error      = 0;
+   verbose    = 0;
+   readonly   = 1;
+   sigOffset  = 0;
+   sigValue   = 0;
+   sigMask    = 0;
+  
    // start getopt 
    while ((opt = getopt(argc, argv, "c:ovh")) != -1) {
       switch (opt) {
@@ -128,7 +136,19 @@ int main(int argc, char** argv) {
       }
    }
    
-    
+   if ( (!strcasecmp(command, "sig")) ) { 
+      if (optind+2 < argc) {
+         sigOffset  = (uint64_t)strtoll(argv[optind+1], NULL, 16);
+         sigValue   = (uint64_t)strtoll(argv[optind+2], NULL, 16);
+      } 
+      else {
+         fprintf(stderr, "%s: expecting two non-optional arguments: <Offset> <Value>\n", program);
+         return 1;
+      }
+      if (optind+3 < argc) {
+         sigMask    = (uint64_t)strtoll(argv[optind+3], NULL, 16);
+      } else { sigMask = 0xffffffffffffffff; }
+   } 
    
    if ( (!strcasecmp(command, "preptime")) || (!strcasecmp(command, "duetime")) || (!strcasecmp(command, "trntime")) || (!strcasecmp(command, "maxmsg"))) { 
       if (optind+1 < argc) {
@@ -256,7 +276,14 @@ int main(int argc, char** argv) {
   }
 
   else if (!strcasecmp(command, "setbp")) {
-    return ftmSetBp(validTargetThrs, bpstr);
+    int planIdx;
+    if(!strcasecmp(bpstr, "idle")) planIdx = -1;
+    else {planIdx = strtol(bpstr, 0, 10);}  	
+    return ftmSetBp(validTargetThrs, planIdx);
+  }
+  
+  else if (!strcasecmp(command, "sig")) {
+    return FtmSignal(validTargetThrs, sigOffset, sigValue, sigMask);  
   }
      
   else  printf("Unknown command: %s\n", command);  
