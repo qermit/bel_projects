@@ -1,5 +1,8 @@
 #include "access.h"
-
+#include "hwregs.h"
+#include "ftmx86.h"
+#include "xmlaux.h"
+#include "fancy.h"
 
 
 /// Expected Firmware Version ///
@@ -23,14 +26,7 @@ const uint32_t devID_Prioq       = 0x10040200;
 
 const char     devName_RAM_pre[] = "WB4-BlockRAM_";
 
-static uint32_t bytesToUint32(uint8_t* pBuf)
-{
-   uint8_t i;
-   uint32_t val=0;
-   
-   for(i=0;i<FTM_WORD_SIZE;   i++) val |= (uint32_t)pBuf[i] << (8*i);
-   return val;
-}
+
 
 static int die(eb_status_t status, const char* what)
 {  
@@ -288,6 +284,8 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   status = eb_device_read(device, (eb_address_t)devices[0].sdb_component.addr_first, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0], 0, eb_block);
   if (status != EB_OK) die(status, "failed to create cycle");
   p->cpuQty = (uint8_t)tmpRead[0];
+  //FIXME Adapt Cluster Info correctly and do a read here!!!
+  p->thrQty = 8;
   p->pCores =  malloc(p->cpuQty * sizeof(t_core));
 
   // Get Shared RAM
@@ -515,6 +513,46 @@ int v02FtmCommand(uint32_t dstCpus, uint32_t command) {
   return 0;
 }
 
+int FtmSignal(uint64_t dstThr, uint32_t offset, uint64_t value, uint64_t mask) {
+  
+  eb_status_t status;
+  eb_cycle_t cycle;
+  uint32_t thrIdx, cpuIdx, i;
+  uint64_t val, read;
+  eb_data_t tmpRead[2];
+  eb_address_t addr;
+  
+  //go through all marked threads
+  for(i=0;i < (p->thrQty * p->thrQty);i++) {
+    if((dstThr >> i) & 0x1) {
+      //get thread shared com RAM address
+      cpuIdx = i / p->thrQty;
+      thrIdx = i % p->thrQty;
+      addr = (eb_address_t)(p->sharedAdr + cpuIdx*CPU_SHARED_SIZE + thrIdx*THR_SHARED_SIZE + offset);
+      printf("Signal address: 0x%08x ", (uint32_t)addr);
+      //read current value
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle");
+      eb_cycle_read(cycle, addr + 0, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
+      eb_cycle_read(cycle, addr + 4, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);
+      if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close write cycle");
+ 
+      printf("CurrentValue: 0x%08x%08x ", (uint32_t)tmpRead[1], (uint32_t)tmpRead[0]);
+      //modify
+      read = (uint64_t)(uint32_t)tmpRead[0] | ((uint64_t)tmpRead[1])<<32;
+      val = (read & ~mask) | (value & mask);
+      printf("NewValue: 0x%08x%08x\n", (uint32_t)(val>>32), (uint32_t)val);
+      //write back 
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle");
+      if ((uint32_t)mask)         eb_cycle_write(cycle, addr + 0, EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)val));
+      if ((uint32_t)(mask >> 32)) eb_cycle_write(cycle, addr + 4, EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(val>>32)));
+      if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close write cycle");
+      
+    }
+  }
+  return 0;
+}
+
+
 int v02FtmPutString(uint32_t dstCpus, const char* sXml) {
   uint8_t    bufWrite[BUF_SIZE];
   t_ftmPage*  pPage;
@@ -621,18 +659,16 @@ int ftmSetMaxMsgs(uint64_t maxmsg) {
   return 0;    
 }
 
-int v02FtmSetBp(uint32_t dstCpus, const char* bpStr) {
+int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
 
-  int planIdx, planQty;
+  int planQty;
   eb_cycle_t cycle;
   eb_status_t status;
   uint32_t bp;
   eb_data_t tmpRead[3];
   
   uint32_t baseAddr, offs, cpuIdx; 
-  
-  if(!strcasecmp(bpStr, "idle")) planIdx = -1;
-  else {planIdx = strtol(bpStr, 0, 10);}   
+   
   
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
@@ -655,14 +691,16 @@ int v02FtmSetBp(uint32_t dstCpus, const char* bpStr) {
       if(bp != FTM_NULL && planIdx < planQty) {
         printf("Writing plan %d @ 0x%08x to BP\n", planIdx, bp);
         status = eb_device_write(device, (eb_address_t)(baseAddr + offs + FTM_PAGE_BP_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)bp, 0, eb_block);
-        if (status != EB_OK) return die(status, "failed to create cycle");  
+        if (status != EB_OK) return die(status, "failed to create cycle"); 
+        
       } else { 
         if (planIdx >= planQty) printf ("Sorry, but the plan index is neither idle nor 0 <= %d (planIdx) <  %u (planQty)\n", planIdx, planQty);
         else printf ("Found a NULL ptr at plan idx %d, something is wrong\n", planIdx);
+        return -1;
       }
     }  
   }
-  return 0;
+  return 0; 
 }
 
 
@@ -694,7 +732,7 @@ int ftmGetStatus(uint32_t srcCpus, uint32_t* buff) {
       if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
       for(i=0;i<4;i++) buff[offset + cpuIdx*4  + i] = (uint32_t)tmpRead[i];
     } else {
-      memset((const uint8_t*)&buff[offset + cpuIdx*4  + 0], 0, 4*4);
+      memset((uint8_t*)&buff[offset + cpuIdx*4  + 0], 0, 4*4);
     }
   }  
   return 0;
@@ -749,7 +787,7 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
     if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
     if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");
     if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
-    SNTPRINTF(pSB ,"   \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"   \u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
 
     SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[r_FPQ.dstAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
@@ -787,7 +825,7 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
       SNTPRINTF(pSB ,"\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
        (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), (uint16_t)(ftmStatus >> 16), ftmTPrep<<3);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-      SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*0x0C);
+      SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*CPU_SHARED_SIZE);
       if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) SNTPRINTF(pSB ,"   Act Page: A 0x%08x  Inact Page: B 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
       else                      SNTPRINTF(pSB ,"   Act Page: B 0x%08x  Inact Page: A 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
       SNTPRINTF(pSB ,"   \u2502\n");
@@ -828,5 +866,5 @@ int ftmPutFile(uint64_t dstThr, const char* filename) { return v02FtmPutFile(thr
 int ftmClear(uint64_t dstThr)                         { return v02FtmClear(thrs2cpus(dstThr));}
 uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) 
                                                       { return v02FtmDump(thrs2cpus(srcThr), len, actIna, stringBuf, lenStringBuf);}
-int ftmSetBp(uint64_t dstThr, const char* bpStr)      { return v02FtmSetBp(thrs2cpus(dstThr), bpStr);}
+int ftmSetBp(uint64_t dstThr, int32_t planIdx)      { return v02FtmSetBp(thrs2cpus(dstThr), planIdx);}
   
