@@ -62,6 +62,9 @@ Example Usage
 * Start test with a Data Master that is already running:
   <pre>./start-node-test.sh cfg/timing_devices_complete.cfg</pre>
 
+* Start external Data Master only (without any other configuration):
+  <pre>./start-data-master.sh udp/dev/data.master</pre>
+
 * Start switch test:
   <pre>./start-switch-test.sh cfg/timing_devices_complete.cfg</pre>
 
