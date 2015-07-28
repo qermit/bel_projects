@@ -214,7 +214,7 @@ architecture rtl of ftm is
   signal led_track    : std_logic;
   signal led_pps      : std_logic;
   
-  signal gpio_o       : std_logic_vector(7 downto 0);
+  signal gpio_o       : std_logic_vector(3 downto 0);
   signal lvds_p_i     : std_logic_vector(4 downto 0);
   signal lvds_n_i     : std_logic_vector(4 downto 0);
   signal lvds_i_led   : std_logic_vector(4 downto 0);
@@ -234,19 +234,19 @@ begin
 
   main : monster
     generic map(
-      g_family      => c_family,
-      g_project     => c_project,
-      g_flash_bits  => 25,
-      g_gpio_out    => 8,
-      g_lvds_in     => 2,
-      g_lvds_out    => 0,
-      g_lvds_inout  => 3,
-      g_lvds_invert => true,
-      g_en_pcie     => true,
-      g_en_usb      => true,
-      g_en_lcd      => false, 
+      g_family              => c_family,
+      g_project             => c_project,
+      g_flash_bits          => 25,
+      g_gpio_out            => 4,
+      g_lvds_in             => 2,
+      g_lvds_out            => 0,
+      g_lvds_inout          => 3,
+      g_lvds_invert         => true,
+      g_en_pcie             => true,
+      g_en_usb              => true,
+      g_en_lcd              => false, 
       g_lm32_profile        => "medium_icache_debug",
-      g_lm32_are_ftm        => true,	
+      g_lm32_are_ftm        => true,
       g_lm32_cores          => 4,
       g_lm32_ramsizes       => 65536/4,
       g_lm32_shared_ramsize => 4096/4,
@@ -332,10 +332,14 @@ begin
   led(6) <= '0' when gpio_o(1)='1' else 'Z';
   led(7) <= '0' when gpio_o(2)='1' else 'Z';
   led(8) <= '0' when gpio_o(3)='1' else 'Z';
-  p7     <= '0' when gpio_o(4)='1' else 'Z'; -- LED5 (DB1/2)
-  n7     <= '0' when gpio_o(5)='1' else 'Z'; -- LED6
-  p8     <= '0' when gpio_o(6)='1' else 'Z'; -- LED7
-  n8     <= '0' when gpio_o(7)='1' else 'Z'; -- LED8
+  --p7     <= '0' when gpio_o(4)='1' else 'Z'; -- LED5 (DB1/2)
+  --n7     <= '0' when gpio_o(5)='1' else 'Z'; -- LED6
+  --p8     <= '0' when gpio_o(6)='1' else 'Z'; -- LED7
+  --n8     <= '0' when gpio_o(7)='1' else 'Z'; -- LED8
+  p7 <= not (led_link_act and led_link_up); -- red   = traffic/no-link
+  n7 <= not led_link_up;                    -- blue  = link
+  p8 <= not led_track;                      -- green = timing valid
+  n8 <= not led_pps;                        -- white = PPS
   
   -- LVDS->LEMO output enable / termination
   n10 <= '0' when lvds_oen(0)='0' else 'Z'; -- TTLIO1 output enable
