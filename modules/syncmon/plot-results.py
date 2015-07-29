@@ -9,6 +9,10 @@ import time
 # Function plot(...)
 # --------------------------------------------------------------------------------
 def plot():
+  # Reset min and max plot limits
+  min_val_plot = -200
+  max_val_plot = 200
+
   # Read configuration file (get name and io number)
   data_ref = np.genfromtxt(filename,delimiter=' ', dtype=np.str)
   device_names = [row[0] for row in data_ref]
@@ -60,6 +64,11 @@ def plot():
           value_dev[i] = np.int64(value_dev[i]) - np.int64(value_ref[i])
           # Calculate average
           average_dev = average_dev + value_dev[i]
+          # Get min and max value for plotting
+          if min_val_plot > value_dev[i]:
+             min_val_plot = value_dev[i]
+	  if max_val_plot < value_dev[i]:
+             max_val_plot = value_dev[i]
         
         # Create legend with average note and plot it
         average_dev = average_dev/len(value_dev)
@@ -88,6 +97,7 @@ def plot():
   ax2.set_ylabel('Time Difference [ns]')
   ax2.set_xlabel('PPS Count')
   ax2.set_xlim([1,(len(value_ref)-1)])
+  ax2.set_ylim([min_val_plot,max_val_plot])
   ax2.axhspan(-200, 200, facecolor='0.25', alpha=0.25)
   ax2.grid()
   ax2.legend(loc=2)
@@ -112,6 +122,8 @@ def main(argv):
   global value_refz
   global filename
   global update_rate
+  global min_val_plot
+  global max_val_plot
   
   # Check if a file name was given as argument
   if (len(sys.argv) == 3):
