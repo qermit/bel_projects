@@ -1,0 +1,117 @@
+#/bin/bash
+LOG="tmp"
+RESULT_FILE="tmp/result"
+ROOT_FOLDER=$(pwd)
+
+
+HEADER="Measurements\n" 
+HEADER_TAB="MAC\t\t\t|PORT\t\t|PPS\t|Status" 
+HEADER_DIV="--------------------------------------------------------------------\n" 
+
+IFS=$'\n' # make newlines the only separator
+dev=$1    # first argument
+cmd_ip="ip"
+cmd_verbose="verbose 011303"
+
+NUM_DEV=`ls /dev/ttyACM* | wc -l`
+DEV=`ls /dev/ttyACM*`
+
+function ret()
+{
+        printf "\r" > $1
+}
+
+function get_ip()
+{
+        ret $1
+        for (( i=0; i<${#cmd_ip}; i++ )); do
+                printf "%s" ${cmd_ip:$i:1} > $1
+                sleep 0.2
+        done
+        ret $1
+}
+
+function set_verbose_level()
+{
+        ret $1
+        for (( i=0; i<${#cmd_verbose}; i++ )); do
+                printf "%s" ${cmd_verbose:$i:1} > $1
+                sleep 0.2
+        done
+        ret $1
+}
+
+
+function create_file 
+{
+
+	echo -e $HEADER > $RESULT_FILE
+	echo -e $HEADER_TAB >> $RESULT_FILE
+	echo -e $HEADER_DIV >> $RESULT_FILE
+}
+
+function get_mac()
+{
+	MAC=`$ROOT_FOLDER/eb-tools/src/wr-mac dev/ttyUSB$1`
+}
+
+function add_dev() 
+{
+
+	echo -e "$MAC\t|$j\t|\t|" >> $RESULT_FILE
+}
+
+function run()
+{
+	mkdir -p $LOG 
+	mkdir -p $LOG/log
+	mkdir -p $LOG/dump_log
+	touch $DATE/result
+
+	create_file
+
+	echo "Starting the Measurements"
+	echo "*************************"
+	echo "Devices connected" $NUM_DEV":"
+
+	CNT=0
+	for j in $DEV; do
+		echo $j
+		stty -F $j  115200 -icrnl -echo clocal
+		get_mac $CNT
+		add_dev
+		set_verbose_level $j
+		cat -v $j > $LOG/log/"ACM$CNT" &
+		let CNT=CNT+1
+	done
+	exit 0
+}
+
+function stop() 
+{
+
+	killall cat &>/dev/null
+	CNT=0
+	for j in $DEV; do
+		eb-get dev/ttyUSB$CNT 0x40000/131072 $LOG/dump_log/dump_ACM$CNT &>/dev/null
+		let CNT=CNT+1
+	done
+	
+	DATE=`date +%Y_%m_%d_%H_%M`
+
+	MNG_SERV_PATH="/common/usr/timing_log"
+	scp -r $LOG root@tsl004.acc.gsi.de:$MNG_SERV_PATH/$DATE
+	rm -rf $LOG
+	exit 0
+}
+
+if [ "$1" == "run" ] 
+then
+	run;
+elif [ "$1" == "stop" ] 
+then
+	stop;
+else
+	echo "Wrong parameter or no parameter, [run/stop]";
+fi
+
