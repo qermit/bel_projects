@@ -13,7 +13,6 @@ CXX     = $(TARGET)g++
 
 all: ftm-ctl
 
-
 libftm.a: $(SOURCES)
 	$(CC) $(CFLAGS) -c $(SOURCES) $(LIBS)
 	ar rcsv $@ *.o 
@@ -25,7 +24,14 @@ install: ftm-ctl
 	cp ./ftm-ctl /usr/local/bin
 
 clean:
-	        rm -f *.o *.a *.elf *.bin ftm-ctl
+	rm -f *.o *.a *.elf *.bin ftm-ctl mockup-test
+	        
+mockup: ftmx86.c xmlaux.c mockup.c
+	$(CC) $(CFLAGS) -DMOCKUP=1 -c $^ -Wl,-rpath, -lxml2
+	ar rcsv libftmmockup.a *.o  
+
+mockup-test:	mockup
+	$(CC) $(CFLAGS) -DMOCKUP=1 -o $@ main.c libftmmockup.a -Wl,-rpath, -lxml2
 
 
 
