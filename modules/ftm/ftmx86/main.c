@@ -283,7 +283,7 @@ int main(int argc, char** argv) {
   }
   
   else if (!strcasecmp(command, "sig")) {
-    return FtmSignal(validTargetThrs, sigOffset, sigValue, sigMask);  
+    return ftmSignal(validTargetThrs, sigOffset, sigValue, sigMask);  
   }
      
   else  printf("Unknown command: %s\n", command);  

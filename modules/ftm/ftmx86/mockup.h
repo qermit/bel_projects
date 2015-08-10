@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <etherbone.h>
 
 
 
@@ -23,8 +22,8 @@
 #define ACTIVE    1
 #define INACTIVE  2
 
-
-
+#define CPU_MAX 8
+#define THR_MAX 8
 
 
 
@@ -59,8 +58,7 @@ typedef struct {
 uint32_t ftm_shared_offs;
 t_ftmAccess* p;
 t_ftmAccess ftmAccess;
-eb_device_t device;
-eb_socket_t mySocket;
+
 
 uint64_t cpus2thrs(uint32_t cpus);
 uint32_t thrs2cpus(uint64_t thrs);
@@ -83,14 +81,6 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose);
 
 //per thread
 int ftmThrRst(uint64_t dstBitField);
-//these need wrappers to per thread access for future version compatibility
-
-int v02FtmCommand(uint32_t dstCpus, uint32_t command);
-int v02FtmPutString(uint32_t dstCpus, const char* sXml);
-int v02FtmPutFile(uint32_t dstCpus, const char* filename);
-int v02FtmClear(uint32_t dstCpus);
-uint32_t v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
-int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx);
 
 int ftmCommand(uint64_t dstThr, uint32_t command);
 int ftmSignal(uint64_t dstThr, uint32_t offset, uint64_t value, uint64_t mask);

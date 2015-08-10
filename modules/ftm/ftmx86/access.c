@@ -399,6 +399,7 @@ void ftmClose(void)
   eb_status_t status;
   if ((status = eb_device_close(device))   != EB_OK) die(status, "failed to close Etherbone device");
   if ((status = eb_socket_close(mySocket)) != EB_OK) die(status, "failed to close Etherbone socket");
+  free(p->pCores);
 }
 
 
@@ -513,7 +514,7 @@ int v02FtmCommand(uint32_t dstCpus, uint32_t command) {
   return 0;
 }
 
-int FtmSignal(uint64_t dstThr, uint32_t offset, uint64_t value, uint64_t mask) {
+int ftmSignal(uint64_t dstThr, uint32_t offset, uint64_t value, uint64_t mask) {
   
   eb_status_t status;
   eb_cycle_t cycle;
