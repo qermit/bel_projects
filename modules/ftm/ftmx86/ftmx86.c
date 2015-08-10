@@ -96,6 +96,8 @@ uint8_t* serPage (t_ftmPage*  pPage, uint8_t* pBufStart, uint32_t embeddedOffs, 
    t_ftmChain* pChain;
    uint32_t    pBufPlans[FTM_PLAN_MAX];
    pBuf = pBufStart + FTM_PAGEMETA;
+   
+   if(pPage == NULL) {fprintf(stderr, "error: Got no DOM to serialize from XML Parser. Something went wrong.\n"); return NULL;};
    //leave space for page meta info, write all plans to pBuffer
    for(planIdx = 0; planIdx < pPage->planQty; planIdx++)
    {
