@@ -310,13 +310,14 @@ t_ftmPage* parseXmlFile(const char* filename)
     xmlNode *root_element = NULL;
    t_ftmPage* pPage = NULL;
 
-    LIBXML_TEST_VERSION
+    //qLIBXML_TEST_VERSION
 
     /*parse the file and get the DOM */
     doc = xmlReadFile(filename, NULL, 0);
 
     if (doc == NULL) {
         printf("error: could not parse file %s\n", filename);
+        return NULL;
     }
 
     /*Get the root element node */
@@ -340,16 +341,17 @@ t_ftmPage* parseXmlFile(const char* filename)
 t_ftmPage* parseXmlString(const char* sXml)
 {
    xmlDoc *doc = NULL;
-    xmlNode *root_element = NULL;
+   xmlNode *root_element = NULL;
    t_ftmPage* pPage = NULL;
 
-    LIBXML_TEST_VERSION
+    //LIBXML_TEST_VERSION
 
     /*parse the file and get the DOM */
     doc = xmlParseDoc((const xmlChar *)sXml);
 
     if (doc == NULL) {
-        printf("error: could not parse string \n");
+        fprintf(stderr, "error: could not parse string \n");
+        return NULL;
     }
 
     /*Get the root element node */

@@ -15,7 +15,11 @@
 #define EBM_REG_EB_OPT        (EBM_REG_OPS_MAX      +4) 
 #define EBM_REG_LAST          (EBM_REG_EB_OPT)
 
-
+#define PPS_CNTR_UTCLO 0x8
+#define PPS_CNTR_UTCHI 0xC
+#define PPS_STATE      0x1C
+#define PPS_VALID      0x2
+#define TS_VALID      0x4
 
 // Priority Queue RegisterLayout
 static const struct {
