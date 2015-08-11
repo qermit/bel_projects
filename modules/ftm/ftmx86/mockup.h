@@ -77,7 +77,7 @@ int ftmCpuRst(uint32_t dstCpus);
 int ftmFwLoad(uint32_t dstCpus, const char* filename);
 int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
 int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
-void ftmShowStatus(uint32_t* status, uint8_t verbose);
+void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose);
 
 //per thread
 int ftmThrRst(uint64_t dstBitField);
