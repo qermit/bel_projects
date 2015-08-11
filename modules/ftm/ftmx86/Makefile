@@ -24,15 +24,14 @@ install: ftm-ctl
 	cp ./ftm-ctl /usr/local/bin
 
 clean:
-	rm -f *.o *.a *.elf *.bin ftm-ctl
+	rm -f *.o *.a *.elf *.bin ftm-ctl mockup-test
 	        
-libftmmockup.a: ftmx86.c xmlaux.c mockup.c
-	$(CC) $(CFLAGS) -c $^ -Wl,-rpath, -lxml2
-	ar rcsv $@ *.o  
+mockup: ftmx86.c xmlaux.c mockup.c
+	$(CC) $(CFLAGS) -DMOCKUP=1 -c $^ -Wl,-rpath, -lxml2
+	ar rcsv libftmmockup.a *.o  
 
-
-mockup:	libftmmockup.a 
-	$(CC) $(CFLAGS) -o mock-ftm-ctl main.c $^ -Wl,-rpath, -lxml2
+mockup-test:	mockup
+	$(CC) $(CFLAGS) -DMOCKUP=1 -o $@ main.c libftmmockup.a -Wl,-rpath, -lxml2
 
 
 

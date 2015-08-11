@@ -3,6 +3,14 @@
 #include "ftmx86.h"
 #include "xmlaux.h"
 #include "fancy.h"
+#include <time.h>
+
+uint32_t ftm_shared_offs;
+t_ftmAccess* p;
+t_ftmAccess ftmAccess;
+eb_device_t device;
+eb_socket_t mySocket;
+
 
 
 /// Expected Firmware Version ///
@@ -14,6 +22,10 @@ const char myName[] = "ftm\n";
 const uint64_t vendID_CERN       = 0x000000000000ce42;
 const uint64_t vendID_GSI        = 0x0000000000000651;
 
+const uint32_t devID_SysCon      = 0xff07fc47;
+const uint32_t devID_PPS         = 0xde0d8ced;
+
+
 const uint32_t devID_Reset       = 0x3a362063;
 const uint32_t devID_RAM         = 0x66cfeb52;
 const uint32_t devID_CoreRAM     = 0x54111351;
@@ -23,7 +35,7 @@ const uint32_t devID_ClusterInfo = 0x10040086;
 const uint32_t devID_ClusterCB   = 0x10041000;
 const uint32_t devID_Ebm         = 0x00000815;
 const uint32_t devID_Prioq       = 0x10040200;
-
+ 
 const char     devName_RAM_pre[] = "WB4-BlockRAM_";
 
 
@@ -254,12 +266,12 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 
 
   /* open EB socket and device */
-  if ((status = eb_socket_open(EB_ABI_CODE, 0, EB_ADDR32 | EB_DATA32, &mySocket))               != EB_OK) die(status, "failed to open Etherbone socket");
-  if ((status = eb_device_open(mySocket, netaddress, EB_ADDR32 | EB_DATA32, attempts, &device)) != EB_OK) die(status, "failed to open Etherbone device");
+  if ((status = eb_socket_open(EB_ABI_CODE, 0, EB_ADDR32 | EB_DATA32, &mySocket))               != EB_OK) {die(status, "failed to open Etherbone socket"); return 0;}
+  if ((status = eb_device_open(mySocket, netaddress, EB_ADDR32 | EB_DATA32, attempts, &device)) != EB_OK) {die(status, "failed to open Etherbone device"); return 0;}
 
   num_devices = MAX_DEVICES;
   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_ClusterCB, (struct sdb_device*)&CluCB, &num_devices)) != EB_OK)
-  die(status, "failed to when searching for device");
+  {die(status, "failed to when searching for device"); return 0;}
   p->clusterAdr = CluCB.sdb_component.addr_first;
   
   //find reset ctrl
@@ -271,40 +283,61 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   }
   p->resetAdr = (eb_address_t)devices[0].sdb_component.addr_first;
 
+  //get wr-syscon
+  num_devices = MAX_DEVICES;
+  if ((status = eb_sdb_find_by_identity(device, vendID_CERN, devID_SysCon, &devices[0], &num_devices)) != EB_OK)
+  {die(status, "failed to when searching for device"); return 0;}
+  if (num_devices == 0) {
+    fprintf(stderr, "%s: No wr syscon found\n", program);
+    goto error;
+  }
+  p->sysConAdr = (eb_address_t)devices[0].sdb_component.addr_first;
+  
+  //get pps
+  num_devices = MAX_DEVICES;
+  if ((status = eb_sdb_find_by_identity(device, vendID_CERN, devID_PPS, &devices[0], &num_devices)) != EB_OK)
+  {die(status, "failed to when searching for device"); return 0;}
+  if (num_devices == 0) {
+    fprintf(stderr, "%s: No wr syscon found\n", program);
+    goto error;
+  }
+  p->ppsAdr = (eb_address_t)devices[0].sdb_component.addr_first;
+
+
   //get clusterInfo
   num_devices = MAX_DEVICES;
   if ((status = eb_sdb_find_by_identity_at(device, &CluCB, vendID_GSI, devID_ClusterInfo, &devices[0], &num_devices)) != EB_OK)
-  die(status, "failed to when searching for device");
+  {die(status, "failed to when searching for device"); return 0;}
   if (num_devices == 0) {
     fprintf(stderr, "%s: No lm32 clusterId rom found\n", program);
     goto error;
   }
-
   //get number of CPUs
+  num_devices = MAX_DEVICES;
   status = eb_device_read(device, (eb_address_t)devices[0].sdb_component.addr_first, EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0], 0, eb_block);
-  if (status != EB_OK) die(status, "failed to create cycle");
+  if (status != EB_OK) {die(status, "failed to create cycle"); return 0;}
   p->cpuQty = (uint8_t)tmpRead[0];
   //FIXME Adapt Cluster Info correctly and do a read here!!!
   p->thrQty = 8;
   p->pCores =  malloc(p->cpuQty * sizeof(t_core));
 
   // Get Shared RAM
-  num_devices = 1;
+  num_devices = MAX_DEVICES;
   if ((status = eb_sdb_find_by_identity_at(device, &CluCB, vendID_GSI, devID_SharedRAM, &devices[0], &num_devices)) != EB_OK)
-  die(status, "failed to when searching for Shared RAM ");
+  {die(status, "failed to when searching for Shared RAM "); return 0;}
   //Old or new Gateware ?
   //FIXME: the cumbersome legacy code has to go sometime
   if(num_devices < 1) {
     //Old
     if ((status = eb_sdb_find_by_identity_at(device, &CluCB, vendID_CERN, devID_RAM, &devices[0], &num_devices)) != EB_OK)
-    die(status, "failed to when searching for Shared RAM ");
+    {die(status, "failed to when searching for Shared RAM "); return 0;}
   }
   p->sharedAdr = (eb_address_t)devices[0].sdb_component.addr_first;
 
   // Get prioq
   num_devices = 1;
   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_Prioq, &devices[0], &num_devices)) != EB_OK)
-  die(status, "failed to when searching for Priority Queue ");
+  {die(status, "failed to when searching for Priority Queue "); return 0;}
   if (num_devices == 0) {
     fprintf(stderr, "%s: No Priority Queue found\n", program);
     goto error;
@@ -314,7 +347,7 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   // Get EBM
   num_devices = 1;
   if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_Ebm, &devices[0], &num_devices)) != EB_OK)
-  die(status, "failed to when searching for device");
+  {die(status, "failed to when searching for device"); return 0;}
   if (num_devices == 0) {
     fprintf(stderr, "%s: No Etherbone Master found\n", program);
     goto error;
@@ -324,7 +357,7 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   //Get RAMs 
   num_devices = MAX_DEVICES;
   if ((status = eb_sdb_find_by_identity_at(device, &CluCB, vendID_GSI, devID_CoreRAM, &devices[0], &num_devices)) != EB_OK)
-  die(status, "failed to when searching for device");
+  {die(status, "failed to when searching for device"); return 0;}
   
   //Old or new Gateware ?
   //FIXME: the cumbersome legacy code has to go sometime
@@ -358,7 +391,7 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 
       num_devices = MAX_DEVICES;
       if ((status = eb_sdb_find_by_identity(device, vendID_CERN, devID_RAM, &devices[0], &num_devices)) != EB_OK)
-      die(status, "failed to when searching for device");
+      {die(status, "failed to when searching for device"); return 0;}
       
       for (idx = 0; idx < num_devices; ++idx) {
         if(strncmp(devName_RAM_post, (const char*)&devices[idx].sdb_component.product.name[13], 3) == 0) {
@@ -386,10 +419,11 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
     
     } else printf("Core #%u: Can't read schedule data offsets - no valid firmware present.\n", cpuIdx);
   }
-
+  p->validCpus = validCpus;
   return validCpus;
 
   error:
+  p->validCpus = 0;
   ftmClose();
   return 0; //dummy
 }
@@ -706,54 +740,145 @@ int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
 
 
 
-int ftmGetStatus(uint32_t srcCpus, uint32_t* buff) {
-  uint32_t cpuIdx, offset, i;
+int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
+  uint32_t cpuIdx, thrIdx, offset;
+  uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
+  uint32_t returnedLen = ((EBM_REG_LAST + r_FPQ.tsCh)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
+  
+  if (len < returnedLen) return (len - returnedLen);
+  
   eb_address_t tmpAdr;
-  eb_data_t tmpRead[4];
+  eb_data_t tmpRead[6];
   eb_cycle_t cycle;
   eb_status_t status;
+  
+  
+  
+  offset = 0;
   
   // read EBM status
   ftmRamRead(p->ebmAdr + EBM_REG_STATUS, (const uint8_t*)&buff[EBM_REG_STATUS>>2], EBM_REG_LAST, BIG_ENDIAN);
   ftmRamRead(p->prioQAdr + r_FPQ.cfgGet, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.cfgGet)>>2], 4, BIG_ENDIAN);
+  offset += EBM_REG_LAST>>2; //advance offset
+  
   
   // read PrioQ status
   ftmRamRead(p->prioQAdr + r_FPQ.dstAdr, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.dstAdr)>>2], r_FPQ.ebmAdr - r_FPQ.dstAdr +4, BIG_ENDIAN);
-  offset = (EBM_REG_LAST + r_FPQ.tsCh)>>2;
+  offset += r_FPQ.tsCh>>2; //advance offset
+
+  
+
+  
+  //read WR State
+  if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+  eb_cycle_read(cycle, (eb_address_t)p->ppsAdr + PPS_STATE,   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
+  
+  eb_cycle_read(cycle, (eb_address_t)p->ppsAdr + PPS_CNTR_UTCLO,   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]);
+  eb_cycle_read(cycle, (eb_address_t)p->ppsAdr + PPS_CNTR_UTCHI,   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);
+  if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
+  
+  buff[offset + WR_STATUS] = (uint32_t)tmpRead[0] & 0x6;
+  buff[offset + WR_UTC_HI] = (uint32_t)tmpRead[1] & 0xff;
+  buff[offset + WR_UTC_LO] = (uint32_t)tmpRead[2];
+  
+  offset += WR_STATE_SIZE; 
   
   // read CPU status'
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
-    if((srcCpus >> cpuIdx) & 0x1) {
+    if((p->validCpus >> cpuIdx) & 0x1) {
       tmpAdr = p->pCores[cpuIdx].ramAdr + ftm_shared_offs;
       if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_STAT_OFFSET,         EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
-      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_SHARED_PTR_OFFSET,   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]); 
-      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]);
-      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET+4,      EB_BIG_ENDIAN | EB_DATA32, &tmpRead[3]);
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_STAT_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_SHARED_PTR_OFFSET,  EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]); 
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET,       EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]);
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_TPREP_OFFSET+4,     EB_BIG_ENDIAN | EB_DATA32, &tmpRead[3]);
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_PACT_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[4]);
+      eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_PINA_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[5]);
       if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
-      for(i=0;i<4;i++) buff[offset + cpuIdx*4  + i] = (uint32_t)tmpRead[i];
+      
+      
+      
+           
+      
+      //TODO
+      //Future work: change everything to new register layout in v03
+      buff[offset + cpuIdx*coreStateSize  + CPU_STATUS]   = (uint32_t)tmpRead[0] & 0xffff;
+      buff[offset + cpuIdx*coreStateSize  + CPU_MSGS]     = (uint32_t)tmpRead[0] >> 16;
+      buff[offset + cpuIdx*coreStateSize  + CPU_SHARED]   = (uint32_t)tmpRead[1];
+      
+      
+      
+      buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_HI] = (uint32_t)tmpRead[2];
+      buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_LO] = (uint32_t)tmpRead[3];
+      
+      
+      
+    
+      //TODO
+      //Future work: change everything to new register layout in v03. And include real threads !!!
+      uint32_t tmp = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];
+      if(tmp & STAT_RUNNING) buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = 1;
+      if(tmp & STAT_WAIT) buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = 1;
+      if(tmp & STAT_IDLE)    buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = 1;
+      if(tmp & STAT_ERROR)   buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = 1;
+      
+      p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[4];
+      p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[5];
+      
+      if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) { buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_A] = 1;
+                                                                  buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_B] = 0;} 
+      else                                                      { buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_A] = 0;
+                                                                  buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_B] = 1;}
+                                                                  
+      if(tmp & STAT_RUNNING) buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_A] = 1;
+      if(tmp & STAT_RUNNING) buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_B] = 1;
+        
+      thrIdx = 0;
+      buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_STATUS]  = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];  
+      buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_MSGS]    = buff[offset + cpuIdx*coreStateSize  + CPU_MSGS];
+      
+      if(p->thrQty > 1) {
+        for(thrIdx=1;thrIdx < p->thrQty;thrIdx++) {
+          buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_STATUS]  = 0;
+          buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_MSGS]    = 0;
+        }
+      }
+      
+      
     } else {
-      memset((uint8_t*)&buff[offset + cpuIdx*4  + 0], 0, 4*4);
+      memset((uint8_t*)&buff[offset + cpuIdx*coreStateSize  + 0], 0, coreStateSize*4);
     }
-  }  
-  return 0;
+  }
+  
+  
+  
+    
+  return returnedLen;
 }
 
 
 //this is horrible code, but harmless. Does the job for now.
 //TODO: replace this with something more sensible
-void ftmShowStatus(uint32_t* status, uint8_t verbose) {
+void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   uint32_t cpuIdx, i;
-  uint32_t ftmStatus, mySharedMem, sharedMem;
+  uint32_t ftmStatus, ftmMsgs, mySharedMem, sharedMem;
   uint32_t cfg;
   uint64_t tmp;
   long long unsigned int ftmTPrep;
   uint32_t* buffEbm   = status;
-  uint32_t* buffPrioq = buffEbm + (EBM_REG_LAST>>2);
-  uint32_t* buffCpu   = buffPrioq + (r_FPQ.tsCh>>2);
-
+  uint32_t* buffPrioq = (uint32_t*)&buffEbm[(EBM_REG_LAST>>2)];
+  uint32_t* buffWr    = (uint32_t*)&buffPrioq[(r_FPQ.tsCh>>2)];
+  uint32_t* buffCpu   = (uint32_t*)&buffWr[WR_STATE_SIZE];
+  uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
   char strBuff[65536];
   char* pSB = (char*)&strBuff;
+  char sLinkState[20];
+  char* pL = (char*)&sLinkState;
+  char sSyncState[20];
+  char* pS = (char*)&sSyncState;
+
+  
+  
 
   if(verbose) {
 
@@ -811,12 +936,38 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
   
   }
 
+    
+
+  //Generate WR Status
+  
+    if(buffWr[WR_STATUS] & PPS_VALID) SNTPRINTF(pL ,"  %sOK%s  ", KGRN, KNRM);
+    else                              SNTPRINTF(pL ,"  %s--%s  ", KRED, KNRM);
+  
+    if(buffWr[WR_STATUS] & TS_VALID) SNTPRINTF(pS ,"  %sOK%s  ", KGRN, KNRM);
+    else                                  SNTPRINTF(pS ,"  %s--%s  ", KRED, KNRM);
+
+   uint64_t testme = (((uint64_t)buffWr[WR_UTC_HI]) << 32 | ((uint64_t)buffWr[WR_UTC_LO]));
+
+    time_t testtime = (time_t)testme;
+  
+    
+    SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+    SNTPRINTF(pSB ,"\u2502 %sWR %s                                                                           \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 PPS: %s TS: %s \u2502 WR-UTC: %.24s                     \u2502\n", sLinkState, sSyncState, ctime((time_t*)&testtime));
+    SNTPRINTF(pSB ,"\u2514"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+    
+
 
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
-      ftmStatus = buffCpu[cpuIdx*4+0];
-      sharedMem = buffCpu[cpuIdx*4+1]; //convert lm32's view to pcie's view
+    if((srcCpus >> cpuIdx) & 0x1) {
+    
+      ftmStatus = buffCpu[cpuIdx*coreStateSize + CPU_STATUS];  
+      ftmMsgs   = buffCpu[cpuIdx*coreStateSize + CPU_MSGS];
+      sharedMem = buffCpu[cpuIdx*coreStateSize + CPU_SHARED]; //convert lm32's view to pcie's view
       mySharedMem = p->clusterAdr + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
-      ftmTPrep = (long long unsigned int)(((uint64_t)buffCpu[cpuIdx*4+2]) << 32 | ((uint64_t)buffCpu[cpuIdx*4+3]));
+      
+      ftmTPrep = (long long unsigned int)(((uint64_t)buffCpu[cpuIdx*coreStateSize + CPU_TPREP_HI]) << 32 | ((uint64_t)buffCpu[cpuIdx*coreStateSize + CPU_TPREP_LO]));
 
       
          
@@ -824,7 +975,7 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
       SNTPRINTF(pSB ,"\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
-       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), (uint16_t)(ftmStatus >> 16), ftmTPrep<<3);
+       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), ftmMsgs, ftmTPrep<<3);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*CPU_SHARED_SIZE);
       if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) SNTPRINTF(pSB ,"   Act Page: A 0x%08x  Inact Page: B 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
@@ -840,17 +991,21 @@ void ftmShowStatus(uint32_t* status, uint8_t verbose) {
       if(ftmStatus & STAT_WAIT)       SNTPRINTF(pSB ,"  WAIT_COND  ");  else SNTPRINTF(pSB ,"      -      ");
       SNTPRINTF(pSB ,"       \u2502\n");
       SNTPRINTF(pSB ,"\u2514"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+    }
   }
   printf("%s", (const char*)strBuff);
 }
 
 uint64_t cpus2thrs(uint32_t cpus) {
-  uint32_t i;
+  uint64_t i;
   uint64_t res=0;
   
-  for(i=0;i<8;i++) res |= (((cpus >> i) & 1) << (i*8));
+  for(i=0;i<8;i++) {
+    res |= (((cpus >> i) & 1ull) << (i*8));
+  }  
   return res;
 }
+
 uint32_t thrs2cpus(uint64_t thrs) {
   uint32_t i;
   uint64_t res=0;
@@ -860,7 +1015,7 @@ uint32_t thrs2cpus(uint64_t thrs) {
   
 }
 
-
+int ftmFetchStatus(uint32_t* buff, uint32_t len)      {return  v02FtmFetchStatus(buff, len);}
 int ftmCommand(uint64_t dstThr, uint32_t command)     { return v02FtmCommand(thrs2cpus(dstThr),command);}
 int ftmPutString(uint64_t dstThr, const char* sXml)   { return v02FtmPutString(thrs2cpus(dstThr), sXml);}
 int ftmPutFile(uint64_t dstThr, const char* filename) { return v02FtmPutFile(thrs2cpus(dstThr), filename);}

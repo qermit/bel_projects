@@ -5,8 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#if MOCKUP==0
 #include <etherbone.h>
+#endif
 
+#if MOCKUP==0
+extern eb_device_t device;
+extern eb_socket_t mySocket;
+#endif
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 
 #define SWAP_4(x) ( ((x) << 24) | \
@@ -23,8 +33,44 @@
 #define ACTIVE    1
 #define INACTIVE  2
 
+#if MOCKUP==1
+#define CPU_MAX 8
+#define THR_MAX 8
+#endif
 
 
+
+
+//Status report fields
+//TODO not all of em meaningful yet
+
+//offsets (in 32b words)
+//THESE ARE !!!NOT!!! register addresses, but the word offset in the report buffer 
+#define WR_STATUS        0
+#define WR_UTC_LO       (WR_STATUS        + 1)
+#define WR_UTC_HI       (WR_UTC_LO        + 1)
+#define WR_STATE_SIZE   (WR_UTC_HI        + 1) //number 32b field for wr status
+
+#define CPU_STATUS      0
+#define CPU_MSGS        (CPU_STATUS       + 1)
+#define CPU_SHARED      (CPU_MSGS         + 1)
+#define CPU_TPREP_HI    (CPU_SHARED       + 1)
+#define CPU_TPREP_LO    (CPU_TPREP_HI     + 1)
+
+#define CPU_THR_RUNNING (CPU_TPREP_LO     + 1)
+#define CPU_THR_IDLE    (CPU_THR_RUNNING  + 1)
+#define CPU_THR_WAITING (CPU_THR_IDLE     + 1)
+#define CPU_THR_ERROR   (CPU_THR_WAITING  + 1)
+#define CPU_THR_ACT_A   (CPU_THR_ERROR    + 1)
+#define CPU_THR_ACT_B   (CPU_THR_ACT_A    + 1)
+#define CPU_THR_RDY_A   (CPU_THR_ACT_B    + 1)
+#define CPU_THR_RDY_B   (CPU_THR_RDY_A    + 1)
+
+#define CPU_STATE_SIZE  (CPU_THR_RDY_B    + 1) //number 32b field for cpu status
+
+#define THR_STATUS      0
+#define THR_MSGS        (THR_STATUS       + 1)
+#define THR_STATE_SIZE  (THR_MSGS         + 1) //number 32b field for thread status
 
 
 
@@ -46,21 +92,21 @@ typedef struct {
 typedef struct {
    uint8_t cpuQty;
    uint8_t thrQty;
+   uint32_t validCpus;
    t_core* pCores;
    uint32_t resetAdr;
    uint32_t clusterAdr;
    uint32_t sharedAdr;
    uint32_t prioQAdr;
    uint32_t ebmAdr;
+   uint32_t sysConAdr;
+   uint32_t ppsAdr;
 } t_ftmAccess;
 
 
 
-uint32_t ftm_shared_offs;
-t_ftmAccess* p;
-t_ftmAccess ftmAccess;
-eb_device_t device;
-eb_socket_t mySocket;
+extern uint32_t ftm_shared_offs;
+extern t_ftmAccess* p;
 
 uint64_t cpus2thrs(uint32_t cpus);
 uint32_t thrs2cpus(uint64_t thrs);
@@ -79,18 +125,20 @@ int ftmCpuRst(uint32_t dstCpus);
 int ftmFwLoad(uint32_t dstCpus, const char* filename);
 int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep);
 int ftmGetStatus(uint32_t srcCpus, uint32_t* buff);
-void ftmShowStatus(uint32_t* status, uint8_t verbose);
+void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose);
 
 //per thread
 int ftmThrRst(uint64_t dstBitField);
 //these need wrappers to per thread access for future version compatibility
-
+#if MOCKUP==0
 int v02FtmCommand(uint32_t dstCpus, uint32_t command);
 int v02FtmPutString(uint32_t dstCpus, const char* sXml);
 int v02FtmPutFile(uint32_t dstCpus, const char* filename);
 int v02FtmClear(uint32_t dstCpus);
 uint32_t v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
 int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx);
+int v02FtmFetchStatus(uint32_t* buff, uint32_t len);
+#endif
 
 int ftmCommand(uint64_t dstThr, uint32_t command);
 int ftmSignal(uint64_t dstThr, uint32_t offset, uint64_t value, uint64_t mask);
@@ -99,8 +147,12 @@ int ftmPutFile(uint64_t dstThr, const char* filename);
 int ftmClear(uint64_t dstThr);
 uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf);
 int ftmSetBp(uint64_t dstThr, int32_t planIdx);
+int ftmFetchStatus(uint32_t* buff, uint32_t len);
 
 
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif

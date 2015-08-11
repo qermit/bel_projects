@@ -12,6 +12,7 @@
 #define FILENAME_LEN   256
 #define UINT64_STR_LEN 24
 #define DUMP_STR_LEN 65536
+#define STATUS_BUF_SIZE 65536
 
 const char* program;
 uint8_t verbose, readonly, error;
@@ -176,6 +177,8 @@ int main(int argc, char** argv) {
 
   //printf("Connecting to FTM\n");
   validCpus = ftmOpen(netaddress, overrideFWcheck);
+  
+  if(!validCpus) return -1;
    
   if(cpuId < 0) {
     targetCpus = (1 << p->cpuQty) -1;
@@ -188,6 +191,8 @@ int main(int argc, char** argv) {
   
   validTargetCpus = validCpus & targetCpus;
   validTargetThrs = cpus2thrs(validTargetCpus);
+  
+  
          
 // DM prioQ Operations   
   if(!strcasecmp(command, "duetime")) {
@@ -208,12 +213,12 @@ int main(int argc, char** argv) {
   }      
         
   /* -------------------------------------------------------------------- */
-  if (!strcasecmp(command, "status")) {
+   if (!strcasecmp(command, "status")) {
   
-    uint32_t* stateBuff = (uint32_t*)malloc(128 + p->cpuQty*16);
-    ftmGetStatus(targetCpus, stateBuff);
-    printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM);
-    ftmShowStatus(stateBuff, verbose);
+    uint32_t* stateBuff = (uint32_t*)malloc(STATUS_BUF_SIZE);
+    ftmFetchStatus(stateBuff, STATUS_BUF_SIZE/4);
+    printf("%s### FTM @ %s - %u Cores ####%s\n", KCYN, netaddress, p->cpuQty, KNRM);
+    ftmShowStatus(targetCpus, stateBuff, verbose);
     free(stateBuff);
   }
 
@@ -255,7 +260,16 @@ int main(int argc, char** argv) {
   
   else if(!strcasecmp(command, "put")) {
     if(!readonly) {
-      return ftmPutFile(validTargetThrs, filename);   
+      uint32_t res;
+      res = ftmPutFile(validTargetThrs, filename);
+#if MOCKUP==1
+      char* pBufDump = (char*)malloc(DUMP_STR_LEN); 
+      ftmDump(validTargetThrs, BUF_SIZE, INACTIVE, pBufDump, DUMP_STR_LEN);
+      printf("%s\n", pBufDump);
+      free(pBufDump);
+      res = 0;
+#endif
+      return res;   
     } else { fprintf(stderr, "No xml file specified\n"); return -1;}
   }
   
@@ -287,6 +301,14 @@ int main(int argc, char** argv) {
   }
      
   else  printf("Unknown command: %s\n", command);  
+
+#if MOCKUP==1
+  uint32_t* stateBuff = (uint32_t*)malloc(STATUS_BUF_SIZE);
+  ftmFetchStatus(stateBuff, STATUS_BUF_SIZE/4);
+  printf("%s### FTM @ %s ####%s\n", KCYN, netaddress, KNRM);
+  ftmShowStatus(targetCpus, stateBuff, 1);
+  free(stateBuff);
+#endif  
 
 
   return 0;
