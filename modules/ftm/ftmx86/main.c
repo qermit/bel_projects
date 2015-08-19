@@ -67,8 +67,8 @@ int main(int argc, char** argv) {
    // cpu access related
    int cpuId = 0;
    uint8_t overrideFWcheck;
-   uint32_t targetCpus, validCpus, validTargetCpus;
-   uint64_t validTargetThrs; //validTargetThrs is there for compatibility with future versions of access library
+   int32_t targetCpus, validCpus, validTargetCpus;
+   int64_t validTargetThrs; //validTargetThrs is there for compatibility with future versions of access library
    
    overrideFWcheck = 0;
    error      = 0;
@@ -178,8 +178,11 @@ int main(int argc, char** argv) {
   //printf("Connecting to FTM\n");
   validCpus = ftmOpen(netaddress, overrideFWcheck);
   
-  if(!validCpus) return -1;
-   
+  if(validCpus <= 0) {
+    if(validCpus == 0) fprintf(stderr, "ERROR: No valid DM CPUs found.\n");
+    return -1;
+  } 
+  
   if(cpuId < 0) {
     targetCpus = (1 << p->cpuQty) -1;
   } else if (cpuId <= p->cpuQty -1) {

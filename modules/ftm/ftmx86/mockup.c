@@ -3,6 +3,7 @@
 #include "ftmx86.h"
 #include "xmlaux.h"
 #include "fancy.h"
+#include <time.h>
 
 
 uint32_t vStatus[CPU_MAX];
@@ -22,6 +23,7 @@ t_ftmAccess* p;
 t_ftmAccess ftmAccess;
 
 
+
 static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32_t len) {
   uint32_t baseAddr, offs, cpuIdx;
   
@@ -30,11 +32,16 @@ static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32
       baseAddr  = p->pCores[cpuIdx].ramAdr;
       offs      = p->pCores[cpuIdx].inaOffs;
       memset(bufWrite, 0, len);
-      serPage (pPage, (uint8_t*)&bufWrite[cpuIdx*(FTM_PAGESIZE * 2) + offs], offs, cpuIdx);
+      printf("Serializing...\n");
+      if(serPage (pPage, (uint8_t*)&bufWrite[cpuIdx*(FTM_PAGESIZE * 2) + offs], offs, cpuIdx) != NULL) {
+        printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
+        printf("Verify..."); 
+        printf("OK\n");
+      } else {
+        fprintf(stderr, "There were errors, aborting PUT.\n");
+        return -1;
+      }
       
-      printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
-      printf("Verify..."); 
-      printf("OK\n");
     }
   }
   printf("done.\n");
@@ -42,7 +49,7 @@ static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32
 
 }
 
-uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
+int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 {
   
   int cpuIdx;
@@ -55,6 +62,7 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   p->resetAdr     = 0x0;
   p->cpuQty       = CPU_MAX;
   p->thrQty       = THR_MAX;
+  
   p->pCores       = malloc(p->cpuQty * sizeof(t_core));
   p->sharedAdr    = 0x8000;
   p->prioQAdr     = 0x200000;
@@ -83,7 +91,9 @@ uint32_t ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 }
 
 
-void ftmClose(void) {}
+int ftmClose(void) {
+  return 0;
+}
 
 
 //per DM
@@ -93,12 +103,12 @@ int ftmRst(void) {
 }  
 
 int ftmSetDuetime(uint64_t tdue) {
-  vTdue = tdue;
+  vTdue = tdue>>3;
   return 0;
 }
 
 int ftmSetTrntime(uint64_t ttrn) {
-  vTtrn = ttrn;
+  vTtrn = ttrn>>3;
   return 0;
 }
 
@@ -136,7 +146,7 @@ int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep) {
   int cpuIdx;
   for(cpuIdx = 0; cpuIdx < p->cpuQty; cpuIdx++) {
     if(dstCpus & (1 << cpuIdx)) {
-      vTprep[cpuIdx] = tprep;
+      vTprep[cpuIdx] = tprep>>3;
     }  
   }
   return 0;  
@@ -155,9 +165,9 @@ int ftmFetchStatus(uint32_t* buff, uint32_t len) {
   buff[EBM_REG_SRC_MAC_LO   >>2] = 0xA5EDBEE0;
   buff[EBM_REG_SRC_IPV4     >>2] = 0xCAFEBABE;
   buff[EBM_REG_SRC_UDP_PORT >>2] = 0xEBD0;
-  buff[EBM_REG_DST_MAC_HI   >>2] = 0x0000D15E;
-  buff[EBM_REG_DST_MAC_LO   >>2] = 0xA5EDBEE8;
-  buff[EBM_REG_DST_IPV4     >>2] = 0xCAFEBABE;
+  buff[EBM_REG_DST_MAC_HI   >>2] = 0x0000ffff;
+  buff[EBM_REG_DST_MAC_LO   >>2] = 0xffffffff;
+  buff[EBM_REG_DST_IPV4     >>2] = 0xffffffff;
   buff[EBM_REG_DST_UDP_PORT >>2] = 0xEBD0;
   buff[EBM_REG_MTU          >>2] = 1500;
   buff[EBM_REG_ADR_HI       >>2] = 0x0;
@@ -167,6 +177,7 @@ int ftmFetchStatus(uint32_t* buff, uint32_t len) {
   buff[(EBM_REG_LAST + r_FPQ.cfgGet)>>2]    = r_FPQ.cfg_ENA | r_FPQ.cfg_FIFO | r_FPQ.cfg_AUTOPOP | r_FPQ.cfg_AUTOFLUSH_TIME | r_FPQ.cfg_AUTOFLUSH_MSGS;
   buff[(EBM_REG_LAST + r_FPQ.dstAdr)>>2]    = 0x7fffffff;
   buff[(EBM_REG_LAST + r_FPQ.heapCnt)>>2]   = 0;
+  
   buff[(EBM_REG_LAST + r_FPQ.msgCntO)>>2]   = 100;
   buff[(EBM_REG_LAST + r_FPQ.msgCntI)>>2]   = 100;
   buff[(EBM_REG_LAST + r_FPQ.tTrnHi)>>2]    = (uint32_t)(vTtrn >> 32);
@@ -178,15 +189,17 @@ int ftmFetchStatus(uint32_t* buff, uint32_t len) {
   buff[(EBM_REG_LAST + r_FPQ.ebmAdr)>>2]    = p->ebmAdr;
 
   offset = (EBM_REG_LAST + r_FPQ.tsCh)>>2;
-  
+  //printf("MsgCnt O is at 0x%08x\n", (EBM_REG_LAST + r_FPQ.msgCntO)>>2);
   
   buff[offset + WR_STATUS] =  0x6;
   
-  buff[offset + WR_UTC_HI] +=  1;
-  buff[offset + WR_UTC_LO] +=  1000;
+  uint64_t now = (uint64_t)time(NULL);
+  
+  buff[offset + WR_UTC_HI] =  (uint32_t)(now >> 32);
+  buff[offset + WR_UTC_LO] =  (uint32_t)(now);
   
   offset += WR_STATE_SIZE; 
-  
+
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((p->validCpus >> cpuIdx) & 0x1) {
       buff[offset + cpuIdx*coreStateSize  + CPU_STATUS]   = vStatus[cpuIdx] & 0xffff;
@@ -194,15 +207,35 @@ int ftmFetchStatus(uint32_t* buff, uint32_t len) {
       buff[offset + cpuIdx*coreStateSize  + CPU_SHARED]   = vShaPtr[cpuIdx];
       buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_HI] = (uint32_t)(vTprep[cpuIdx] >> 32);
       buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_LO] = (uint32_t)vTprep[cpuIdx];
+      //TODO
+      //Future work: change everything to new register layout in v03. And include real threads !!!
+      uint32_t tmp = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];
+      if(tmp & STAT_RUNNING)  buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = 1;
+      else                    buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = 0;
+      if(tmp & STAT_WAIT)     buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = 1;
+      else                    buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = 0;
+      if(tmp & STAT_IDLE)     buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = 1;
+      else                    buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = 0;
+      if(tmp & STAT_ERROR)    buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = 1;
+      else                    buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = 0;
+      
+      
+      if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) { buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_A] = 1;
+                                                                  buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_B] = 0;} 
+      else                                                      { buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_A] = 0;
+                                                                  buff[offset + cpuIdx*coreStateSize  + CPU_THR_ACT_B] = 1;}
+                                                                  
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_A] = 1;
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_B] = 1;
       
       thrIdx = 0;
-      buff[offset + cpuIdx*coreStateSize  + thrIdx*THR_STATE_SIZE + THR_STATUS]  = vStatus[cpuIdx] & 0xffff;  
-      buff[offset + cpuIdx*coreStateSize  + thrIdx*THR_STATE_SIZE + THR_MSGS]    = vStatus[cpuIdx] >> 16;
+      buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_STATUS]  = vStatus[cpuIdx] & 0xffff;  
+      buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_MSGS]    = vStatus[cpuIdx] >> 16;
       
       if(p->thrQty > 1) {
         for(thrIdx=1;thrIdx < p->thrQty;thrIdx++) {
-          buff[offset + cpuIdx*coreStateSize  + thrIdx*THR_STATE_SIZE + THR_STATUS]  = 0;  
-          buff[offset + cpuIdx*coreStateSize  + thrIdx*THR_STATE_SIZE + THR_MSGS]    = 0;
+          buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_STATUS]  = 0;  
+          buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_MSGS]    = 0;
         }
       }
       
@@ -239,15 +272,18 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   uint64_t tmp;
   long long unsigned int ftmTPrep;
   uint32_t* buffEbm   = status;
-  uint32_t* buffPrioq = buffEbm + (EBM_REG_LAST>>2);
-  uint32_t* buffCpu   = buffPrioq + (r_FPQ.tsCh>>2);
+  uint32_t* buffPrioq = (uint32_t*)&buffEbm[(EBM_REG_LAST>>2)];
+  uint32_t* buffWr    = (uint32_t*)&buffPrioq[(r_FPQ.tsCh>>2)];
+  uint32_t* buffCpu   = (uint32_t*)&buffWr[WR_STATE_SIZE];
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
-
   char strBuff[65536];
   char* pSB = (char*)&strBuff;
+  char sLinkState[20];
+  char* pL = (char*)&sLinkState;
+  char sSyncState[20];
+  char* pS = (char*)&sSyncState;
 
   if(verbose) {
-
     //Generate EBM Status
     SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
     SNTPRINTF(pSB ,"\u2502 %sEBM%s                                                                           \u2502\n", KCYN, KNRM);
@@ -281,7 +317,6 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
     SNTPRINTF(pSB ,"   \u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-
     SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[r_FPQ.dstAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[r_FPQ.ebmAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 ts Adr       \u2502         0x%08x", buffPrioq[r_FPQ.tsAdr>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
@@ -299,19 +334,30 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     SNTPRINTF(pSB ,"\u2502 Capacity     \u2502 %18u", buffPrioq[r_FPQ.capacity>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[r_FPQ.msgMax>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
-  
   }
 
-
-  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
+  //Generate WR Status
+  if(buffWr[WR_STATUS] & PPS_VALID) SNTPRINTF(pL ,"  %sOK%s  ", KGRN, KNRM);
+  else                              SNTPRINTF(pL ,"  %s--%s  ", KRED, KNRM);
+  if(buffWr[WR_STATUS] & TS_VALID)  SNTPRINTF(pS ,"  %sOK%s  ", KGRN, KNRM);
+  else                              SNTPRINTF(pS ,"  %s--%s  ", KRED, KNRM);
+  uint64_t testme = (((uint64_t)buffWr[WR_UTC_HI]) << 32 | ((uint64_t)buffWr[WR_UTC_LO]));
+  time_t testtime = (time_t)testme;
+  SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+  SNTPRINTF(pSB ,"\u2502 %sWR %s                                                                           \u2502\n", KCYN, KNRM);
+  SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+  SNTPRINTF(pSB ,"\u2502 PPS: %s TS: %s \u2502 WR-UTC: %.24s                     \u2502\n", sLinkState, sSyncState, ctime((time_t*)&testtime));
+  SNTPRINTF(pSB ,"\u2514"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
     
+  //Generate CPUs Status
+  for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((srcCpus >> cpuIdx) & 0x1) {
       ftmStatus = buffCpu[cpuIdx*coreStateSize + CPU_STATUS];  
       ftmMsgs   = buffCpu[cpuIdx*coreStateSize + CPU_MSGS];
       sharedMem = buffCpu[cpuIdx*coreStateSize + CPU_SHARED]; //convert lm32's view to pcie's view
       mySharedMem = p->clusterAdr + (sharedMem & 0x3fffffff); //convert lm32's view to pcie's view
       ftmTPrep = (long long unsigned int)(((uint64_t)buffCpu[cpuIdx*coreStateSize + CPU_TPREP_HI]) << 32 | ((uint64_t)buffCpu[cpuIdx*coreStateSize + CPU_TPREP_LO]));
-
+      
       SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
       SNTPRINTF(pSB ,"\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
@@ -337,6 +383,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   printf("%s", (const char*)strBuff);
 }
 
+
 //per thread
 int ftmThrRst(uint64_t dstBitField) {
   return 0;
@@ -347,7 +394,6 @@ int ftmCommand(uint64_t dstThr, uint32_t command) {
   uint32_t cpuIdx, tmp;
 
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
-    printf("CPUs: %08x\n", thrs2cpus(dstThr));
     if((thrs2cpus(dstThr) >> cpuIdx) & 0x1) {
       switch(command) {
         case CMD_START        : vStatus[cpuIdx] |=  STAT_RUNNING; break;
@@ -374,6 +420,29 @@ int ftmPutString(uint64_t dstThr, const char* sXml) {
   return ftmPut(thrs2cpus(dstThr), pPage, pBuf, BUF_SIZE);
   
 }
+
+
+
+int ftmCheckString(const char* sXml) {
+
+  uint8_t     buff[65536];
+  int         ret;
+  t_ftmPage*  pPage = parseXmlString(sXml);
+  
+  
+  if(serPage (pPage, (uint8_t*)&buff[0], 0, 0) != NULL) {
+    printf("Schedule OK\n");
+    ret = 0;
+  } else {
+    fprintf(stderr, "There were errors in the Schedule.\n");
+    ret = -1;
+  }
+  
+  if(pPage != NULL) free(pPage);
+
+  return ret;
+}
+
   
 int ftmPutFile(uint64_t dstThr, const char* filename) {
   t_ftmPage*  pPage = parseXmlFile(filename);
@@ -396,7 +465,7 @@ int ftmClear(uint64_t dstThr) {
 
 
 
-uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) {
+int ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf, uint32_t lenStringBuf) {
   uint32_t offs, cpuIdx;  
   t_ftmPage* pPage;
   char* bufStr = stringBuf;
@@ -413,7 +482,7 @@ uint32_t ftmDump(uint64_t srcThr, uint32_t len, uint8_t actIna, char* stringBuf,
          if (lenStringBuf - (bufStr - stringBuf) < 2048) {printf("String buffer running too low, aborting.\n"); return (uint32_t)(bufStr - stringBuf);}
          SNTPRINTF(bufStr, "---CPU %u %s page---\n", cpuIdx, "active"); //don't do zero termination in between dumps
          bufStr += showFtmPage(pPage, bufStr); //don't do zero termination in between dumps
-      } else printf("Deserialization for CPU %u FAILED! Corrupt/No Data ?\n", cpuIdx);
+      } else {printf("Deserialization for CPU %u FAILED! Corrupt/No Data ?\n", cpuIdx); return -1;}
     }
   }
   *bufStr++ = 0x00; // zero terminate all dumps
