@@ -19,9 +19,9 @@ entity microtca_control is
     pcie_tx_o      : out std_logic_vector(3 downto 0);
     nPCI_RESET     : in std_logic;
     
-    pe_smdat        : inout std_logic; -- !!!
-    pe_snclk        : out std_logic;   -- !!!
-    pe_waken        : out std_logic;   -- !!!
+--    pe_smdat        : inout std_logic; -- !!!
+--    pe_snclk        : out std_logic;   -- !!!
+--    pe_waken        : out std_logic;   -- !!!
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -38,11 +38,11 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lcd display
     -----------------------------------------------------------------------
-    di              : out std_logic_vector(6 downto 0);
-    ai              : in  std_logic_vector(1 downto 0);
-    dout_LCD        : in  std_logic;
-    wrdis           : out std_logic := '0';
-    dres            : out std_logic := '1';
+    dis_di_o        : out std_logic_vector(6 downto 0);
+    dis_ai_i        : in  std_logic_vector(1 downto 0);
+    dis_do_i        : in  std_logic;
+    dis_wr_o        : out std_logic := '0';
+    dis_rst_o       : out std_logic := '1';
     
     -----------------------------------------------------------------------
     -- connector cpld
@@ -59,17 +59,65 @@ entity microtca_control is
     ant             : inout std_logic_vector(26 downto 1) := (others => 'Z'); -- trigger bus
     
     -----------------------------------------------------------------------
-    -- lvds/lemos
+    -- lvds/lvttl lemos
     -----------------------------------------------------------------------
-    lvds_p_i         : in std_logic_vector(4 downto 0);
-    lvds_n_i         : in std_logic_vector(4 downto 0);
-    lvds_p_o         : out std_logic_vector(4 downto 0);
-    lvds_n_o         : out std_logic_vector(4 downto 0);
-    lvds_ctrl_oen_o  : out std_logic_vector(4 downto 0);
-    lvds_ctrl_term_o : out std_logic_vector(4 downto 0);
-    lvds_led_nact_o  : out std_logic_vector(4 downto 0);
-    lvds_led_ndir_o  : out std_logic_vector(4 downto 0);
-    
+    lvtio_in_n_i     : in std_logic_vector(4 downto 0);
+    lvtio_in_p_i     : in std_logic_vector(4 downto 0);
+    lvtio_out_n_o    : out std_logic_vector(4 downto 0);
+    lvtio_out_p_o    : out std_logic_vector(4 downto 0);
+    lvtio_oen_o      : out std_logic_vector(4 downto 0);
+    lvtio_term_en_o  : out std_logic_vector(4 downto 0);
+    lvtio_act_led_o  : out std_logic_vector(4 downto 0);
+    lvtio_dir_led_o  : out std_logic_vector(4 downto 0);
+
+    -- clock input
+    lvtclk_n_i       : in  std_logic;
+    lvtclk_p_i       : in  std_logic;
+    lvtclk_in_en_o   : out std_logic;
+
+    -----------------------------------------------------------------------
+    -- lvds/lvds libera triggers
+    -----------------------------------------------------------------------
+    m_trig_n_o        : out std_logic_vector(3 downto 0);
+    m_trig_p_o        : out std_logic_vector(3 downto 0);
+    m_trig_en_o       : out std_logic;
+
+    -----------------------------------------------------------------------
+    -- lvds/m-lvds microTCA.4 triggers, gates, clocks
+    -----------------------------------------------------------------------
+    mlvdio_in_n_i     : in std_logic_vector(7 downto 0);
+    mlvdio_in_p_i     : in std_logic_vector(7 downto 0);
+    mlvdio_out_n_o    : out std_logic_vector(7 downto 0);
+    mlvdio_out_p_o    : out std_logic_vector(7 downto 0);
+    mlvdio_oen_o      : out std_logic_vector(7 downto 0);
+    mlvdio_fsen_o     : out std_logic_vector(7 downto 0);
+
+    -----------------------------------------------------------------------
+    -- microTCA.4 backplane clocks
+    -----------------------------------------------------------------------
+    tclka_in_n_i      : in  std_logic;
+    tclka_in_p_i      : in  std_logic;
+    tclka_out_n_o     : out std_logic;
+    tclka_out_p_o     : out std_logic;
+    tclka_oe_o        : out std_logic;
+
+    tclkb_in_n_i      : in  std_logic;
+    tclkb_in_p_i      : in  std_logic;
+    tclkb_out_n_o     : out std_logic;
+    tclkb_out_p_o     : out std_logic;
+    tclkb_oe_o        : out std_logic;
+
+    tclkc_in_n_i      : in  std_logic;
+    tclkc_in_p_i      : in  std_logic;
+    tclkc_out_n_o     : out std_logic;
+    tclkc_out_p_o     : out std_logic;
+    tclkc_bpl_en_o    : out std_logic;
+
+    tclkd_in_n_i      : in  std_logic;
+    tclkd_in_p_i      : in  std_logic;
+    tclkd_out_n_o     : out std_logic;
+    tclkd_out_p_o     : out std_logic;
+    tclkd_bpl_en_o    : out std_logic;
     -----------------------------------------------------------------------
     -- usb
     -----------------------------------------------------------------------
@@ -84,7 +132,7 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- leds (6 LEDs for WR and FTRN status)
     -----------------------------------------------------------------------
-    led             : out std_logic_vector(6 downto 1) := (others => '1');
+    led_status      : out std_logic_vector(6 downto 1) := (others => '1');
     led_user        : out std_logic_vector(8 downto 1) := (others => '1');
     
     -----------------------------------------------------------------------
