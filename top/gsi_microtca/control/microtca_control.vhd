@@ -8,16 +8,17 @@ use work.monster_pkg.all;
 entity microtca_control is
   port(
     clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
-    clk_125m_pllref_i : in std_logic;  -- 125 MHz PLL reference
-    clk_125m_local_i  : in std_logic;  -- local clk from 125Mhz oszillator
+    clk_125m_wrpll_i  : in std_logic_vector (1 downto 0);  -- 125 MHz PLL reference
+    clk_osc_i         : in std_logic_vector (1 downto 0);  -- local clk from 100MHz or 125Mhz oscillator
     
     -----------------------------------------
     -- PCI express pins
     -----------------------------------------
-    pcie_refclk_i  : in  std_logic;
-    pcie_rx_i      : in  std_logic_vector(3 downto 0);
-    pcie_tx_o      : out std_logic_vector(3 downto 0);
-    nPCI_RESET     : in std_logic;
+    pcie_clk_i     : in  std_logic;
+    pcie_l0_rx_i   : in  std_logic_vector;
+    pcie_l0_tx_o   : out std_logic_vector;
+
+--    nPCI_RESET     : in std_logic;
     
 --    pe_smdat        : inout std_logic; -- !!!
 --    pe_snclk        : out std_logic;   -- !!!
@@ -26,9 +27,9 @@ entity microtca_control is
     ------------------------------------------------------------------------
     -- WR DAC signals
     ------------------------------------------------------------------------
-    dac_sclk       : out std_logic;
-    dac_din        : out std_logic;
-    ndac_cs        : out std_logic_vector(2 downto 1);
+    wr_dac_sclk_o  : out std_logic;
+    wr_dac_din_o   : out std_logic;
+    wr_ndac_cs_o   : out std_logic_vector(2 downto 1);
     
     -----------------------------------------------------------------------
     -- OneWire
@@ -54,21 +55,22 @@ entity microtca_control is
     -----------------------------------------------------------------------
     fpga_res        : in std_logic;
     nres            : in std_logic;
-    pbs2            : in std_logic;
+    pbs_f_i         : in std_logic;
+
+    hpwck           : out   std_logic;
     hpw             : inout std_logic_vector(15 downto 0) := (others => 'Z'); -- logic analyzer
-    ant             : inout std_logic_vector(26 downto 1) := (others => 'Z'); -- trigger bus
     
     -----------------------------------------------------------------------
-    -- lvds/lvttl lemos
+    -- lvds/lvttl lemos on front panel
     -----------------------------------------------------------------------
-    lvtio_in_n_i     : in std_logic_vector(4 downto 0);
-    lvtio_in_p_i     : in std_logic_vector(4 downto 0);
-    lvtio_out_n_o    : out std_logic_vector(4 downto 0);
-    lvtio_out_p_o    : out std_logic_vector(4 downto 0);
-    lvtio_oen_o      : out std_logic_vector(4 downto 0);
-    lvtio_term_en_o  : out std_logic_vector(4 downto 0);
-    lvtio_act_led_o  : out std_logic_vector(4 downto 0);
-    lvtio_dir_led_o  : out std_logic_vector(4 downto 0);
+    lvtio_in_n_i     : in  std_logic_vector(5 downto 1);
+    lvtio_in_p_i     : in  std_logic_vector(5 downto 1);
+    lvtio_out_n_o    : out std_logic_vector(5 downto 1);
+    lvtio_out_p_o    : out std_logic_vector(5 downto 1);
+    lvtio_oen_o      : out std_logic_vector(5 downto 1);
+    lvtio_term_en_o  : out std_logic_vector(5 downto 1);
+    lvtio_act_led_o  : out std_logic_vector(5 downto 1);
+    lvtio_dir_led_o  : out std_logic_vector(5 downto 1);
 
     -- clock input
     lvtclk_n_i       : in  std_logic;
@@ -76,48 +78,45 @@ entity microtca_control is
     lvtclk_in_en_o   : out std_logic;
 
     -----------------------------------------------------------------------
-    -- lvds/lvds libera triggers
+    -- lvds/lvds libera triggers on backplane
     -----------------------------------------------------------------------
-    m_trig_n_o        : out std_logic_vector(3 downto 0);
-    m_trig_p_o        : out std_logic_vector(3 downto 0);
-    m_trig_en_o       : out std_logic;
+    lib_trig_n_o        : out std_logic_vector(3 downto 0);
+    lib_trig_p_o        : out std_logic_vector(3 downto 0);
+    lib_trig_oe_o       : out std_logic;
 
     -----------------------------------------------------------------------
-    -- lvds/m-lvds microTCA.4 triggers, gates, clocks
+    -- lvds/m-lvds microTCA.4 triggers, gates, clocks on backplane
     -----------------------------------------------------------------------
-    mlvdio_in_n_i     : in std_logic_vector(7 downto 0);
-    mlvdio_in_p_i     : in std_logic_vector(7 downto 0);
-    mlvdio_out_n_o    : out std_logic_vector(7 downto 0);
-    mlvdio_out_p_o    : out std_logic_vector(7 downto 0);
-    mlvdio_oen_o      : out std_logic_vector(7 downto 0);
-    mlvdio_fsen_o     : out std_logic_vector(7 downto 0);
+    mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
+    mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
+    mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
+    mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
+    mlvdio_oe_o       : out std_logic_vector(8 downto 1);
+    mlvdio_fsen_o     : out std_logic_vector(8 downto 1);
+    mlvdio_pdn_o      : out std_logic; -- output buffer powerdown, active low
 
     -----------------------------------------------------------------------
-    -- microTCA.4 backplane clocks
+    -- lvds/lvds microTCA.4 backplane clocks
     -----------------------------------------------------------------------
-    tclka_in_n_i      : in  std_logic;
-    tclka_in_p_i      : in  std_logic;
-    tclka_out_n_o     : out std_logic;
-    tclka_out_p_o     : out std_logic;
-    tclka_oe_o        : out std_logic;
+    tclk_in_n_i      : in  std_logic_vector(4 downto 1);
+    tclk_in_p_i      : in  std_logic_vector(4 downto 1);
+    tclk_out_n_o     : out std_logic_vector(4 downto 1);
+    tclk_out_p_o     : out std_logic_vector(4 downto 1);
+    tclk_oe_o        : out std_logic_vector(4 downto 1);
 
-    tclkb_in_n_i      : in  std_logic;
-    tclkb_in_p_i      : in  std_logic;
-    tclkb_out_n_o     : out std_logic;
-    tclkb_out_p_o     : out std_logic;
-    tclkb_oe_o        : out std_logic;
+    -----------------------------------------------------------------------
+    -- mmc
+    -----------------------------------------------------------------------
+ 		mmc_pcie_en_i	        : in  std_logic;
+		fpga2mmc_int_o	      : out std_logic;
+		mmc2fpga_usr_1_i	    : in  std_logic;
+		mmc2fpga_usr_2_i	    : in  std_logic;
+		mmc_spi0_sck_i	      : in  std_logic;
+		mmc_spi0_miso_o 	    : out std_logic;
+		mmc_spi0_mosi_i 	    : in  std_logic;
+		mmc_spi0_sel_fpga_n_i : in  std_logic;
 
-    tclkc_in_n_i      : in  std_logic;
-    tclkc_in_p_i      : in  std_logic;
-    tclkc_out_n_o     : out std_logic;
-    tclkc_out_p_o     : out std_logic;
-    tclkc_bpl_en_o    : out std_logic;
 
-    tclkd_in_n_i      : in  std_logic;
-    tclkd_in_p_i      : in  std_logic;
-    tclkd_out_n_o     : out std_logic;
-    tclkd_out_p_o     : out std_logic;
-    tclkd_bpl_en_o    : out std_logic;
     -----------------------------------------------------------------------
     -- usb
     -----------------------------------------------------------------------
@@ -128,6 +127,7 @@ entity microtca_control is
     ctl             : in    std_logic_vector(2 downto 0);
     uclk            : in    std_logic;
     ures            : out   std_logic;
+    ifclk           : out   std_logic;
     
     -----------------------------------------------------------------------
     -- leds (6 LEDs for WR and FTRN status)
@@ -140,67 +140,22 @@ entity microtca_control is
     -----------------------------------------------------------------------
     ledsfpr          : out std_logic_vector(4 downto 1);
     ledsfpg          : out std_logic_vector(4 downto 1);
-    sfp234_ref_clk_i : in  std_logic;
+    sfp_ref_clk_i : in  std_logic;
 
     -----------------------------------------------------------------------
-    -- SFP1  
+    -- SFP 
     -----------------------------------------------------------------------
     
-    sfp1_tx_disable_o : out std_logic := '0';
-    sfp1_tx_fault     : in std_logic;
-    sfp1_los          : in std_logic;
+    sfp_tx_dis_o     : out std_logic := '0';
+    sfp_tx_fault_i   : in std_logic;
+    sfp_los_i        : in std_logic;
     
-    --sfp1_txp_o        : out std_logic;
-    --sfp1_rxp_i        : in  std_logic;
+    sfp_txp_o        : out std_logic;
+    sfp_rxp_i        : in  std_logic;
     
-    sfp1_mod0         : in    std_logic; -- grounded by module
-    sfp1_mod1         : inout std_logic; -- SCL
-    sfp1_mod2         : inout std_logic; -- SDA
-    
-    -----------------------------------------------------------------------
-    -- SFP2
-    -----------------------------------------------------------------------
-    
-    sfp2_tx_disable_o : out std_logic := '0';
-    sfp2_tx_fault     : in  std_logic;
-    sfp2_los          : in  std_logic;
-    
-    --sfp2_txp_o        : out std_logic;
-    --sfp2_rxp_i        : in  std_logic;
-    
-    sfp2_mod0         : in    std_logic; -- grounded by module
-    sfp2_mod1         : inout std_logic; -- SCL
-    sfp2_mod2         : inout std_logic; -- SDA
-    
-    -----------------------------------------------------------------------
-    -- SFP3 
-    -----------------------------------------------------------------------
-       
-    sfp3_tx_disable_o : out std_logic := '0';
-    sfp3_tx_fault     : in std_logic;
-    sfp3_los          : in std_logic;
-    
-    --sfp3_txp_o        : out std_logic;
-    --sfp3_rxp_i        : in  std_logic;
-    
-    sfp3_mod0         : in    std_logic; -- grounded by module
-    sfp3_mod1         : inout std_logic; -- SCL
-    sfp3_mod2         : inout std_logic; -- SDA
-    
-    -----------------------------------------------------------------------
-    -- SFP4 
-    -----------------------------------------------------------------------
-    
-    sfp4_tx_disable_o : out std_logic := '0';
-    sfp4_tx_fault     : in std_logic;
-    sfp4_los          : in std_logic;
-    
-    sfp4_txp_o        : out std_logic;
-    sfp4_rxp_i        : in  std_logic;
-    
-    sfp4_mod0         : in    std_logic; -- grounded by module
-    sfp4_mod1         : inout std_logic; -- SCL
-    sfp4_mod2         : inout std_logic); -- SDA
+    sfp_mod0         : in    std_logic; -- grounded by module
+    sfp_mod1         : inout std_logic; -- SCL
+    sfp_mod2         : inout std_logic); -- SDA
     
 end microtca_control;
 
