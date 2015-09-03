@@ -7,16 +7,18 @@ use work.monster_pkg.all;
 
 entity microtca_control is
   port(
-    clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
-    clk_125m_wrpll_i  : in std_logic_vector (1 downto 0);  -- 125 MHz PLL reference
-    clk_osc_i         : in std_logic_vector (1 downto 0);  -- local clk from 100MHz or 125Mhz oscillator
+    clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
+    clk_125m_wrpll_0_i  : in std_logic;  -- 125 MHz PLL reference
+    clk_125m_wrpll_1_i  : in std_logic;  -- 125 MHz PLL reference
+    clk_osc_0_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
+    clk_osc_1_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
     
     -----------------------------------------
     -- PCI express pins
     -----------------------------------------
     pcie_clk_i     : in  std_logic;
-    pcie_l0_rx_i   : in  std_logic_vector;
-    pcie_l0_tx_o   : out std_logic_vector;
+    pcie_l0_rx_i   : in  std_logic;
+    pcie_l0_tx_o   : out std_logic;
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -63,8 +65,8 @@ entity microtca_control is
     lvtio_out_p_o    : out std_logic_vector(5 downto 1);
     lvtio_oen_o      : out std_logic_vector(5 downto 1);
     lvtio_term_en_o  : out std_logic_vector(5 downto 1);
-    lvtio_act_led_o  : out std_logic_vector(5 downto 1);
-    lvtio_dir_led_o  : out std_logic_vector(5 downto 1);
+    lvtio_led_act_o  : out std_logic_vector(5 downto 1);
+    lvtio_led_dir_o  : out std_logic_vector(5 downto 1);
 
     -- clock input
     lvtclk_n_i       : in  std_logic;
@@ -166,13 +168,26 @@ architecture rtl of microtca_control is
   signal s_leds_user : std_logic_vector(3 downto 0);
   
   -- lvds
-  signal s_lvds_p_i     : std_logic_vector(4 downto 0);
-  signal s_lvds_n_i     : std_logic_vector(4 downto 0);
-  signal s_lvds_i_led   : std_logic_vector(4 downto 0);
-  signal s_lvds_p_o     : std_logic_vector(4 downto 0);
-  signal s_lvds_n_o     : std_logic_vector(4 downto 0);
-  signal s_lvds_o_led   : std_logic_vector(4 downto 0);
-  signal s_lvds_oen     : std_logic_vector(4 downto 0);
+--  signal s_lvds_p_i     : std_logic_vector(12 downto 0);
+--  signal s_lvds_n_i     : std_logic_vector(12 downto 0);
+--  signal s_lvds_i_led   : std_logic_vector(12 downto 0);
+--  signal s_lvds_p_o     : std_logic_vector(16 downto 0);
+--  signal s_lvds_n_o     : std_logic_vector(16 downto 0);
+--  signal s_lvds_o_led   : std_logic_vector(16 downto 0);
+--  signal s_lvds_oen     : std_logic_vector(12 downto 0);
+
+  signal s_lvds_p_i     : std_logic_vector(11 downto 0);
+  signal s_lvds_n_i     : std_logic_vector(11 downto 0);
+  signal s_lvds_i_led   : std_logic_vector(11 downto 0);
+  signal s_lvds_p_o     : std_logic_vector(11 downto 0);
+  signal s_lvds_n_o     : std_logic_vector(11 downto 0);
+  signal s_lvds_o_led   : std_logic_vector(11 downto 0);
+  signal s_lvds_oen     : std_logic_vector(11 downto 0);
+
+
+  signal s_pcie_rx      : std_logic_vector(3 downto 0);
+  signal s_pcie_tx      : std_logic_vector(3 downto 0);
+
   
   constant c_family  : string := "Arria V"; 
   constant c_project : string := "microtca_control";
@@ -187,8 +202,9 @@ begin
       g_family      => c_family,
       g_project     => c_project,
       g_flash_bits  => 25,
-      g_gpio_out    => 6, -- 2xfront end+4xuser leds
-      g_lvds_inout  => 17, -- front end lemos + MicroTCA.4 backplane triggers + Libera triggers (5 + 8 + 4)
+      g_gpio_out    => 6,  -- 2xfront end+4xuser leds
+      g_lvds_inout  => 12, -- front end lemos + MicroTCA.4 backplane triggers + Libera triggers (5 + 8) FIXME : need one more !!!
+--      g_lvds_out    => 4,  -- Libera bacplane triggers (4) 
       g_lvds_invert => true,
       g_en_pcie     => true,
       g_en_usb      => true,
@@ -197,9 +213,9 @@ begin
     )
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
-      core_clk_125m_pllref_i => clk_125m_wrpll_i(0),
-      core_clk_125m_sfpref_i => clk_125m_wrpll_i(1),
-      core_clk_125m_local_i  => clk_osc_i(0),
+      core_clk_125m_pllref_i => clk_125m_wrpll_0_i,
+      core_clk_125m_sfpref_i => clk_125m_wrpll_1_i,
+      core_clk_125m_local_i  => clk_osc_0_i,
       core_rstn_i            => pbs_f_i,
 
       wr_onewire_io          => rom_data,
@@ -231,8 +247,8 @@ begin
 
       pcie_refclk_i          => pcie_clk_i,
       pcie_rstn_i            => mmc_pcie_rst_n_i,
-      pcie_rx_i              => pcie_rx_i,
-      pcie_tx_o              => pcie_tx_o,
+      pcie_rx_i              => s_pcie_rx,
+      pcie_tx_o              => s_pcie_tx,
 
       usb_rstn_o             => ures,
       usb_ebcyc_i            => pa(3),
@@ -255,12 +271,21 @@ begin
 
   sfp_tx_dis_o <= '0'; -- SFP always enabled
 
+
+  -- pcie lane 0 
+  s_pcie_rx(0)          <= pcie_l0_rx_i;
+  s_pcie_rx(3 downto 1) <= (others => '0');
+
+  pcie_l0_tx_o          <= s_pcie_tx(0);
+
+
+
   -- Link LEDs
   dis_wr_o    <= '0';
   dis_rst_o   <= '1';
-  dip_di_o(5) <= '0' when (not led_link_up)                   = '1' else 'Z'; -- red
-  dip_di_o(6) <= '0' when (    led_link_up and not led_track) = '1' else 'Z'; -- blue
-  dip_di_o(4) <= '0' when (    led_link_up and     led_track) = '1' else 'Z'; -- green
+  dis_di_o(5) <= '0' when (not led_link_up)                   = '1' else 'Z'; -- red
+  dis_di_o(6) <= '0' when (    led_link_up and not led_track) = '1' else 'Z'; -- blue
+  dis_di_o(4) <= '0' when (    led_link_up and     led_track) = '1' else 'Z'; -- green
 
   -- Front end: 6 LEDs for WR and FTRN status (from left to right: red, blue, green, white, red, blue)
   led_status(1) <= not (led_link_act and led_link_up); -- red   = traffic/no-link
@@ -285,69 +310,74 @@ begin
   -- lemo io connectors on front panel
 
   -- lvds/lvttl lemos in/out
-  s_lvds_p_i(4 downto 0) <= lvtio_in_p_i(4 downto 0);
-  s_lvds_n_i(4 downto 0) <= lvtio_in_n_i(4 downto 0);
+  s_lvds_p_i(4 downto 0) <= lvtio_in_p_i(5 downto 1);
+  s_lvds_n_i(4 downto 0) <= lvtio_in_n_i(5 downto 1);
 
-  lvtio_out_p_o(4 downto 0)   <= s_lvds_p_o(4 downto 0);
-  lvtio_out_n_o(4 downto 0)   <= s_lvds_n_o(4 downto 0);
+  lvtio_out_p_o(5 downto 1)   <= s_lvds_p_o(4 downto 0);
+  lvtio_out_n_o(5 downto 1)   <= s_lvds_n_o(4 downto 0);
   
   -- lvds/lvttl lemos output enable
-  lvtio_oen_o(0) <= '0' when s_lvds_oen(0)='0' else 'Z'; -- LVTTL_IO1
-  lvtio_oen_o(1) <= '0' when s_lvds_oen(1)='0' else 'Z'; -- LVTTL_IO2
-  lvtio_oen_o(2) <= '0' when s_lvds_oen(2)='0' else 'Z'; -- LVTTL_IO3
-  lvtio_oen_o(3) <= '0' when s_lvds_oen(3)='0' else 'Z'; -- LVTTL_IO4
-  lvtio_oen_o(4) <= '0' when s_lvds_oen(4)='0' else 'Z'; -- LVTTL_IO5
+  lvtio_oen_o(1) <= '0' when s_lvds_oen(0)='0' else 'Z'; -- LVTTL_IO1
+  lvtio_oen_o(2) <= '0' when s_lvds_oen(1)='0' else 'Z'; -- LVTTL_IO2
+  lvtio_oen_o(3) <= '0' when s_lvds_oen(2)='0' else 'Z'; -- LVTTL_IO3
+  lvtio_oen_o(4) <= '0' when s_lvds_oen(3)='0' else 'Z'; -- LVTTL_IO4
+  lvtio_oen_o(5) <= '0' when s_lvds_oen(4)='0' else 'Z'; -- LVTTL_IO5
   
   -- lvds/lvttl lemos terminator (terminate on input mode)
-  lvtio_term_en_o(0) <= '1' when s_lvds_oen(0)='1' else '0';
-  lvtio_term_en_o(1) <= '1' when s_lvds_oen(1)='1' else '0';
-  lvtio_term_en_o(2) <= '1' when s_lvds_oen(2)='1' else '0';
-  lvtio_term_en_o(3) <= '1' when s_lvds_oen(3)='1' else '0';
-  lvtio_term_en_o(4) <= '1' when s_lvds_oen(4)='1' else '0';
+  lvtio_term_en_o(1) <= '1' when s_lvds_oen(0)='1' else '0';
+  lvtio_term_en_o(2) <= '1' when s_lvds_oen(1)='1' else '0';
+  lvtio_term_en_o(3) <= '1' when s_lvds_oen(2)='1' else '0';
+  lvtio_term_en_o(4) <= '1' when s_lvds_oen(3)='1' else '0';
+  lvtio_term_en_o(5) <= '1' when s_lvds_oen(4)='1' else '0';
   
   -- lvds/lvttl lemos direction leds (blue) -- hi = led on
-  lvtio_led_dir_o(0) <= (s_lvds_oen(0));
-  lvtio_led_dir_o(1) <= (s_lvds_oen(1));
-  lvtio_led_dir_o(2) <= (s_lvds_oen(2));
-  lvtio_led_dir_o(3) <= (s_lvds_oen(3));
-  lvtio_led_dir_o(4) <= (s_lvds_oen(4));
+  lvtio_led_dir_o(1) <= (s_lvds_oen(0));
+  lvtio_led_dir_o(2) <= (s_lvds_oen(1));
+  lvtio_led_dir_o(3) <= (s_lvds_oen(2));
+  lvtio_led_dir_o(4) <= (s_lvds_oen(3));
+  lvtio_led_dir_o(5) <= (s_lvds_oen(4));
   
   -- lvds/lemos activity leds (red) -- -- hi = led on
-  lvtio_led_act_o(0) <= (s_lvds_i_led(0)) or (s_lvds_o_led(0));
-  lvtio_led_act_o(1) <= (s_lvds_i_led(1)) or (s_lvds_o_led(1));
-  lvtio_led_act_o(2) <= (s_lvds_i_led(2)) or (s_lvds_o_led(2));
-  lvtio_led_act_o(3) <= (s_lvds_i_led(3)) or (s_lvds_o_led(3));
-  lvtio_led_act_o(4) <= (s_lvds_i_led(4)) or (s_lvds_o_led(4));
+  lvtio_led_act_o(1) <= (s_lvds_i_led(0)) or (s_lvds_o_led(0));
+  lvtio_led_act_o(2) <= (s_lvds_i_led(1)) or (s_lvds_o_led(1));
+  lvtio_led_act_o(3) <= (s_lvds_i_led(2)) or (s_lvds_o_led(2));
+  lvtio_led_act_o(4) <= (s_lvds_i_led(3)) or (s_lvds_o_led(3));
+  lvtio_led_act_o(5) <= (s_lvds_i_led(4)) or (s_lvds_o_led(4));
 
   -----------------------------------------------------------
   -- microTCA.4 backplane triggers
-  s_lvds_p_i(16 downto 9) <= mlvdio_in_p_i(8 downto 1);
-  s_lvds_n_i(16 downto 9) <= mlvdio_in_n_i(8 downto 1);
+  -- using only 7 IOs !!!
+  s_lvds_p_i(11 downto 5) <= mlvdio_in_p_i(7 downto 1);
+  s_lvds_n_i(11 downto 5) <= mlvdio_in_n_i(7 downto 1);
 
-  mlvdio_out_p_o(4 downto 0)   <= s_lvds_p_o(16 downto 9);
-  mlvdio_out_n_o(4 downto 0)   <= s_lvds_n_o(16 downto 9);
+  mlvdio_out_p_o(7 downto 1)   <= s_lvds_p_o(11 downto 5);
+  mlvdio_out_p_o(8)            <= '0';
+  mlvdio_out_n_o(7 downto 1)   <= s_lvds_n_o(11 downto 5);
+  mlvdio_out_n_o(8)            <= '1';
 
-  mlvdio_oe_o     <= '0'; -- outputs turned off
-  mlvdio_fsen_o   <= '0'; -- 
+  mlvdio_oe_o(7 downto 1)      <= not s_lvds_oen(11 downto 5);
+  mlvdio_oe_o(8)               <= '0';
+  mlvdio_fsen_o                <= (others => '0'); -- 
   mlvdio_pdn_o    <= '0'; -- output buffer powerdown, active low
 
   -----------------------------------------------
   -- microTCA.4 clocks
 --  tclk_in_n_i  
 --  tclk_in_p_i  
-  tclk_out_n_o <= '1';
-  tclk_out_p_o <= '0';
+  tclk_out_n_o <= (others => '1');
+  tclk_out_p_o <= (others => '0');
   tclk_oe_o    <= (others => '0');
 
   -----------------------------------------------------------
   -- trigger outputs on backplane for Libera
+  -- currently not driven because monster has max 12 lvdios
 
   -- no intputs from Libera backplane
-  s_lvds_p_i(8 downto 5) <= '0';
-  s_lvds_n_i(8 downto 5) <= '1';
+--  s_lvds_p_i(16 downto 13) <= (others => '0');
+--  s_lvds_n_i(16 downto 13) <= (others => '1');
 
-  lib_trig_n_o(3 downto 0)   <= s_lvds_p_o(8 downto 5);
-  lib_trig_p_o(3 downto 0)   <= s_lvds_n_o(8 downto 5);
+  lib_trig_n_o(3 downto 0)   <= (others => '1'); -- s_lvds_p_o(16 downto 13);
+  lib_trig_p_o(3 downto 0)   <= (others => '0'); -- s_lvds_n_o(16 downto 13);
 
   -- output buffers enable
   lib_trig_oe_o <= '0'; 
