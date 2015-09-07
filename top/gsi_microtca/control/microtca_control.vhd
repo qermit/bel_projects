@@ -14,19 +14,16 @@ entity microtca_control is
 --    clk_osc_1_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
 
     clk_125m_pllref_i : in std_logic; -- 125 MHz PLL reference - (clk_125m_wrpll_0  on schl)
-    clk_125m_local_i  : in std_logic; -- local clk from 125Mhz oszillator (clk_osc_0  on sch)
-    sfp234_ref_clk_i  : in std_logic; -- SFP clk (clk_125m_wrpll_0 on sch)
-    lvtclk_i          : in  std_logic;
-
-    core_clk_butis_t0_o    : out   std_logic;
-    core_rstn_butis_o      : out   std_logic;
+    clk_125m_local_i  : in std_logic; -- local clk from 125Mhz oszillator (clk_osc_1  on sch)
+    sfp234_ref_clk_i  : in std_logic; -- SFP clk (clk_125m_wrpll_1 on sch)
+    lvtclk_i          : in std_logic; -- LEMO front panel input
     
     -----------------------------------------
     -- PCI express pins
     -----------------------------------------
     pcie_clk_i     : in  std_logic;
-    pcie_l0_rx_i   : in  std_logic;
-    pcie_l0_tx_o   : out std_logic;
+    pcie_rx_i      : in  std_logic;
+    pcie_tx_o      : out std_logic;
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -71,7 +68,7 @@ entity microtca_control is
     lvtio_in_p_i     : in  std_logic_vector(5 downto 1);
     lvtio_out_n_o    : out std_logic_vector(5 downto 1);
     lvtio_out_p_o    : out std_logic_vector(5 downto 1);
-    lvtio_oen_o      : out std_logic_vector(5 downto 1);
+    lvtio_oe_n_o      : out std_logic_vector(5 downto 1);
     lvtio_term_en_o  : out std_logic_vector(5 downto 1);
     lvtio_led_act_o  : out std_logic_vector(5 downto 1);
     lvtio_led_dir_o  : out std_logic_vector(5 downto 1);
@@ -142,8 +139,6 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- SFP 
     -----------------------------------------------------------------------
-
-    sfp_ref_clk_i    : in  std_logic;
    
     sfp_tx_dis_o     : out std_logic := '0';
     sfp_tx_fault_i   : in std_logic;
@@ -242,8 +237,8 @@ begin
       core_clk_125m_local_i  => clk_125m_local_i,
       core_rstn_i            => pbs_f_i,
 
-      core_clk_butis_t0_o    => s_clk_mmc_spi;
-      core_rstn_butis_o      => s_rstn_mmc_spi;
+      core_clk_butis_t0_o    => s_clk_mmc_spi,
+      core_rstn_butis_o      => s_rstn_mmc_spi,
 
       wr_onewire_io          => rom_data,
       wr_sfp_sda_io          => sfp_mod2,
@@ -300,10 +295,10 @@ begin
 
 
   -- pcie lane 0 
-  s_pcie_rx(0)          <= pcie_l0_rx_i;
+  s_pcie_rx(0)          <= pcie_rx_i;
   s_pcie_rx(3 downto 1) <= (others => '0');
 
-  pcie_l0_tx_o          <= s_pcie_tx(0);
+  pcie_tx_o             <= s_pcie_tx(0);
 
 
 
@@ -344,11 +339,11 @@ begin
   lvtio_out_n_o(5 downto 1)   <= s_lvds_n_o(4 downto 0);
   
   -- lvds/lvttl lemos output enable
-  lvtio_oen_o(1) <= '0' when s_lvds_oen(0)='0' else 'Z'; -- LVTTL_IO1
-  lvtio_oen_o(2) <= '0' when s_lvds_oen(1)='0' else 'Z'; -- LVTTL_IO2
-  lvtio_oen_o(3) <= '0' when s_lvds_oen(2)='0' else 'Z'; -- LVTTL_IO3
-  lvtio_oen_o(4) <= '0' when s_lvds_oen(3)='0' else 'Z'; -- LVTTL_IO4
-  lvtio_oen_o(5) <= '0' when s_lvds_oen(4)='0' else 'Z'; -- LVTTL_IO5
+  lvtio_oe_n_o(1) <= '0' when s_lvds_oen(0)='0' else 'Z'; -- LVTTL_IO1
+  lvtio_oe_n_o(2) <= '0' when s_lvds_oen(1)='0' else 'Z'; -- LVTTL_IO2
+  lvtio_oe_n_o(3) <= '0' when s_lvds_oen(2)='0' else 'Z'; -- LVTTL_IO3
+  lvtio_oe_n_o(4) <= '0' when s_lvds_oen(3)='0' else 'Z'; -- LVTTL_IO4
+  lvtio_oe_n_o(5) <= '0' when s_lvds_oen(4)='0' else 'Z'; -- LVTTL_IO5
   
   -- lvds/lvttl lemos terminator (terminate on input mode)
   lvtio_term_en_o(1) <= '1' when s_lvds_oen(0)='1' else '0';
@@ -436,7 +431,7 @@ begin
       else
         -- right shift inputs for sync and edge detection
         s_mmc_spi_clk   <= mmc_spi0_sck_i   & s_mmc_spi_clk(2 downto 1);
-        s_mmc_spi_mosi  <= mmc_spi0_mosi_i  & s_mmc_spi_mosi(1 downto 0);
+        s_mmc_spi_mosi  <= mmc_spi0_mosi_i  & s_mmc_spi_mosi(1);
         s_mmc_spi_sel_fpga_n <= mmc_spi0_sel_fpga_n_i & s_mmc_spi_sel_fpga_n(2 downto 1);
 
         -- rising edge on clock
@@ -454,8 +449,8 @@ begin
         end if;
 
         -- SPI shift in
-        if s_mmc_spi_sel_fpga_n(1) = '0' and s_mmc_spi_clk_re  then
-          s_mmc_spi_shift_reg <=  s_mmc_spi_mosi(0) & s_mmc_spi_shift_reg(s_mmc_spi_shift_reg'left - 2 downto 1) ;
+        if s_mmc_spi_sel_fpga_n(1) = '0' and s_mmc_spi_clk_re = '1'  then
+          s_mmc_spi_shift_reg <=  s_mmc_spi_mosi(0) & s_mmc_spi_shift_reg(s_mmc_spi_shift_reg'left downto 1) ;
         else
           s_mmc_spi_shift_reg <= s_mmc_spi_shift_reg;
         end if;
@@ -477,7 +472,7 @@ begin
         
       end if; -- reset
     end if; -- clk
-  end bpl_signal_en_reg;
+  end process bpl_signal_en_reg;
 
   
 end rtl;
