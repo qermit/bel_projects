@@ -8,10 +8,18 @@ use work.monster_pkg.all;
 entity microtca_control is
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
-    clk_125m_wrpll_0_i  : in std_logic;  -- 125 MHz PLL reference
-    clk_125m_wrpll_1_i  : in std_logic;  -- 125 MHz PLL reference
-    clk_osc_0_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
-    clk_osc_1_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
+--    clk_125m_wrpll_0_i  : in std_logic;  -- 125 MHz PLL reference
+--    clk_125m_wrpll_1_i  : in std_logic;  -- 125 MHz PLL reference
+--    clk_osc_0_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
+--    clk_osc_1_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
+
+    clk_125m_pllref_i : in std_logic; -- 125 MHz PLL reference - (clk_125m_wrpll_0  on schl)
+    clk_125m_local_i  : in std_logic; -- local clk from 125Mhz oszillator (clk_osc_0  on sch)
+    sfp234_ref_clk_i  : in std_logic; -- SFP clk (clk_125m_wrpll_0 on sch)
+    lvtclk_i          : in  std_logic;
+
+    core_clk_butis_t0_o    : out   std_logic;
+    core_rstn_butis_o      : out   std_logic;
     
     -----------------------------------------
     -- PCI express pins
@@ -69,8 +77,6 @@ entity microtca_control is
     lvtio_led_dir_o  : out std_logic_vector(5 downto 1);
 
     -- clock input
-    lvtclk_n_i       : in  std_logic;
-    lvtclk_p_i       : in  std_logic;
     lvtclk_in_en_o   : out std_logic;
 
     -----------------------------------------------------------------------
@@ -194,6 +200,24 @@ architecture rtl of microtca_control is
   constant c_initf   : string := c_project & ".mif"; 
   -- projectname is standard to ensure a stub mif that prevents unwanted scanning of the bus 
   -- multiple init files for n processors are to be seperated by semicolon ';'
+
+
+  signal s_mmc_spi_clk        : std_logic_vector(2 downto 0);
+  signal s_mmc_spi_mosi       : std_logic_vector(1 downto 0);
+  signal s_mmc_spi_sel_fpga_n : std_logic_vector(2 downto 0);
+
+  signal s_mmc_spi_clk_re         : std_logic;
+  signal s_mmc_spi_sel_fpga_n_re  : std_logic;
+        
+  signal s_mmc_spi_shift_reg      : std_logic_vector(15 downto 0);
+       
+  signal s_mtca4_trig_oe_reg      : std_logic_vector(8 downto 1);
+  signal s_mtca4_trig_pdn_reg     : std_logic;
+  signal s_mtca4_clk_oe_reg       : std_logic_vector(4 downto 1);
+  signal s_libera_trig_oe_reg     : std_logic;
+
+  signal s_rstn_mmc_spi           : std_logic;
+  signal s_clk_mmc_spi            : std_logic;
   
 begin
 
@@ -213,10 +237,13 @@ begin
     )
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
-      core_clk_125m_pllref_i => clk_125m_wrpll_0_i,
-      core_clk_125m_sfpref_i => clk_125m_wrpll_1_i,
-      core_clk_125m_local_i  => clk_osc_0_i,
+      core_clk_125m_pllref_i => clk_125m_pllref_i,
+      core_clk_125m_sfpref_i => sfp234_ref_clk_i,
+      core_clk_125m_local_i  => clk_125m_local_i,
       core_rstn_i            => pbs_f_i,
+
+      core_clk_butis_t0_o    => s_clk_mmc_spi;
+      core_rstn_butis_o      => s_rstn_mmc_spi;
 
       wr_onewire_io          => rom_data,
       wr_sfp_sda_io          => sfp_mod2,
@@ -351,14 +378,14 @@ begin
   s_lvds_n_i(11 downto 5) <= mlvdio_in_n_i(7 downto 1);
 
   mlvdio_out_p_o(7 downto 1)   <= s_lvds_p_o(11 downto 5);
-  mlvdio_out_p_o(8)            <= '0';
   mlvdio_out_n_o(7 downto 1)   <= s_lvds_n_o(11 downto 5);
+  mlvdio_out_p_o(8)            <= '0';
   mlvdio_out_n_o(8)            <= '1';
 
-  mlvdio_oe_o(7 downto 1)      <= not s_lvds_oen(11 downto 5);
+  mlvdio_oe_o(7 downto 1)      <= (not s_lvds_oen(11 downto 5)) and s_mtca4_trig_oe_reg(7 downto 1);
   mlvdio_oe_o(8)               <= '0';
   mlvdio_fsen_o                <= (others => '0'); -- 
-  mlvdio_pdn_o    <= '0'; -- output buffer powerdown, active low
+  mlvdio_pdn_o    <= s_mtca4_trig_pdn_reg; -- output buffer powerdown, active low
 
   -----------------------------------------------
   -- microTCA.4 clocks
@@ -366,7 +393,7 @@ begin
 --  tclk_in_p_i  
   tclk_out_n_o <= (others => '1');
   tclk_out_p_o <= (others => '0');
-  tclk_oe_o    <= (others => '0');
+  tclk_oe_o    <= s_mtca4_clk_oe_reg;
 
   -----------------------------------------------------------
   -- trigger outputs on backplane for Libera
@@ -380,21 +407,77 @@ begin
   lib_trig_p_o(3 downto 0)   <= (others => '0'); -- s_lvds_n_o(16 downto 13);
 
   -- output buffers enable
-  lib_trig_oe_o <= '0'; 
+  lib_trig_oe_o <= s_libera_trig_oe_reg; 
 
 
   ----------------------------------------------
-  -- spi from mmc - ftrn side is spi slave
-  --	mmc_spi0_sck_i
-	  mmc_spi0_miso_o       <= 'Z';
-  --	mmc_spi0_mosi_i
-  --	mmc_spi0_sel_fpga_n_i
+  fpga2mmc_int_o  <= '0'; -- irq to mmc
 
-  --	mmc_pcie_en_i	  
-  --  mmc_pcie_rst_n_i
 
-  --	mmc2fpga_usr_i
-	  fpga2mmc_int_o  <= '0'; -- irq to mmc
+
+  bpl_signal_en_reg  :process(s_clk_mmc_spi)
+  begin
+    if rising_edge(s_clk_mmc_spi) then
+      if s_rstn_mmc_spi = '0' then
+        s_mmc_spi_clk        <= (others => '0');
+        s_mmc_spi_mosi       <= (others => '0');
+        s_mmc_spi_sel_fpga_n <= (others => '1');
+
+        s_mmc_spi_clk_re         <= '0';
+        s_mmc_spi_sel_fpga_n_re  <= '0';
+              
+        s_mmc_spi_shift_reg      <= (others => '0');
+             
+        s_mtca4_trig_oe_reg      <= (others => '0');
+        s_mtca4_trig_pdn_reg     <= '0';
+        s_mtca4_clk_oe_reg       <= (others => '0');
+        s_libera_trig_oe_reg     <= '0';
+
+      else
+        -- right shift inputs for sync and edge detection
+        s_mmc_spi_clk   <= mmc_spi0_sck_i   & s_mmc_spi_clk(2 downto 1);
+        s_mmc_spi_mosi  <= mmc_spi0_mosi_i  & s_mmc_spi_mosi(1 downto 0);
+        s_mmc_spi_sel_fpga_n <= mmc_spi0_sel_fpga_n_i & s_mmc_spi_sel_fpga_n(2 downto 1);
+
+        -- rising edge on clock
+        if s_mmc_spi_clk(1) = '1' and s_mmc_spi_clk(0) = '0' then 
+          s_mmc_spi_clk_re  <= '1';
+        else 
+          s_mmc_spi_clk_re  <= '0';
+        end if;
+
+        -- rising edge on Chip Select
+        if s_mmc_spi_sel_fpga_n(1) = '1' and s_mmc_spi_sel_fpga_n(0) = '0' then 
+          s_mmc_spi_sel_fpga_n_re  <= '1';
+        else 
+          s_mmc_spi_sel_fpga_n_re  <= '0';
+        end if;
+
+        -- SPI shift in
+        if s_mmc_spi_sel_fpga_n(1) = '0' and s_mmc_spi_clk_re  then
+          s_mmc_spi_shift_reg <=  s_mmc_spi_mosi(0) & s_mmc_spi_shift_reg(s_mmc_spi_shift_reg'left - 2 downto 1) ;
+        else
+          s_mmc_spi_shift_reg <= s_mmc_spi_shift_reg;
+        end if;
+        
+        mmc_spi0_miso_o <= s_mmc_spi_shift_reg(s_mmc_spi_shift_reg'right);
+        
+        -- store settings given by mmc
+        if s_mmc_spi_sel_fpga_n_re = '1' then 
+          s_mtca4_trig_oe_reg   <= s_mmc_spi_shift_reg(7 downto 0);
+          s_mtca4_trig_pdn_reg  <= s_mmc_spi_shift_reg(12);
+          s_mtca4_clk_oe_reg    <= s_mmc_spi_shift_reg(11 downto 8);
+          s_libera_trig_oe_reg  <= s_mmc_spi_shift_reg(13);
+        else -- hold
+          s_mtca4_trig_oe_reg   <= s_mtca4_trig_oe_reg;
+          s_mtca4_trig_pdn_reg  <= s_mtca4_trig_pdn_reg;
+          s_mtca4_clk_oe_reg    <= s_mtca4_clk_oe_reg;
+          s_libera_trig_oe_reg  <= s_libera_trig_oe_reg;
+        end if;
+        
+      end if; -- reset
+    end if; -- clk
+  end bpl_signal_en_reg;
 
   
 end rtl;
