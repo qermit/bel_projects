@@ -48,32 +48,24 @@ set_location_assignment PIN_U18 -to pcie_clk_i
 set_location_assignment PIN_U19 -to "pcie_clk_i(n)"
 set_instance_assignment -name IO_STANDARD LVDS -to pcie_clk_i
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pcie_clk_i
-
-
 set_location_assignment PIN_AB26 -to pcie_rx_i
 set_location_assignment PIN_AB25 -to pcie_rx_i(n)
-
 set_location_assignment PIN_AB26 -to pcie_rx_i[0]
 set_location_assignment PIN_Y26 -to pcie_rx_i[1]
 set_location_assignment PIN_V26 -to pcie_rx_i[2]
 set_location_assignment PIN_T26 -to pcie_rx_i[3]
-
 set_location_assignment PIN_AA24 -to pcie_tx_o[0]
 set_location_assignment PIN_W24 -to pcie_tx_o[1]
 set_location_assignment PIN_U24 -to pcie_tx_o[2]
 set_location_assignment PIN_R24 -to pcie_tx_o[3]
-
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_tx_o[0]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_tx_o[1]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_tx_o[2]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_tx_o[3]
-
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_rx_i[0]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_rx_i[1]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_rx_i[2]
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_rx_i[3]
-
-
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_tx_o
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to pcie_rx_i
 set_global_assignment -name STRATIXV_CONFIGURATION_SCHEME "ACTIVE SERIAL X4"
@@ -345,10 +337,6 @@ set_location_assignment PIN_AC20 -to lib_trig_p_o(n)[2]
 set_location_assignment PIN_AD20 -to lib_trig_p_o[2]
 set_location_assignment PIN_AC19 -to lib_trig_p_o(n)[3]
 set_location_assignment PIN_AD19 -to lib_trig_p_o[3]
-set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lib_trig_p_o[0]
-set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lib_trig_p_o[1]
-set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lib_trig_p_o[2]
-set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lib_trig_p_o[3]
 set_instance_assignment -name IO_STANDARD LVDS -to lib_trig_p_o[0]
 set_instance_assignment -name IO_STANDARD LVDS -to lib_trig_p_o[1]
 set_instance_assignment -name IO_STANDARD LVDS -to lib_trig_p_o[2]
