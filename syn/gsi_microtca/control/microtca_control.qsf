@@ -47,7 +47,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_pcie_rst_n_i
 set_location_assignment PIN_U18 -to pcie_clk_i
 set_location_assignment PIN_U19 -to "pcie_clk_i(n)"
 set_instance_assignment -name IO_STANDARD LVDS -to pcie_clk_i
-set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pcie_clk_i
 set_location_assignment PIN_AB26 -to pcie_rx_i
 set_location_assignment PIN_AB25 -to pcie_rx_i(n)
 set_location_assignment PIN_AB26 -to pcie_rx_i[0]
@@ -177,12 +176,28 @@ set_location_assignment PIN_R3 -to led_user[5]
 set_location_assignment PIN_R6 -to led_user[6]
 set_location_assignment PIN_T1 -to led_user[7]
 set_location_assignment PIN_T2 -to led_user[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_user[8]
+
 set_location_assignment PIN_G11 -to led_status[1]
 set_location_assignment PIN_F11 -to led_status[2]
 set_location_assignment PIN_D11 -to led_status[3]
 set_location_assignment PIN_C11 -to led_status[4]
 set_location_assignment PIN_G12 -to led_status[5]
 set_location_assignment PIN_F12 -to led_status[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to led_status[6]
+
 set_location_assignment PIN_AC1 -to fd[7]
 set_location_assignment PIN_AF3 -to fd[6]
 set_location_assignment PIN_AD4 -to fd[5]
@@ -309,7 +324,6 @@ set_instance_assignment -name IO_STANDARD LVDS -to lvtio_out_n_o[2]
 set_instance_assignment -name IO_STANDARD LVDS -to lvtio_out_n_o[3]
 set_instance_assignment -name IO_STANDARD LVDS -to lvtio_out_n_o[4]
 set_instance_assignment -name IO_STANDARD LVDS -to lvtio_out_n_o[5]
-
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_p_i[1]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_p_i[2]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_p_i[3]
@@ -320,8 +334,6 @@ set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_n_i[2]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_n_i[3]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_n_i[4]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to lvtio_in_n_i[5]
-
-
 set_location_assignment PIN_C10 -to lvtio_term_en_o[1]
 set_location_assignment PIN_B10 -to lvtio_led_act_o[1]
 set_location_assignment PIN_K12 -to lvtio_led_dir_o[1]
