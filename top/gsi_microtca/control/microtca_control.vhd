@@ -116,7 +116,7 @@ entity microtca_control is
 		mmc_spi0_sel_fpga_n_i : in  std_logic;
 
  		mmc_pcie_en_i	        : in  std_logic;
-    mmc_pcie_rst_n_i      : in  std_logic;
+--    mmc_pcie_rst_n_i      : in  std_logic;
 
 		mmc2fpga_usr_i	      : in  std_logic_vector(2 downto 1);
 		fpga2mmc_int_o	      : out std_logic;
@@ -272,7 +272,7 @@ begin
       led_pps_o              => led_pps,
 
       pcie_refclk_i          => pcie_clk_i,
-      pcie_rstn_i            => mmc_pcie_rst_n_i,
+      pcie_rstn_i            => mmc_pcie_en_i,
       pcie_rx_i              => pcie_rx_i,
       pcie_tx_o              => pcie_tx_o,
 
