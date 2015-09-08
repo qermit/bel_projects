@@ -92,6 +92,10 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to con[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to con[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to con[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to con[1]
+
+set_location_assignment PIN_T7 -to mmc_pcie_en_i
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_pcie_en_i
+
 set_location_assignment PIN_V4 -to mmc_spi0_sck_i
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_spi0_sck_i
 set_location_assignment PIN_V5 -to mmc_spi0_miso_o
