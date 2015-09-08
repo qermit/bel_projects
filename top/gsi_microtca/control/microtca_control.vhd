@@ -17,13 +17,15 @@ entity microtca_control is
     clk_125m_local_i  : in std_logic; -- local clk from 125Mhz oszillator (clk_osc_1  on sch)
     sfp234_ref_clk_i  : in std_logic; -- SFP clk (clk_125m_wrpll_1 on sch)
     lvtclk_i          : in std_logic; -- LEMO front panel input
+
+    clk_125m_wrpll_i  : in std_logic; -- optional second clock from WR PLL
     
     -----------------------------------------
     -- PCI express pins
     -----------------------------------------
     pcie_clk_i     : in  std_logic;
-    pcie_rx_i      : in  std_logic;
-    pcie_tx_o      : out std_logic;
+    pcie_rx_i      : in  std_logic_vector(3 downto 0);
+    pcie_tx_o      : out std_logic_vector(3 downto 0);
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -57,6 +59,8 @@ entity microtca_control is
     fpga_res        : in std_logic;
     nres            : in std_logic;
     pbs_f_i         : in std_logic;
+    hswf_i          : in std_logic_vector(3 downto 0);
+    
 
     hpwck           : out   std_logic;
     hpw             : inout std_logic_vector(15 downto 0) := (others => 'Z'); -- logic analyzer
@@ -269,8 +273,8 @@ begin
 
       pcie_refclk_i          => pcie_clk_i,
       pcie_rstn_i            => mmc_pcie_rst_n_i,
-      pcie_rx_i              => s_pcie_rx,
-      pcie_tx_o              => s_pcie_tx,
+      pcie_rx_i              => pcie_rx_i,
+      pcie_tx_o              => pcie_tx_o,
 
       usb_rstn_o             => ures,
       usb_ebcyc_i            => pa(3),
@@ -293,13 +297,10 @@ begin
 
   sfp_tx_dis_o <= '0'; -- SFP always enabled
 
-
   -- pcie lane 0 
-  s_pcie_rx(0)          <= pcie_rx_i;
-  s_pcie_rx(3 downto 1) <= (others => '0');
-
-  pcie_tx_o             <= s_pcie_tx(0);
-
+  -- s_pcie_rx(0)          <= pcie_rx_i;
+  -- s_pcie_rx(3 downto 1) <= (others => '0');
+  -- pcie_tx_o             <= s_pcie_tx(0);
 
 
   -- Link LEDs
