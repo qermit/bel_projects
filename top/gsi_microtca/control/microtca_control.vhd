@@ -8,17 +8,13 @@ use work.monster_pkg.all;
 entity microtca_control is
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
---    clk_125m_wrpll_0_i  : in std_logic;  -- 125 MHz PLL reference
---    clk_125m_wrpll_1_i  : in std_logic;  -- 125 MHz PLL reference
---    clk_osc_0_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
---    clk_osc_1_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
 
     clk_125m_pllref_i : in std_logic; -- 125 MHz PLL reference - (clk_125m_wrpll_0  on schl)
     clk_125m_local_i  : in std_logic; -- local clk from 125Mhz oszillator (clk_osc_1  on sch)
     sfp234_ref_clk_i  : in std_logic; -- SFP clk (clk_125m_wrpll_1 on sch)
     lvtclk_i          : in std_logic; -- LEMO front panel input
 
-    clk_125m_wrpll_i  : in std_logic; -- optional second clock from WR PLL
+--    clk_osc_0_i         : in std_logic;  -- local clk from 100MHz or 125Mhz oscillator
     
     -----------------------------------------
     -- PCI express pins
@@ -59,7 +55,7 @@ entity microtca_control is
     fpga_res        : in std_logic;
     nres            : in std_logic;
     pbs_f_i         : in std_logic;
-    hswf_i          : in std_logic_vector(3 downto 0);
+    hswf_i          : in std_logic_vector(4 downto 1);
     
 
     hpwck           : out   std_logic;
@@ -83,17 +79,23 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/lvds libera triggers on backplane
     -----------------------------------------------------------------------
-    lib_trig_n_o        : out std_logic_vector(3 downto 0);
-    lib_trig_p_o        : out std_logic_vector(3 downto 0);
+--    lib_trig_n_o        : out std_logic_vector(3 downto 0);
+--    lib_trig_p_o        : out std_logic_vector(3 downto 0);
     lib_trig_oe_o       : out std_logic;
 
     -----------------------------------------------------------------------
     -- lvds/m-lvds microTCA.4 triggers, gates, clocks on backplane
     -----------------------------------------------------------------------
-    mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
-    mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
-    mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
-    mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
+    mlvdio_in_n_i     : in  std_logic_vector(7 downto 1);
+    mlvdio_in_p_i     : in  std_logic_vector(7 downto 1);
+    mlvdio_out_n_o    : out std_logic_vector(7 downto 1);
+    mlvdio_out_p_o    : out std_logic_vector(7 downto 1);
+
+--    mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
+--    mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
+--    mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
+--    mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
+
     mlvdio_oe_o       : out std_logic_vector(8 downto 1);
     mlvdio_fsen_o     : out std_logic_vector(8 downto 1);
     mlvdio_pdn_o      : out std_logic; -- output buffer powerdown, active low
@@ -116,7 +118,7 @@ entity microtca_control is
 		mmc_spi0_sel_fpga_n_i : in  std_logic;
 
  		mmc_pcie_en_i	        : in  std_logic;
---    mmc_pcie_rst_n_i      : in  std_logic;
+    mmc_pcie_rst_n_i      : in  std_logic;
 
 		mmc2fpga_usr_i	      : in  std_logic_vector(2 downto 1);
 		fpga2mmc_int_o	      : out std_logic;
@@ -272,7 +274,7 @@ begin
       led_pps_o              => led_pps,
 
       pcie_refclk_i          => pcie_clk_i,
-      pcie_rstn_i            => mmc_pcie_en_i,
+      pcie_rstn_i            => mmc_pcie_rst_n_i,
       pcie_rx_i              => pcie_rx_i,
       pcie_tx_o              => pcie_tx_o,
 
@@ -369,14 +371,14 @@ begin
 
   -----------------------------------------------------------
   -- microTCA.4 backplane triggers
-  -- using only 7 IOs !!!
+  -- using only 7 IOs, need more from monster!!!
   s_lvds_p_i(11 downto 5) <= mlvdio_in_p_i(7 downto 1);
   s_lvds_n_i(11 downto 5) <= mlvdio_in_n_i(7 downto 1);
 
   mlvdio_out_p_o(7 downto 1)   <= s_lvds_p_o(11 downto 5);
   mlvdio_out_n_o(7 downto 1)   <= s_lvds_n_o(11 downto 5);
-  mlvdio_out_p_o(8)            <= '0';
-  mlvdio_out_n_o(8)            <= '1';
+--  mlvdio_out_p_o(8)            <= '0';
+--  mlvdio_out_n_o(8)            <= '1';
 
   mlvdio_oe_o(7 downto 1)      <= (not s_lvds_oen(11 downto 5)) and s_mtca4_trig_oe_reg(7 downto 1);
   mlvdio_oe_o(8)               <= '0';
@@ -399,8 +401,8 @@ begin
 --  s_lvds_p_i(16 downto 13) <= (others => '0');
 --  s_lvds_n_i(16 downto 13) <= (others => '1');
 
-  lib_trig_n_o(3 downto 0)   <= (others => '1'); -- s_lvds_p_o(16 downto 13);
-  lib_trig_p_o(3 downto 0)   <= (others => '0'); -- s_lvds_n_o(16 downto 13);
+--  lib_trig_n_o(3 downto 0)   <= (others => '1'); -- s_lvds_p_o(16 downto 13);
+--  lib_trig_p_o(3 downto 0)   <= (others => '0'); -- s_lvds_n_o(16 downto 13);
 
   -- output buffers enable
   lib_trig_oe_o <= s_libera_trig_oe_reg; 
@@ -411,7 +413,7 @@ begin
 
 
 
-  bpl_signal_en_reg  :process(s_clk_mmc_spi)
+  bpl_outbuf_en_reg  :process(s_clk_mmc_spi)
   begin
     if rising_edge(s_clk_mmc_spi) then
       if s_rstn_mmc_spi = '0' then
@@ -473,7 +475,7 @@ begin
         
       end if; -- reset
     end if; -- clk
-  end process bpl_signal_en_reg;
+  end process bpl_outbuf_en_reg;
 
   
 end rtl;
