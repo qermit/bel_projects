@@ -330,7 +330,10 @@ begin
 
   -- GPIOs
   status_led_o(6 downto 5) <= not s_gpio (1 downto 0);
-  user_led_o(8 downto 1)   <= not s_gpio (9 downto 2);
+--  user_led_o(8 downto 1)   <= not s_gpio (9 downto 2);
+  user_led_o(3 downto 1)   <= not s_gpio (4 downto 2);
+
+  user_led_o(8 downto 4)   <= con; -- CPLD outputs to leds
   
   -- LVDS inputs
   s_lvds_p_i(0) <= lvttio_in_p_1;
