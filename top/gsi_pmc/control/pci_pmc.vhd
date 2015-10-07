@@ -182,6 +182,10 @@ architecture rtl of pci_pmc is
   signal s_led_pps      : std_logic;
   
   signal s_gpio         : std_logic_vector(9 downto 0);
+
+  signal s_hsw_fpga     : std_logic_vector(4 downto 1);
+  signal s_pbs_fpga     : std_logic;
+  
   
   signal s_lvds_p_i     : std_logic_vector(4 downto 0);
   signal s_lvds_n_i     : std_logic_vector(4 downto 0);
@@ -282,8 +286,8 @@ begin
       pmc_req_o              => pmc_req_o,
       pmc_gnt_i              => pmc_gnt_i,
 
-      pmc_ctrl_hs_i          => hswf,
-      pmc_pb_i               => pbs_f,
+      pmc_ctrl_hs_i          => s_hsw_fpga,
+      pmc_pb_i               => s_pbs_fpga,
       pmc_ctrl_hs_cpld_i     => con(4 downto 1),
       pmc_pb_cpld_i          => con(5),
       pmc_clk_oe_o           => s_wr_ext_in,
@@ -293,10 +297,18 @@ begin
       lcd_scp_o              => dis_di(3),
       lcd_lp_o               => dis_di(1),
       lcd_flm_o              => dis_di(2),
-      lcd_in_o               => dis_di(0));
+      lcd_in_o               => dis_di(0)
+);
 
 
-pmc_buf_oe_o <= '1'; -- enable PCI bus translators
+  pmc_buf_oe_o <= '1'; -- enable PCI bus translators
+
+
+  -- invert push button and hex switch
+  s_hsw_fpga  <= not hswf;
+  s_pbs_fpga  <= not pbs_f;
+
+
 
   -- SFP always enabled
   sfp_tx_disable_o <= '0';
