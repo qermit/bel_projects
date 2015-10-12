@@ -309,7 +309,6 @@ begin
   s_pbs_fpga  <= not pbs_f;
 
 
-
   -- SFP always enabled
   sfp_tx_disable_o <= '0';
 
