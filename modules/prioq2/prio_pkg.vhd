@@ -72,10 +72,26 @@ package prio_pkg is
     master_i    : in t_wishbone_master_in;
     
     ts_o        : out std_logic_vector(63 downto 0);
-    ts_valid_o  : out std_logic;
-    
-    sel_i       : in std_logic
+    ts_valid_o  : out std_logic
 
+  );
+  end component;
+  
+  component arbiter is
+  generic(
+    g_depth       : natural := 16;
+    g_num_masters : natural := 8 
+  );
+  port(
+    clk_i       : in  std_logic;
+    rst_n_i     : in  std_logic;
+    
+    slaves_i    : in t_wishbone_slave_in_array(g_num_masters-1 downto 0);
+    slaves_o    : out t_wishbone_slave_out_array(g_num_masters-1 downto 0);
+    
+    master_o    : out t_wishbone_master_out;
+    master_i    : in t_wishbone_master_in
+    
   );
   end component;
 

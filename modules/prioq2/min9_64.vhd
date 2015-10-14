@@ -14,8 +14,8 @@ port(
   clk_i     : in  std_logic;
   rst_n_i   : in  std_logic;
   
-  in_i      : in slv64_array(8 downto 0)      := (others => (others => '0')); -- numbers to compare
-  e_abc_i   : in std_logic_vector(8 downto 0) := (others => '1'); -- empty a, b, c, ....
+  in_i      : in slv64_array(8 downto 0)      ; -- numbers to compare
+  e_abc_i   : in std_logic_vector(8 downto 0) ; -- empty a, b, c, ....
   
   y_o       : out std_logic_vector(8 downto 0)          -- min a, b, c 1-hot
   
@@ -24,11 +24,11 @@ end min9_64;
 
 architecture behavioral of min9_64 is
 
-  signal s_y_top, s_msk_x, s_msk_y, s_msk_z, 
+  signal s_y_top, 
          s_e_xyz  : std_logic_vector(2 downto 0);
-  signal s_y, s_msk : std_logic_vector(8 downto 0);
-  signal s_xyz : slv64_array(2 downto 0); 
-  signal s_e_top : std_logic;
+  signal s_y      : std_logic_vector(8 downto 0);
+  signal s_xyz    : slv64_array(2 downto 0); 
+  signal s_e_top  : std_logic;
   
 begin  
 
