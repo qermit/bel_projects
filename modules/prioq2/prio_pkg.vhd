@@ -86,6 +86,8 @@ package prio_pkg is
     clk_i       : in  std_logic;
     rst_n_i     : in  std_logic;
     
+    en_i        : in  std_logic;
+    
     slaves_i    : in t_wishbone_slave_in_array(g_num_masters-1 downto 0);
     slaves_o    : out t_wishbone_slave_out_array(g_num_masters-1 downto 0);
     

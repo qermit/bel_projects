@@ -19,8 +19,10 @@ port(
   clk_i       : in  std_logic;
   rst_n_i     : in  std_logic;
   
-  slaves_i     : in t_wishbone_slave_in_array(g_num_masters-1 downto 0);
-  slaves_o     : out t_wishbone_slave_out_array(g_num_masters-1 downto 0);
+  en_i        : in  std_logic;   
+  
+  slaves_i    : in t_wishbone_slave_in_array(g_num_masters-1 downto 0);
+  slaves_o    : out t_wishbone_slave_out_array(g_num_masters-1 downto 0);
   
   master_o    : out t_wishbone_master_out;
   master_i    : in t_wishbone_master_in
@@ -191,6 +193,7 @@ architecture behavioral of arbiter is
   
 
   function matrix_logic(
+    enabled     : std_logic;
     ts_priority : slave_row;
     matrix_old  : matrix;
     slave_i     : t_wishbone_slave_in_array(g_num_masters-1 downto 0))
@@ -206,6 +209,7 @@ architecture behavioral of arbiter is
     variable sbusy      : column;  -- Does the slave's  previous connection persist?
     variable mbusy      : row;     -- Does the master's previous connection persist?
     variable matrix_new : matrix;
+    constant c_no_one   : row := (others => '0');
   begin
     -- The slave is busy if ... it's busy or if the previously sending channel did not have time to reload yet
       for master in g_num_masters-1 downto 0 loop
@@ -221,7 +225,7 @@ architecture behavioral of arbiter is
 
     -- Decode the selection and grant priority
     for master in g_num_masters-1 downto 0 loop
-      selected(master, c_slave) := slave_i(master).CYC and slave_i(master).STB and ts_priority(master);
+      selected(master, c_slave) := slave_i(master).CYC and slave_i(master).STB and ts_priority(master) and enabled;
     end loop;
      
     -- Determine the master granted access
@@ -278,7 +282,7 @@ begin
   end generate;
 
   -- Copy the matrix to a register:
-  matrix_new <= matrix_logic(s_ts_prio(g_num_masters-1 downto 0), matrix_old, s_masters_o);
+  matrix_new <= matrix_logic(en_i, s_ts_prio(g_num_masters-1 downto 0), matrix_old, s_masters_o);
   main : process(clk_i)
   begin
     if rising_edge(clk_i) then

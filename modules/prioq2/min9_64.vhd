@@ -29,6 +29,7 @@ architecture behavioral of min9_64 is
   signal s_y      : std_logic_vector(8 downto 0);
   signal s_xyz    : slv64_array(2 downto 0); 
   signal s_e_top  : std_logic;
+  signal s_min    : std_logic_vector(63 downto 0);
   
 begin  
 
@@ -65,7 +66,7 @@ begin
     b_i     => s_xyz(c_y),
     c_i     => s_xyz(c_z),
     e_abc_i => s_e_xyz,
-    min_o   => open,
+    min_o   => s_min,
     e_o     => s_e_top,
     y_abc_o => s_y_top
   );
