@@ -43,9 +43,9 @@ extern eb_socket_t mySocket;
 #define EBM_SRC_MAC_LO    (EBM_SRC_MAC_HI   +1)    
 #define EBM_SRC_IPV4      (EBM_SRC_MAC_LO   +1)    
 #define EBM_SRC_UDP_PORT  (EBM_SRC_IPV4     +1)   
-#define EBM_DST_MAC_HI    (EBM_SRC_UDP_PORT +1)  
-#define EBM_DST_MAC_LO    (EBM_DST_MAC_HI   +1)   
-#define EBM_DST_IPV4      (EBM_DST_MAC_LO   +1)  
+#define EBM_DST_MAC_LO    (EBM_SRC_UDP_PORT +1)  
+#define EBM_DST_MAC_HI    (EBM_DST_MAC_LO   +1)   
+#define EBM_DST_IPV4      (EBM_DST_MAC_HI   +1)  
 #define EBM_DST_UDP_PORT  (EBM_DST_IPV4     +1)   
 #define EBM_MTU           (EBM_DST_UDP_PORT +1)  
 #define EBM_ADR_HI        (EBM_MTU          +1)    
@@ -68,7 +68,7 @@ extern eb_socket_t mySocket;
 #define PRIOQ_MSG_PAC     (PRIOQ_CAPACITY + 1)  
 
 #define VALID_PRIOQ_CFG   0x3b
-#define ECA_ADDRESS       0x7fffffff
+#define ECA_ADDRESS       0x7ffffff0
 #define MAX_MSG_PER_PACKET 42 
 
 #define OFFSET_WR       34

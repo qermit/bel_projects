@@ -809,10 +809,10 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
       //TODO
       //Future work: change everything to new register layout in v03. And include real threads !!!
       uint32_t tmp = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];
-      if(tmp & STAT_RUNNING) buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = 1;
-      if(tmp & STAT_WAIT) buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = 1;
-      if(tmp & STAT_IDLE)    buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = 1;
-      if(tmp & STAT_ERROR)   buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = 1;
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = (uint32_t)(bool)(tmp & STAT_RUNNING);
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = (uint32_t)(bool)(tmp & STAT_WAIT);
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = (uint32_t)(bool)(tmp & STAT_IDLE);
+      buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = (uint32_t)(bool)(tmp & STAT_ERROR);
       
       p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[4];
       p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[5];
