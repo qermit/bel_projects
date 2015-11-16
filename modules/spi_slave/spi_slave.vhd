@@ -356,6 +356,36 @@ begin
             rst_i   => '0',
             clk_i   => clk_i
         );
+
+
+
+
+  ------------------------------------------------------------------------------
+  -- Synchronisation FF chain
+  ------------------------------------------------------------------------------
+  cmp_SpiClkSyncFedRed: gc_sync_ffs
+    generic map(
+      g_sync_edge => "positive")
+    port map(
+      clk_i    => clk_i,
+      rst_n_i  => '1',
+      data_i   => spi_sck_i,
+      synced_o => s_spi_sck_sync,
+      npulse_o => s_spi_sck_sync_fed,
+      ppulse_o => s_spi_sck_sync_red);
+
+
+  cmp_SpiSSelSync: gc_sync_ffs
+    generic map(
+      g_sync_edge => "positive")
+    port map(
+      clk_i    => clk_i,
+      rst_n_i  => '1',
+      data_i   => spi_ssel_i,
+      synced_o => s_spi_sck_sync,
+      npulse_o => open,
+      ppulse_o => open);
+
     
     --This signal will go high for one clock cycle either on rising or falling edge of
     --sinhronized spi sck input.
