@@ -19,3 +19,4 @@
 [submodule "ip_cores/pci-core"]
 	path = ip_cores/pci-core
 	url = git://ohwr.org/hdl-core-lib/pci-core.git
+
