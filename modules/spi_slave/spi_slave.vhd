@@ -135,10 +135,17 @@
 --  ====
 --
 -----------------------------------------------------------------------------------------------------------------------
+-- Dusan Slavinec
+-- 2015/11/18               [dsl]   SPI clock and SPI chip select inputs are synched to internal clock using  
+--                                  sychronizers already available in bel_projects (gc_sync_ffs). 
+--                                  This way whole module works on internal clock and SPI clock input does not need
+--                                  to drive clock network. Clock domain crossing code is left in for now.  
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
+use work.monster_pkg.all;
 
 entity spi_slave is
     Generic (   
@@ -304,58 +311,58 @@ begin
     -- connect rx bit input
     s_rx_bit_next <= spi_mosi_i;
     
-    --=============================================================================================
-    --  MODIFICATION: kerjavec
-        -- to replace spi_sck_i'event with s_spi_sck_event signal that won't be interpreted as a
-        -- clock signal.
-    --=============================================================================================
-    
-    s_spi_ssel_slv(0) <= spi_ssel_i;
-    
-    cmp_SynchSpiSsel : InputSynch
-        generic map(
-            g_width => 1
-        )
-        Port map ( 
-            clk_i => clk_i,
-            sig_i => s_spi_ssel_slv,
-            sig_o => s_spi_ssel_sync_slv
-        );
-    
-    s_spi_ssel_sync <= s_spi_ssel_sync_slv(0);
-    
-    -- Synch spi_sck_i to clk_i
-    s_spi_sck_slv(0) <= spi_sck_i;
-    
-    cmp_SynchSpiClk : InputSynch
-        generic map(
-            g_width => 1
-        )
-        Port map ( 
-            clk_i => clk_i,
-            sig_i => s_spi_sck_slv,
-            sig_o => s_spi_sck_sync_slv
-        );
-    
-    s_spi_sck_sync <= s_spi_sck_sync_slv(0);
-    
-    --rising edge detector on sinhronized spi sck signal
-    cmp_SpiClkRed : RED 
-        port map (
-            sig_i   => s_spi_sck_sync,
-            sig_o   => s_spi_sck_sync_red,
-            rst_i   => '0',
-            clk_i   => clk_i
-        );
-    
-    --falling edge detector on sinhronized spi sck signal
-    cmp_SpiClkFed : FED 
-        port map (
-            sig_i   => s_spi_sck_sync,
-            sig_o   => s_spi_sck_sync_fed,
-            rst_i   => '0',
-            clk_i   => clk_i
-        );
+--    --=============================================================================================
+--    --  MODIFICATION: kerjavec
+--        -- to replace spi_sck_i'event with s_spi_sck_event signal that won't be interpreted as a
+--        -- clock signal.
+--    --=============================================================================================
+--    
+--    s_spi_ssel_slv(0) <= spi_ssel_i;
+--    
+--    cmp_SynchSpiSsel : InputSynch
+--        generic map(
+--            g_width => 1
+--        )
+--        Port map ( 
+--            clk_i => clk_i,
+--            sig_i => s_spi_ssel_slv,
+--            sig_o => s_spi_ssel_sync_slv
+--        );
+--    
+--    s_spi_ssel_sync <= s_spi_ssel_sync_slv(0);
+--    
+--    -- Synch spi_sck_i to clk_i
+--    s_spi_sck_slv(0) <= spi_sck_i;
+--    
+--    cmp_SynchSpiClk : InputSynch
+--        generic map(
+--            g_width => 1
+--        )
+--        Port map ( 
+--            clk_i => clk_i,
+--            sig_i => s_spi_sck_slv,
+--            sig_o => s_spi_sck_sync_slv
+--        );
+--    
+--    s_spi_sck_sync <= s_spi_sck_sync_slv(0);
+--    
+--    --rising edge detector on sinhronized spi sck signal
+--    cmp_SpiClkRed : RED 
+--        port map (
+--            sig_i   => s_spi_sck_sync,
+--            sig_o   => s_spi_sck_sync_red,
+--            rst_i   => '0',
+--            clk_i   => clk_i
+--        );
+--    
+--    --falling edge detector on sinhronized spi sck signal
+--    cmp_SpiClkFed : FED 
+--        port map (
+--            sig_i   => s_spi_sck_sync,
+--            sig_o   => s_spi_sck_sync_fed,
+--            rst_i   => '0',
+--            clk_i   => clk_i
+--        );
 
 
 
