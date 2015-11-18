@@ -34,5 +34,8 @@ modules = {
     "nau8811",
     "psram",
     "pmc_ctrl",
+    "simple_tag_decoder",
+    "flash_loader",
+    "pll",
   ]
 }

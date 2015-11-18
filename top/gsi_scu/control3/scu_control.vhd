@@ -288,7 +288,7 @@ begin
       g_en_mil        => true,
       g_en_oled       => true,
       g_en_user_ow    => true,
-      g_en_fg         => true,
+      g_en_fg         => false,
       g_en_cfi        => true,
       g_lm32_init_files => c_initf
     )
@@ -451,7 +451,7 @@ begin
   
   -- MIL Option LEMO Control  
   eio(11) <= mil_lemo_data_o_tmp(1) when mil_lemo_out_en_o_tmp(1)='1' else 'Z'; --SCU A17, A_LEMO3_IO
-  eio(14) <= mil_lemo_data_o_tmp(2) when mil_lemo_out_en_o_tmp(1)='1' else 'Z'; --SCU A20, A_LEMO4_IO
+  eio(14) <= mil_lemo_data_o_tmp(2) when mil_lemo_out_en_o_tmp(2)='1' else 'Z'; --SCU A20, A_LEMO4_IO
   mil_lemo_data_i_tmp(1) <= eio(11); 
   mil_lemo_data_i_tmp(2) <= eio(14);
   mil_lemo_data_i_tmp(3) <= '0'; -- not used for SCU, to be used in SIO
