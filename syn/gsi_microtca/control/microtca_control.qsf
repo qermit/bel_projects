@@ -606,6 +606,11 @@ set_instance_assignment -name LL_MEMBER_OF "wr_arria5:rx" -to "monster:main|wr_a
 set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:microtca_control.tcl"
 
 
+set_global_assignment -name VHDL_FILE ../../../modules/spi_slave/spi_slave_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../../modules/microtca_ctrl/src/hdl/microtca_ctrl.vhd
+set_global_assignment -name VHDL_FILE ../../../modules/microtca_ctrl/src/hdl/microtca_ctrl_auto.vhd
+set_global_assignment -name VHDL_FILE ../../../modules/microtca_ctrl/src/hdl/microtca_ctrl_auto_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../../modules/microtca_ctrl/src/hdl/microtca_ctrl_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../../modules/spi_slave/spi_slave.vhd
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_endpoint/endpoint_private_pkg.vhd"
 set_global_assignment -name VHDL_FILE "../../../ip_cores/general-cores/platform/altera/wb_pcie/pcie_wb.vhd"

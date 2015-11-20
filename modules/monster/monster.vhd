@@ -59,6 +59,7 @@ use work.psram_pkg.all;
 use work.wb_serdes_clk_gen_pkg.all;
 use work.wb_pmc_host_bridge_pkg.all;
 use work.pmc_ctrl_pkg.all;
+use work.microtca_ctrl_pkg.all;
 
 entity monster is
   generic(
@@ -90,6 +91,7 @@ entity monster is
     g_en_psram             : boolean;
     g_en_pmc               : boolean;
     g_en_pmc_ctrl          : boolean;
+    g_en_microtca_ctrl     : boolean;
     g_lm32_cores           : natural;
     g_lm32_MSIs            : natural;
     g_lm32_ramsizes        : natural;
@@ -313,6 +315,31 @@ entity monster is
     pmc_log_oe_o           : out   std_logic_vector(16 downto 0) := (others => 'Z');
     pmc_log_out_o          : out   std_logic_vector(16 downto 0) := (others => 'Z');
     pmc_log_in_i           : in    std_logic_vector(16 downto 0);
+    -- g_en_microtca_ctrl
+    mtca_ctrl_hs_i         : in    std_logic_vector(3 downto 0);
+    mtca_pb_i              : in    std_logic;
+    mtca_ctrl_hs_cpld_i    : in    std_logic_vector(3 downto 0);
+    mtca_pb_cpld_i         : in    std_logic;
+    mtca_clk_oe_o          : out   std_logic := 'Z';
+    mtca_log_oe_o          : out   std_logic_vector(16 downto 0) := (others => 'Z');
+    mtca_log_out_o         : out   std_logic_vector(16 downto 0) := (others => 'Z');
+    mtca_log_in_i          : in    std_logic_vector(16 downto 0);
+    mtca_backplane_conf0_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf1_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf2_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf3_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf4_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf5_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf6_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_conf7_o : out   std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat0_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat1_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat2_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat3_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat4_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat5_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat6_i : in    std_logic_vector(31 downto 0) := (others => '0');
+    mtca_backplane_stat7_i : in    std_logic_vector(31 downto 0) := (others => '0');
     -- g_en_user_ow
     ow_io                  : inout std_logic_vector(1 downto 0));
 end monster;
@@ -392,49 +419,50 @@ architecture rtl of monster is
   -- GSI Top Crossbar --------------------------------------------------------------
   ----------------------------------------------------------------------------------
   
-  constant c_top_masters    : natural := 9;
-  constant c_topm_ebs       : natural := 0;
-  constant c_topm_lm32      : natural := 1;
-  constant c_topm_pcie      : natural := 2;
-  constant c_topm_vme       : natural := 3;
-  constant c_topm_usb       : natural := 4;
-  constant c_topm_fpq       : natural := 5;
-  constant c_topm_fg        : natural := 6;
-  constant c_topm_eca_wbm   : natural := 7;
-  constant c_topm_pmc       : natural := 8;
-  
-  -- required slaves
-  constant c_top_slaves     : natural := 28;
-  constant c_tops_irq       : natural := 0;
-  constant c_tops_wrc       : natural := 1;
-  constant c_tops_lm32      : natural := 2;
-  constant c_tops_build_id  : natural := 3;
-  constant c_tops_flash     : natural := 4;
-  constant c_tops_reset     : natural := 5;
-  constant c_tops_ebm       : natural := 6;
-  constant c_tops_tlu       : natural := 7;
-  constant c_tops_eca_ctl   : natural := 8;
-  constant c_tops_eca_event : natural := 9;
-  constant c_tops_eca_aq    : natural := 10;
-  constant c_tops_eca_wbm   : natural := 11;
-
-  -- optional slaves:
-  constant c_tops_lcd       : natural := 12;
-  constant c_tops_oled      : natural := 13;
-  constant c_tops_scubus    : natural := 14;
-  constant c_tops_mil       : natural := 15;
-  constant c_tops_mil_ctrl  : natural := 16;
-  constant c_tops_ow        : natural := 17;
-  constant c_tops_scubirq   : natural := 18;
-  constant c_tops_ssd1325   : natural := 19;
-  constant c_tops_vme_info  : natural := 20;
-  constant c_tops_fg        : natural := 21;
-  constant c_tops_fgirq     : natural := 22;
-  constant c_tops_CfiPFlash : natural := 23;
-  constant c_tops_nau8811   : natural := 24;
-  constant c_tops_psram     : natural := 25;
-  constant c_tops_iocfg     : natural := 26;
-  constant c_tops_pmc_ctrl  : natural := 27;
+  constant c_top_masters        : natural := 9;
+  constant c_topm_ebs           : natural := 0;
+  constant c_topm_lm32          : natural := 1;
+  constant c_topm_pcie          : natural := 2;
+  constant c_topm_vme           : natural := 3;
+  constant c_topm_usb           : natural := 4;
+  constant c_topm_fpq           : natural := 5;
+  constant c_topm_fg            : natural := 6;
+  constant c_topm_eca_wbm       : natural := 7;
+  constant c_topm_pmc           : natural := 8;
+      
+  -- required slaves    
+  constant c_top_slaves         : natural := 29;
+  constant c_tops_irq           : natural := 0;
+  constant c_tops_wrc           : natural := 1;
+  constant c_tops_lm32          : natural := 2;
+  constant c_tops_build_id      : natural := 3;
+  constant c_tops_flash         : natural := 4;
+  constant c_tops_reset         : natural := 5;
+  constant c_tops_ebm           : natural := 6;
+  constant c_tops_tlu           : natural := 7;
+  constant c_tops_eca_ctl       : natural := 8;
+  constant c_tops_eca_event     : natural := 9;
+  constant c_tops_eca_aq        : natural := 10;
+  constant c_tops_eca_wbm       : natural := 11;
+    
+  -- optional slaves:   
+  constant c_tops_lcd           : natural := 12;
+  constant c_tops_oled          : natural := 13;
+  constant c_tops_scubus        : natural := 14;
+  constant c_tops_mil           : natural := 15;
+  constant c_tops_mil_ctrl      : natural := 16;
+  constant c_tops_ow            : natural := 17;
+  constant c_tops_scubirq       : natural := 18;
+  constant c_tops_ssd1325       : natural := 19;
+  constant c_tops_vme_info      : natural := 20;
+  constant c_tops_fg            : natural := 21;
+  constant c_tops_fgirq         : natural := 22;
+  constant c_tops_CfiPFlash     : natural := 23;
+  constant c_tops_nau8811       : natural := 24;
+  constant c_tops_psram         : natural := 25;
+  constant c_tops_iocfg         : natural := 26;
+  constant c_tops_pmc_ctrl      : natural := 27;
+  constant c_tops_microtca_ctrl : natural := 28;
 
   -- We have to specify the values for WRC as there is no generic out in vhdl
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
@@ -450,34 +478,35 @@ architecture rtl of monster is
   ----------------------------------------------------------------------------------------------------
   
   constant c_top_layout_req : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (c_tops_irq       => f_sdb_auto_bridge(c_irq_bridge_sdb,                 true),
-    c_tops_wrc       => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
-    c_tops_lm32      => f_sdb_auto_bridge(c_lm32_main_bridge_sdb,           true),
-    c_tops_build_id  => f_sdb_auto_device(c_build_id_sdb,                   true),
-    c_tops_flash     => f_sdb_auto_device(f_wb_spi_flash_sdb(g_flash_bits), true),
-    c_tops_reset     => f_sdb_auto_device(c_arria_reset,                    true),
-    c_tops_ebm       => f_sdb_auto_device(c_ebm_sdb,                        true),
-    c_tops_tlu       => f_sdb_auto_device(c_tlu_sdb,                        true),
-    c_tops_eca_ctl   => f_sdb_auto_device(c_eca_sdb,                        true),
-    c_tops_eca_event => f_sdb_embed_device(c_eca_event_sdb, x"7FFFFFF0"), -- must be located at fixed address
-    c_tops_eca_aq    => f_sdb_auto_device(c_eca_queue_sdb,                  true),
-    c_tops_CfiPFlash => f_sdb_auto_device(c_wb_CfiPFlash_sdb,               g_en_cfi),
-    c_tops_lcd       => f_sdb_auto_device(c_wb_serial_lcd_sdb,              g_en_lcd),
-    c_tops_oled      => f_sdb_auto_device(c_oled_display,                   g_en_oled),
-    c_tops_ssd1325   => f_sdb_auto_device(c_ssd1325_sdb,                    g_en_ssd1325),
-    c_tops_nau8811   => f_sdb_auto_device(c_nau8811_sdb,                    g_en_nau8811),
-    c_tops_scubus    => f_sdb_auto_device(c_scu_bus_master,                 g_en_scubus),
-    c_tops_scubirq   => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               g_en_scubus),
-    c_tops_mil       => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
-    c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
-    c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
-    c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
-    c_tops_fg        => f_sdb_auto_device(c_wb_fg_sdb,                      g_en_fg),
-    c_tops_fgirq     => f_sdb_auto_device(c_fg_irq_ctrl_sdb,                g_en_fg),
-    c_tops_psram     => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
-    c_tops_eca_wbm   => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true),
-    c_tops_iocfg     => f_sdb_auto_bridge(c_iocfg_bridge_sdb,               true),
-    c_tops_pmc_ctrl  => f_sdb_auto_device(c_pmc_ctrl_slave_sdb,             g_en_pmc_ctrl)
+   (c_tops_irq           => f_sdb_auto_bridge(c_irq_bridge_sdb,                 true),
+    c_tops_wrc           => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
+    c_tops_lm32          => f_sdb_auto_bridge(c_lm32_main_bridge_sdb,           true),
+    c_tops_build_id      => f_sdb_auto_device(c_build_id_sdb,                   true),
+    c_tops_flash         => f_sdb_auto_device(f_wb_spi_flash_sdb(g_flash_bits), true),
+    c_tops_reset         => f_sdb_auto_device(c_arria_reset,                    true),
+    c_tops_ebm           => f_sdb_auto_device(c_ebm_sdb,                        true),
+    c_tops_tlu           => f_sdb_auto_device(c_tlu_sdb,                        true),
+    c_tops_eca_ctl       => f_sdb_auto_device(c_eca_sdb,                        true),
+    c_tops_eca_event     => f_sdb_embed_device(c_eca_event_sdb,                 x"7FFFFFF0"), -- must be located at fixed address
+    c_tops_eca_aq        => f_sdb_auto_device(c_eca_queue_sdb,                  true),
+    c_tops_CfiPFlash     => f_sdb_auto_device(c_wb_CfiPFlash_sdb,               g_en_cfi),
+    c_tops_lcd           => f_sdb_auto_device(c_wb_serial_lcd_sdb,              g_en_lcd),
+    c_tops_oled          => f_sdb_auto_device(c_oled_display,                   g_en_oled),
+    c_tops_ssd1325       => f_sdb_auto_device(c_ssd1325_sdb,                    g_en_ssd1325),
+    c_tops_nau8811       => f_sdb_auto_device(c_nau8811_sdb,                    g_en_nau8811),
+    c_tops_scubus        => f_sdb_auto_device(c_scu_bus_master,                 g_en_scubus),
+    c_tops_scubirq       => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               g_en_scubus),
+    c_tops_mil           => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
+    c_tops_mil_ctrl      => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
+    c_tops_vme_info      => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
+    c_tops_ow            => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
+    c_tops_fg            => f_sdb_auto_device(c_wb_fg_sdb,                      g_en_fg),
+    c_tops_fgirq         => f_sdb_auto_device(c_fg_irq_ctrl_sdb,                g_en_fg),
+    c_tops_psram         => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
+    c_tops_eca_wbm       => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true),
+    c_tops_iocfg         => f_sdb_auto_bridge(c_iocfg_bridge_sdb,               true),
+    c_tops_pmc_ctrl      => f_sdb_auto_device(c_pmc_ctrl_slave_sdb,             g_en_pmc_ctrl),
+    c_tops_microtca_ctrl => f_sdb_auto_device(c_microtca_ctrl_slave_sdb,        g_en_microtca_ctrl)
 );
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
@@ -1989,6 +2018,42 @@ c4: eca_ac_wbm
       );
   end generate;  
   
+  microtca_ctrl_n : if not g_en_microtca_ctrl generate
+    top_cbar_master_i(c_tops_microtca_ctrl) <= cc_dummy_slave_out;
+  end generate;
+  microtca_ctrl_y : if g_en_microtca_ctrl generate
+    microtca_ctrl_unit : microtca_ctrl
+      port map (
+        clk_sys_i             => clk_sys,
+        rst_n_i               => rstn_sys,
+        slave_i               => top_cbar_master_o(c_tops_microtca_ctrl),
+        slave_o               => top_cbar_master_i(c_tops_microtca_ctrl),
+        backplane_conf0_o     => mtca_backplane_conf0_o,
+        backplane_conf1_o     => mtca_backplane_conf1_o,
+        backplane_conf2_o     => mtca_backplane_conf2_o,
+        backplane_conf3_o     => mtca_backplane_conf3_o,
+        backplane_conf4_o     => mtca_backplane_conf4_o,
+        backplane_conf5_o     => mtca_backplane_conf5_o,
+        backplane_conf6_o     => mtca_backplane_conf6_o,
+        backplane_conf7_o     => mtca_backplane_conf7_o,
+        backplane_stat0_i     => mtca_backplane_stat0_i,
+        backplane_stat1_i     => mtca_backplane_stat1_i,
+        backplane_stat2_i     => mtca_backplane_stat2_i,
+        backplane_stat3_i     => mtca_backplane_stat3_i,
+        backplane_stat4_i     => mtca_backplane_stat4_i,
+        backplane_stat5_i     => mtca_backplane_stat5_i,
+        backplane_stat6_i     => mtca_backplane_stat6_i,
+        backplane_stat7_i     => mtca_backplane_stat7_i,
+        hex_switch_i          => mtca_ctrl_hs_i,
+        push_button_i(0)      => mtca_pb_i,
+        hex_switch_cpld_i     => mtca_ctrl_hs_cpld_i,
+        push_button_cpld_i(0) => mtca_pb_cpld_i,
+        clock_control_oe_o    => mtca_clk_oe_o,
+        logic_control_oe_o    => mtca_log_oe_o,
+        logic_output_o        => mtca_log_out_o,
+        logic_input_i         => mtca_log_in_i
+      );
+  end generate;  
   
   -- END OF Wishbone slaves
   ----------------------------------------------------------------------------------
