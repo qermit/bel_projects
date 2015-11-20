@@ -55,7 +55,7 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- connector cpld
     -----------------------------------------------------------------------
-    con             : out std_logic_vector(5 downto 1);
+    con             : in std_logic_vector(5 downto 1);
     
     -----------------------------------------------------------------------
     -- io
@@ -201,7 +201,8 @@ architecture rtl of microtca_control is
   -- projectname is standard to ensure a stub mif that prevents unwanted scanning of the bus 
   -- multiple init files for n processors are to be seperated by semicolon ';'
 
-
+  signal s_wr_ext_in    : std_logic;
+  
   signal s_mmc_spi_clk        : std_logic_vector(2 downto 0);
   signal s_mmc_spi_mosi       : std_logic_vector(1 downto 0);
   signal s_mmc_spi_sel_fpga_n : std_logic_vector(2 downto 0);
@@ -229,17 +230,18 @@ begin
 
   main : monster
     generic map(
-      g_family      => c_family,
-      g_project     => c_project,
-      g_flash_bits  => 25,
-      g_gpio_out    => 6,  -- 2xfront end+4xuser leds
-      g_lvds_inout  => c_num_of_lvds_inout,
-      g_lvds_out    => c_num_of_lvds_out,
-      g_lvds_invert => true,
-      g_en_pcie     => true,
-      g_en_usb      => true,
-      g_en_lcd      => true,
-      g_lm32_init_files => c_initf
+      g_family           => c_family,
+      g_project          => c_project,
+      g_flash_bits       => 25,
+      g_gpio_out         => 6,  -- 2xfront end+4xuser leds
+      g_lvds_inout       => c_num_of_lvds_inout,
+      g_lvds_out         => c_num_of_lvds_out,
+      g_lvds_invert      => true,
+      g_en_pcie          => true,
+      g_en_usb           => true,
+      g_en_lcd           => true,
+      g_en_microtca_ctrl => true,
+      g_lm32_init_files  => c_initf
     )
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
@@ -303,9 +305,15 @@ begin
       lcd_flm_o              => dis_di_o(2),
       lcd_in_o               => dis_di_o(0),
 
-      pmc_log_oe_o           => s_log_oe,
-      pmc_log_out_o          => s_log_out,
-      pmc_log_in_i           => s_log_in
+      utca_ctrl_hs_i         => hswf_i,
+      utca_pb_i              => pbs_f_i,
+      utca_ctrl_hs_cpld_i    => con(4 downto 1),
+      utca_pb_cpld_i         => con(5),
+      utca_clk_oe_o          => s_wr_ext_in,
+      utca_log_oe_o          => s_log_oe,
+      utca_log_out_o         => s_log_out,
+      utca_log_in_i          => s_log_in
+      
   );
  
   sfp_tx_dis_o <= '0'; -- SFP always enabled
@@ -340,7 +348,7 @@ begin
   
   
   -- wires to CPLD, currently unused
-  con <= (others => 'Z');
+  --con <= (others => 'Z');
 
 
   -- Logic analyzer

@@ -63,6 +63,7 @@ package monster_pkg is
       g_en_psram             : boolean := false;
       g_en_pmc               : boolean := false;
       g_en_pmc_ctrl          : boolean := false;
+      g_en_microtca_ctrl     : boolean := false;
       g_lm32_cores           : natural := 1;
       g_lm32_MSIs            : natural := 1;
       g_lm32_ramsizes        : natural := 131072/4; -- in 32b words
@@ -277,7 +278,6 @@ package monster_pkg is
       pmc_inta_o             : out   std_logic;
       pmc_req_o              : out   std_logic;
       pmc_gnt_i              : in    std_logic := '1';
-
       -- g_en_pmc_ctrl
       pmc_ctrl_hs_i          : in    std_logic_vector(3 downto 0) := (others => '0');
       pmc_pb_i               : in    std_logic := '0';
@@ -287,6 +287,31 @@ package monster_pkg is
       pmc_log_oe_o           : out   std_logic_vector(16 downto 0);
       pmc_log_out_o          : out   std_logic_vector(16 downto 0);
       pmc_log_in_i           : in    std_logic_vector(16 downto 0):= (others => '0');
+    -- g_en_microtca_ctrl
+      utca_ctrl_hs_i         : in    std_logic_vector(3 downto 0) := (others => '0');
+      utca_pb_i              : in    std_logic := '0';
+      utca_ctrl_hs_cpld_i    : in    std_logic_vector(3 downto 0) := (others => '0');
+      utca_pb_cpld_i         : in    std_logic := '0';
+      utca_clk_oe_o          : out   std_logic;
+      utca_log_oe_o          : out   std_logic_vector(16 downto 0);
+      utca_log_out_o         : out   std_logic_vector(16 downto 0);
+      utca_log_in_i          : in    std_logic_vector(16 downto 0):= (others => '0');
+      utac_backplane_conf0_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf1_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf2_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf3_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf4_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf5_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf6_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf7_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf8_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf9_o : out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf10_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf11_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf12_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf13_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf14_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
+      utac_backplane_conf15_o: out   std_logic_vector(31 downto 0) := (others => 'Z');
       -- g_en_user_ow
       ow_io                  : inout std_logic_vector(1 downto 0) := (others => 'Z'));
   end component;

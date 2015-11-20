@@ -34,5 +34,6 @@ modules = {
     "nau8811",
     "psram",
     "pmc_ctrl",
+    "microtca_ctrl",
   ]
 }
