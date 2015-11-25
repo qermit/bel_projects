@@ -9,10 +9,8 @@ use work.altera_lvds_pkg.all;
 entity microtca_control is
   generic(
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
-    -- currently only 3 trigger lines for MTCA backplane used due to monster limitation (max 12)
-    g_top_lvds_inout_mtca  : natural range 0 to 8 := 3; -- MicroTCA.4 backplane triggers/gates/clocks(8)
-    g_top_lvds_out_libera  : natural := 4; -- Libera backplane triggers (4) 
-    g_top_lvds_in          : natural := 0  -- no lvds inputs only
+    g_top_lvds_inout_mtca  : natural := 8; -- MicroTCA.4 backplane triggers/gates/clocks(8)
+    g_top_lvds_out_libera  : natural := 4  -- Libera backplane triggers (4) 
   );
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
@@ -87,17 +85,17 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/lvds libera triggers on backplane
     -----------------------------------------------------------------------
-    lib_trig_n_o        : out std_logic_vector(3 downto 0);
-    lib_trig_p_o        : out std_logic_vector(3 downto 0);
+    --lib_trig_n_o        : out std_logic_vector(3 downto 0);
+    --lib_trig_p_o        : out std_logic_vector(3 downto 0);
     lib_trig_oe_o       : out std_logic;
 
     -----------------------------------------------------------------------
     -- lvds/m-lvds microTCA.4 triggers, gates, clocks on backplane
     -----------------------------------------------------------------------
-    mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
-    mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
-    mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
-    mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
+    --mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
+    --mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
+    --mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
+    --mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
 
     mlvdio_oe_o       : out std_logic_vector(8 downto 1);
     mlvdio_fsen_o     : out std_logic_vector(8 downto 1);
@@ -106,10 +104,10 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/lvds microTCA.4 backplane clocks
     -----------------------------------------------------------------------
-    tclk_in_n_i      : in  std_logic_vector(4 downto 1);
-    tclk_in_p_i      : in  std_logic_vector(4 downto 1);
-    tclk_out_n_o     : out std_logic_vector(4 downto 1);
-    tclk_out_p_o     : out std_logic_vector(4 downto 1);
+    --tclk_in_n_i      : in  std_logic_vector(4 downto 1);
+    --tclk_in_p_i      : in  std_logic_vector(4 downto 1);
+    --tclk_out_n_o     : out std_logic_vector(4 downto 1);
+    --tclk_out_p_o     : out std_logic_vector(4 downto 1);
     tclk_oe_o        : out std_logic_vector(4 downto 1);
 
     -----------------------------------------------------------------------
@@ -178,18 +176,18 @@ architecture rtl of microtca_control is
   signal s_leds_user : std_logic_vector(3 downto 0);
   
   -- lvds ios
-  constant c_num_of_lvds_in    : natural := g_top_lvds_in;
-  constant c_num_of_lvds_out   : natural := g_top_lvds_out_libera;
-  constant c_num_of_lvds_inout : natural := g_top_lvds_inout_front + g_top_lvds_inout_mtca;
+  --constant c_num_of_lvds_in    : natural := g_top_lvds_in;
+  --constant c_num_of_lvds_out   : natural := g_top_lvds_out_libera;
+  --constant c_num_of_lvds_inout : natural := g_top_lvds_inout_front + g_top_lvds_inout_mtca;
 
-  signal s_lvds_p_i     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
-  signal s_lvds_n_i     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
-  signal s_lvds_i_led   : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
+  signal s_lvds_p_i     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_n_i     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_i_led   : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
 
-  signal s_lvds_p_o     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_n_o     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_o_led   : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_oen     : std_logic_vector(c_num_of_lvds_inout -1 downto 0);
+  signal s_lvds_p_o     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_n_o     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_o_led   : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_oen     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
 
   signal s_pcie_rx      : std_logic_vector(3 downto 0);
   signal s_pcie_tx      : std_logic_vector(3 downto 0);
@@ -234,9 +232,10 @@ begin
       g_project          => c_project,
       g_flash_bits       => 25,
       g_gpio_out         => 6,  -- 2xfront end+4xuser leds
-      g_lvds_inout       => c_num_of_lvds_inout,
-      g_lvds_out         => c_num_of_lvds_out,
+      g_lvds_inout       => g_top_lvds_inout_front,
       g_lvds_invert      => true,
+      g_clocks_inout     => g_top_lvds_out_libera,
+      g_triggers_inout   => g_top_lvds_inout_mtca,
       g_en_pcie          => true,
       g_en_usb           => true,
       g_en_lcd           => true,
@@ -323,7 +322,6 @@ begin
   -- s_pcie_rx(3 downto 1) <= (others => '0');
   -- pcie_tx_o             <= s_pcie_tx(0);
 
-
   -- Link LEDs
   dis_wr_o    <= '0';
   dis_rst_o   <= '1';
@@ -346,11 +344,6 @@ begin
   led_user(4)          <= not led_pps;                        -- white = PPS
   led_user(8 downto 5) <= s_leds_user;                        -- gpio5 ... gpio2
   
-  
-  -- wires to CPLD, currently unused
-  --con <= (others => 'Z');
-
-
   -- Logic analyzer
   s_log_in(15 downto 0) <= hpw(15 downto 0);
   hpwck   <= s_log_out(16) when s_log_oe(16) = '1' else 'Z';
@@ -370,11 +363,8 @@ begin
   hpw(2)  <= s_log_out(2)  when s_log_oe(2)  = '1' else 'Z';
   hpw(1)  <= s_log_out(1)  when s_log_oe(1)  = '1' else 'Z';
   hpw(0)  <= s_log_out(0)  when s_log_oe(0)  = '1' else 'Z';
-
-
-
+  
   -- lemo io connectors on front panel
-
   -- lvds/lvttl lemos in/out
   s_lvds_p_i(4 downto 0) <= lvtio_in_p_i(5 downto 1);
   s_lvds_n_i(4 downto 0) <= lvtio_in_n_i(5 downto 1);
@@ -409,95 +399,6 @@ begin
   lvtio_led_act_o(3) <= (s_lvds_i_led(2)) or (s_lvds_o_led(2));
   lvtio_led_act_o(4) <= (s_lvds_i_led(3)) or (s_lvds_o_led(3));
   lvtio_led_act_o(5) <= (s_lvds_i_led(4)) or (s_lvds_o_led(4));
-
-  -----------------------------------------------------------
-  -- microTCA.4 backplane triggers
-  s_lvds_p_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_p_i(g_top_lvds_inout_mtca downto 1);
-  s_lvds_n_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_n_i(g_top_lvds_inout_mtca downto 1);
-
-  mlvdio_out_p_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_p_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
-  mlvdio_out_n_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_n_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
-
-  -- output enable for onboard M-LVDS buffers to backplane
-  mlvdio_oe_o(g_top_lvds_inout_mtca downto 1) <= (not s_lvds_oen((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front)) and s_mtca4_trig_oe_reg(g_top_lvds_inout_mtca downto 1);
-
-  -- select reciver input Type for onboard M-LVDS buffers to backplane
-  -- ('0' = Type-1 , '1' = Type-2 )
-  mlvdio_fsen_o(g_top_lvds_inout_mtca downto 1) <= (others => '0'); 
-
-  mlvdio_pdn_o    <= s_mtca4_trig_pdn_reg; -- output buffer powerdown, active low
-
-  -- if not all backplane MLVD IOs used
-  gen_mlvdio_not_used : if g_top_lvds_inout_mtca < 8 generate
-    unused_mlvd_ios: for i in (g_top_lvds_inout_mtca + 1) to 8 generate
-      mlvd_obuf : altera_lvds_obuf
-        generic map(
-          g_family  => c_family)
-        port map(
-          datain    => '0',
-          dataout   => mlvdio_out_p_o(i),
-          dataout_b => mlvdio_out_n_o(i)
-        );
-    
-      mlvd_inbuf : altera_lvds_ibuf
-          generic map(
-            g_family  => c_family)
-          port map(
-            datain_b  => mlvdio_in_n_i(i),
-            datain    => mlvdio_in_p_i(i),
-            dataout   => open
-          );
-    end generate;
-
-    -- output enable for onboard M-LVDS buffers to backplane
-    mlvdio_oe_o  (8 downto g_top_lvds_inout_mtca + 1) <= (others => '0');
-    mlvdio_fsen_o(8 downto g_top_lvds_inout_mtca + 1) <= (others => '0'); 
-
-  end generate;
-
-  -----------------------------------------------
-  -- microTCA.4 clocks
-
-    mtca_clk: for i in  1 to 4 generate
--- dummy buffers, just to compile
-      mtca_clk_obuf : altera_lvds_obuf
-        generic map(
-          g_family  => c_family)
-        port map(
-          datain    => '0',
-          dataout   => tclk_out_p_o(i),
-          dataout_b => tclk_out_n_o(i)
-        );
-
--- dummy buffers, just to compile
-      mtca_clk_inbuf : altera_lvds_ibuf
-          generic map(
-            g_family  => c_family)
-          port map(
-            datain_b  => tclk_in_n_i(i),
-            datain    => tclk_in_p_i(i),
-            dataout   => open
-          );
-    end generate;
-
-
-  tclk_oe_o    <= s_mtca4_clk_oe_reg;
-
-  -----------------------------------------------------------
-
-  -- no intputs from Libera backplane, outputs only
-  -- trigger outputs to backplane for Libera
-  lib_trig_p_o(3 downto 0)   <= s_lvds_p_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto g_top_lvds_inout_mtca + 5);
-  lib_trig_n_o(3 downto 0)   <= s_lvds_n_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto g_top_lvds_inout_mtca + 5);
-
-  -- output enable for onboard LVDS buffers to backplane 
-  lib_trig_oe_o <= s_libera_trig_oe_reg; 
-
-
-  ----------------------------------------------
-  fpga2mmc_int_o  <= '0'; -- irq to mmc
-
-
 
   -- control of buffer output enable signals for backplane MTCA and Libera triggers
   -- controlled from MMC via SPI
@@ -564,6 +465,97 @@ begin
       end if; -- reset
     end if; -- clk
   end process bpl_outbuf_en_reg;
+  
+  
+
+  -----------------------------------------------------------
+  -- microTCA.4 backplane triggers
+  --s_lvds_p_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_p_i(g_top_lvds_inout_mtca downto 1);
+  --s_lvds_n_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_n_i(g_top_lvds_inout_mtca downto 1);
+
+  --mlvdio_out_p_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_p_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
+  --mlvdio_out_n_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_n_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
+
+  -- output enable for onboard M-LVDS buffers to backplane
+  --mlvdio_oe_o(g_top_lvds_inout_mtca downto 1) <= (not s_lvds_oen((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front)) and s_mtca4_trig_oe_reg(g_top_lvds_inout_mtca downto 1);
+
+  -- select reciver input Type for onboard M-LVDS buffers to backplane
+  -- ('0' = Type-1 , '1' = Type-2 )
+  --mlvdio_fsen_o(g_top_lvds_inout_mtca downto 1) <= (others => '0'); 
+
+ -- mlvdio_pdn_o    <= s_mtca4_trig_pdn_reg; -- output buffer powerdown, active low
+
+  ---- if not all backplane MLVD IOs used
+  --gen_mlvdio_not_used : if g_top_lvds_inout_mtca < 8 generate
+  --  unused_mlvd_ios: for i in (g_top_lvds_inout_mtca + 1) to 8 generate
+  --    mlvd_obuf : altera_lvds_obuf
+  --      generic map(
+  --        g_family  => c_family)
+  --      port map(
+  --        datain    => '0',
+  --        dataout   => mlvdio_out_p_o(i),
+  --        dataout_b => mlvdio_out_n_o(i)
+  --      );
+  --  
+  --    mlvd_inbuf : altera_lvds_ibuf
+  --        generic map(
+  --          g_family  => c_family)
+  --        port map(
+  --          datain_b  => mlvdio_in_n_i(i),
+  --          datain    => mlvdio_in_p_i(i),
+  --          dataout   => open
+  --        );
+  --  end generate;
+  --
+  --  -- output enable for onboard M-LVDS buffers to backplane
+  --  mlvdio_oe_o  (8 downto g_top_lvds_inout_mtca + 1) <= (others => '0');
+  --  mlvdio_fsen_o(8 downto g_top_lvds_inout_mtca + 1) <= (others => '0'); 
+  --
+  --end generate;
+
+  -----------------------------------------------
+  -- microTCA.4 clocks
+
+  -- mtca_clk: for i in  1 to 4 generate
+----dummy buffers, just to compile
+  --   mtca_clk_obuf : altera_lvds_obuf
+  --     generic map(
+  --       g_family  => c_family)
+  --     port map(
+  --       datain    => '0',
+  --       dataout   => tclk_out_p_o(i),
+  --       dataout_b => tclk_out_n_o(i)
+  --     );
+  --
+----dummy buffers, just to compile
+  --   mtca_clk_inbuf : altera_lvds_ibuf
+  --       generic map(
+  --         g_family  => c_family)
+  --       port map(
+  --         datain_b  => tclk_in_n_i(i),
+  --         datain    => tclk_in_p_i(i),
+  --         dataout   => open
+  --       );
+  -- end generate;
+
+
+  --tclk_oe_o    <= s_mtca4_clk_oe_reg;
+
+  -----------------------------------------------------------
+
+  -- no intputs from Libera backplane, outputs only
+  -- trigger outputs to backplane for Libera
+  --lib_trig_p_o(3 downto 0)   <= s_lvds_p_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto g_top_lvds_inout_mtca + 5);
+  --lib_trig_n_o(3 downto 0)   <= s_lvds_n_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto g_top_lvds_inout_mtca + 5);
+
+  -- output enable for onboard LVDS buffers to backplane 
+  ---lib_trig_oe_o <= s_libera_trig_oe_reg; 
+
+
+  ----------------------------------------------
+  --fpga2mmc_int_o  <= '0'; -- irq to mmc
+
+
   
 end rtl;
 

@@ -48,6 +48,8 @@ package monster_pkg is
       g_lvds_in              : natural := 0;
       g_lvds_out             : natural := 0;
       g_lvds_invert          : boolean := false;
+      g_clocks_inout         : natural := 0;
+      g_triggers_inout       : natural := 0;
       g_en_pcie              : boolean := false;
       g_en_vme               : boolean := false;
       g_en_usb               : boolean := false;
