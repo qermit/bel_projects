@@ -86,8 +86,8 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/lvds libera triggers on backplane
     -----------------------------------------------------------------------
-    --lib_trig_n_o        : out std_logic_vector(3 downto 0);
-    --lib_trig_p_o        : out std_logic_vector(3 downto 0);
+    lib_trig_n_o        : out std_logic_vector(3 downto 0);
+    lib_trig_p_o        : out std_logic_vector(3 downto 0);
     lib_trig_oe_o       : out std_logic;
 
     -----------------------------------------------------------------------
@@ -95,8 +95,8 @@ entity microtca_control is
     -----------------------------------------------------------------------
     mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
     mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
-    --mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
-    --mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
+    mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
+    mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
 
     mlvdio_oe_o       : out std_logic_vector(8 downto 1);
     mlvdio_fsen_o     : out std_logic_vector(8 downto 1);
@@ -107,8 +107,8 @@ entity microtca_control is
     -----------------------------------------------------------------------
     tclk_in_n_i      : in  std_logic_vector(4 downto 1);
     tclk_in_p_i      : in  std_logic_vector(4 downto 1);
-    --tclk_out_n_o     : out std_logic_vector(4 downto 1);
-    --tclk_out_p_o     : out std_logic_vector(4 downto 1);
+    tclk_out_n_o     : out std_logic_vector(4 downto 1);
+    tclk_out_p_o     : out std_logic_vector(4 downto 1);
     tclk_oe_o        : out std_logic_vector(4 downto 1);
 
     -----------------------------------------------------------------------
@@ -280,7 +280,15 @@ begin
       utca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
       utca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
       utca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
-
+      
+      utca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+      utca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
+      utca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+      utca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+      
+      utca_libera_trig_p_o   =>lib_trig_p_o,
+      utca_libera_trig_n_o   =>lib_trig_n_o,
+      
       led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
       led_track_o            => led_track,
