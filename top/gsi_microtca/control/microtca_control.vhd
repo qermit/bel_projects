@@ -9,6 +9,7 @@ use work.altera_lvds_pkg.all;
 entity microtca_control is
   generic(
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
+    g_top_lvds_tclk_mtca   : natural := 4; -- TCLK
     g_top_lvds_inout_mtca  : natural := 8; -- MicroTCA.4 backplane triggers/gates/clocks(8)
     g_top_lvds_out_libera  : natural := 4  -- Libera backplane triggers (4) 
   );
@@ -92,8 +93,8 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/m-lvds microTCA.4 triggers, gates, clocks on backplane
     -----------------------------------------------------------------------
-    --mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
-    --mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
+    mlvdio_in_n_i     : in  std_logic_vector(8 downto 1);
+    mlvdio_in_p_i     : in  std_logic_vector(8 downto 1);
     --mlvdio_out_n_o    : out std_logic_vector(8 downto 1);
     --mlvdio_out_p_o    : out std_logic_vector(8 downto 1);
 
@@ -104,8 +105,8 @@ entity microtca_control is
     -----------------------------------------------------------------------
     -- lvds/lvds microTCA.4 backplane clocks
     -----------------------------------------------------------------------
-    --tclk_in_n_i      : in  std_logic_vector(4 downto 1);
-    --tclk_in_p_i      : in  std_logic_vector(4 downto 1);
+    tclk_in_n_i      : in  std_logic_vector(4 downto 1);
+    tclk_in_p_i      : in  std_logic_vector(4 downto 1);
     --tclk_out_n_o     : out std_logic_vector(4 downto 1);
     --tclk_out_p_o     : out std_logic_vector(4 downto 1);
     tclk_oe_o        : out std_logic_vector(4 downto 1);
@@ -234,8 +235,8 @@ begin
       g_gpio_out         => 6,  -- 2xfront end+4xuser leds
       g_lvds_inout       => g_top_lvds_inout_front,
       g_lvds_invert      => true,
-      g_clocks_inout     => g_top_lvds_out_libera,
-      g_triggers_inout   => g_top_lvds_inout_mtca,
+      g_clocks_inout     => g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca,
+      g_triggers_out     => g_top_lvds_out_libera,
       g_en_pcie          => true,
       g_en_usb           => true,
       g_en_lcd           => true,
@@ -274,6 +275,11 @@ begin
       lvds_n_o               => s_lvds_n_o,
       lvds_o_led_o           => s_lvds_o_led, 
       lvds_oen_o             => s_lvds_oen, 
+      
+      utca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
+      utca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+      utca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
+      utca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
 
       led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
@@ -466,8 +472,18 @@ begin
     end if; -- clk
   end process bpl_outbuf_en_reg;
   
+  -- Output enable stuff
+  mlvdio_oe_o  (g_top_lvds_inout_mtca downto 1)     <= s_mtca4_trig_oe_reg(g_top_lvds_inout_mtca downto 1);
+  mlvdio_fsen_o(8 downto g_top_lvds_inout_mtca + 1) <= (others => '0'); 
+  mlvdio_pdn_o                                      <= s_mtca4_trig_pdn_reg; -- output buffer powerdown, active low
   
-
+  lib_trig_oe_o <= s_libera_trig_oe_reg;
+  
+  tclk_oe_o     <= s_mtca4_clk_oe_reg;
+  
+  fpga2mmc_int_o  <= '0'; -- irq to mmc
+  
+  
   -----------------------------------------------------------
   -- microTCA.4 backplane triggers
   --s_lvds_p_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_p_i(g_top_lvds_inout_mtca downto 1);

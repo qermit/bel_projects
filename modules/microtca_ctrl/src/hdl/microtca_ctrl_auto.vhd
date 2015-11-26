@@ -226,6 +226,7 @@ begin
    slave_o.dat    <= r_slave_out_dat1;
    slave_o.ack    <= r_slave_out_ack1 and not slave_regs_clk_sys_i.ERR;
    slave_o.err    <= r_slave_out_err1 or      slave_regs_clk_sys_i.ERR;
-
+   slave_o.rty    <= '0';
+   slave_o.int    <= '0';
 
 end rtl;
