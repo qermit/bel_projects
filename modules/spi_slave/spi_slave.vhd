@@ -389,7 +389,7 @@ begin
       clk_i    => clk_i,
       rst_n_i  => '1',
       data_i   => spi_ssel_i,
-      synced_o => s_spi_sck_sync,
+      synced_o => s_spi_ssel_sync,
       npulse_o => open,
       ppulse_o => open);
 

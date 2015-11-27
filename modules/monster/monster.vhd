@@ -76,6 +76,8 @@ entity monster is
     g_lvds_in              : natural;
     g_lvds_out             : natural;
     g_lvds_invert          : boolean;
+    g_clocks_inout         : natural;
+    g_triggers_out         : natural;
     g_en_pcie              : boolean;
     g_en_vme               : boolean;
     g_en_usb               : boolean;
@@ -340,6 +342,16 @@ entity monster is
     mtca_backplane_stat5_i : in    std_logic_vector(31 downto 0) := (others => '0');
     mtca_backplane_stat6_i : in    std_logic_vector(31 downto 0) := (others => '0');
     mtca_backplane_stat7_i : in    std_logic_vector(31 downto 0) := (others => '0');
+
+    -- utca stuff
+    mtca_clocks_p_i        : in    std_logic_vector(f_sub1(g_clocks_inout) downto 0);
+    mtca_clocks_n_i        : in    std_logic_vector(f_sub1(g_clocks_inout) downto 0);
+    mtca_clocks_p_o        : out   std_logic_vector(f_sub1(g_clocks_inout) downto 0) := (others => 'Z');
+    mtca_clocks_n_o        : out   std_logic_vector(f_sub1(g_clocks_inout) downto 0) := (others => 'Z');
+    mtca_clocks_oen_o      : out   std_logic_vector(f_sub1(g_clocks_inout) downto 0) := (others => '1');
+    mtca_libera_trig_p_o   : out   std_logic_vector(f_sub1(g_triggers_out) downto 0) := (others => 'Z');
+    mtca_libera_trig_n_o   : out   std_logic_vector(f_sub1(g_triggers_out) downto 0) := (others => 'Z');
+    mtca_libera_trig_oen_o : out   std_logic_vector(f_sub1(g_triggers_out) downto 0) := (others => '1');
     -- g_en_user_ow
     ow_io                  : inout std_logic_vector(1 downto 0));
 end monster;
@@ -700,15 +712,15 @@ architecture rtl of monster is
   signal user_ow_pwren  : std_logic_vector(1 downto 0);
   signal user_ow_en     : std_logic_vector(1 downto 0);
 
-  constant c_lvds_clk_outputs : natural := g_lvds_inout+g_lvds_out;
-  signal lvds_dat_fr_eca_chan : t_lvds_byte_array(11 downto 0);
-  signal lvds_dat_fr_clk_gen  : t_lvds_byte_array(11 downto 0);
-  signal lvds_dum             : t_lvds_byte_array(c_lvds_clk_outputs-1 downto 0);
-  signal lvds_dat             : t_lvds_byte_array(11 downto 0);
-  signal lvds_i               : t_lvds_byte_array(15 downto 0);
-  signal lvds_o               : t_lvds_byte_array(11 downto 0);
+  constant c_lvds_clk_outputs : natural := g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_out;
+  signal lvds_dat_fr_eca_chan : t_lvds_byte_array(31 downto 0);
+  signal lvds_dat_fr_clk_gen  : t_lvds_byte_array(31 downto 0);
+  signal lvds_dum             : t_lvds_byte_array(31 downto 0);
+  signal lvds_dat             : t_lvds_byte_array(31 downto 0);
+  signal lvds_i               : t_lvds_byte_array(31 downto 0);
+  signal lvds_o               : t_lvds_byte_array(31 downto 0);
   
-  signal s_triggers : t_trigger_array(g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in -1 downto 0);
+  signal s_triggers : t_trigger_array(g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in + g_clocks_inout -1 downto 0);
   
   function f_lvds_array_to_trigger_array(lvds : t_lvds_byte_array) return t_trigger_array is
     variable i : natural := 0;
@@ -1514,9 +1526,9 @@ begin
       serdes_dat_o => lvds_dum);
 
   -- LVDS component data input is OR between ECA chan output and SERDES clk. gen.
-  lvds_dat_fr_clk_gen(c_lvds_clk_outputs-1 downto 0) <= lvds_dum;
-  lvds_dat_fr_clk_gen(11 downto c_lvds_clk_outputs) <= (others => (others => '0'));
-  gen_lvds_dat : for i in 0 to 11 generate
+  lvds_dat_fr_clk_gen(31 downto 0) <= lvds_dum;
+  lvds_dat_fr_clk_gen(31 downto c_lvds_clk_outputs) <= (others => (others => '0'));
+  gen_lvds_dat : for i in 0 to 31 generate
     lvds_dat(i) <= lvds_dat_fr_eca_chan(i) or lvds_dat_fr_clk_gen(i);
   end generate gen_lvds_dat;
   
@@ -1524,13 +1536,13 @@ begin
    s_triggers(g_gpio_in + g_gpio_inout -1 downto 0) <= f_gpio_to_trigger_array(gpio_i);
   end generate;
    
-  tlu_lvds : if (g_lvds_inout + g_lvds_in > 0) generate
-   s_triggers(g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in -1 downto g_gpio_in + g_gpio_inout) <= f_lvds_array_to_trigger_array(lvds_i(f_sub1(g_lvds_inout+g_lvds_in) downto 0));
+  tlu_lvds : if (g_clocks_inout + g_lvds_inout + g_lvds_in > 0) generate
+   s_triggers(g_clocks_inout + g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in -1 downto g_gpio_in + g_gpio_inout) <= f_lvds_array_to_trigger_array(lvds_i(f_sub1(g_clocks_inout+g_lvds_inout+g_lvds_in) downto 0));
   end generate;
   
   tlu : wr_tlu
     generic map(
-      g_num_triggers => g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in,
+      g_num_triggers => g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in + g_clocks_inout,
       g_fifo_depth   => g_tlu_fifo_size)
     port map(
       clk_ref_i      => clk_ref,
@@ -1604,7 +1616,7 @@ begin
       rst_n_i   => rstn_ref,
       channel_i => channels(2),
       --lvds_o    => lvds_o);
-      lvds_o    => lvds_dat_fr_eca_chan);
+      lvds_o    => lvds_dat_fr_eca_chan(11 downto 0));
   
   c3 : eca_scubus_channel
     port map(
@@ -1635,23 +1647,30 @@ c4: eca_ac_wbm
   lvds_pins : altera_lvds
     generic map(
       g_family  => g_family,
-      g_inputs  => f_sub1(g_lvds_inout+g_lvds_in) +1,
-      g_outputs => f_sub1(g_lvds_inout+g_lvds_out)+1,
+      g_inputs  => f_sub1(g_clocks_inout+g_lvds_inout+g_lvds_in) +1,
+      g_outputs => f_sub1(g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_out)+1,
       g_invert  => g_lvds_invert)
     port map(
       clk_ref_i    => clk_ref,
       rstn_ref_i   => rstn_ref,
       clk_lvds_i   => clk_lvds,
       clk_enable_i => clk_enable,
-      dat_o        => lvds_i(f_sub1(g_lvds_inout+g_lvds_in) downto 0),
-      lvds_p_i     => lvds_p_i,
-      lvds_n_i     => lvds_n_i,
-      lvds_i_led_o => lvds_i_led_o,
+      dat_o        => lvds_i(f_sub1(g_clocks_inout+g_lvds_inout+g_lvds_in) downto 0),
+      lvds_p_i((g_lvds_inout+g_lvds_in)-1 downto 0)                                       => lvds_p_i,
+      lvds_n_i((g_lvds_inout+g_lvds_in)-1 downto 0)                                       => lvds_n_i,
+      lvds_p_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_p_i,
+      lvds_n_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_n_i,
+      lvds_i_led_o((g_lvds_inout+g_lvds_in)-1 downto 0) => lvds_i_led_o,
       --dat_i        => lvds_o(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
-      dat_i        => lvds_dat(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
-      lvds_p_o     => lvds_p_o,
-      lvds_n_o     => lvds_n_o,
-      lvds_o_led_o => lvds_o_led_o);
+      dat_i        => lvds_dat(f_sub1(g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_out) downto 0),
+      lvds_p_o((g_lvds_inout+g_lvds_in)-1 downto 0)     => lvds_p_o,
+      lvds_n_o((g_lvds_inout+g_lvds_in)-1 downto 0)     => lvds_n_o,
+      lvds_p_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_p_o,
+      lvds_n_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_n_o,
+      lvds_p_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_p_o,
+      lvds_n_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_n_o,
+      
+      lvds_o_led_o((g_lvds_inout+g_lvds_in)-1 downto 0) => lvds_o_led_o);
   
 
   CfiPFlash_n : if not g_en_cfi generate

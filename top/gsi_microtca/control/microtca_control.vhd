@@ -12,10 +12,9 @@ use work.microtca_ctrl_auto_pkg.all;
 entity microtca_control is
   generic(
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
-    -- currently only 3 trigger lines for MTCA backplane used due to monster limitation (max 12)
-    g_top_lvds_inout_mtca  : natural range 0 to 8 := 3; -- MicroTCA.4 backplane triggers/gates/clocks(8)
-    g_top_lvds_out_libera  : natural := 4; -- Libera backplane triggers (4) 
-    g_top_lvds_in          : natural := 0  -- no lvds inputs only
+    g_top_lvds_tclk_mtca   : natural := 4; -- TCLK
+    g_top_lvds_inout_mtca  : natural := 8; -- MicroTCA.4 backplane triggers/gates/clocks(8)
+    g_top_lvds_out_libera  : natural := 4  -- Libera backplane triggers (4) 
   );
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
@@ -31,8 +30,8 @@ entity microtca_control is
     -- PCI express pins
     -----------------------------------------
     pcie_clk_i     : in  std_logic;
-    pcie_rx_i      : in  std_logic_vector(3 downto 0);
-    pcie_tx_o      : out std_logic_vector(3 downto 0);
+    pcie_rx_i      : in  std_logic;
+    pcie_tx_o      : out std_logic;
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -125,14 +124,19 @@ entity microtca_control is
 
     -----------------------------------------------------------------------
     -- MTCA.4 high-speed serial connections to neighbouring slots
-    -- foreseen for SeriaRapidIO
+    -- foreseen for high speed serial links
     -----------------------------------------------------------------------
-    srio_rx_n_i         : in  std_logic_vector(4 downto 1);
-    srio_rx_p_i         : in  std_logic_vector(4 downto 1);
-    srio_tx_n_o  	      : out std_logic_vector(4 downto 1);
-    srio_tx_p_o  	      : out std_logic_vector(4 downto 1);
-    -- enable srio buffer outputs to/from FPGA 
-    srio_trxbuf_oe_o    : out std_logic_vector(4 downto 1);
+    hss_rx_n_i          : in  std_logic_vector(4 downto 1);
+    hss_rx_p_i          : in  std_logic_vector(4 downto 1);
+    hss_tx_n_o  	      : out std_logic_vector(4 downto 1);
+    hss_tx_p_o  	      : out std_logic_vector(4 downto 1);
+    -- enable hss buffer outputs to/from FPGA 
+    hss_tx_en_o         : out std_logic_vector(4 downto 1);
+    hss_rx_en_o         : out std_logic_vector(4 downto 1);
+    
+    -- enable Receive Equalization and Transmit Pre-Emphasis
+    hss_tx_pe_en_o      : out std_logic;
+    hss_rx_eq_en_o      : out std_logic;
 	 
     -----------------------------------------------------------------------
     -- mmc > fpga spi bus, mmc is master
@@ -202,18 +206,18 @@ architecture rtl of microtca_control is
   signal s_leds_user : std_logic_vector(3 downto 0);
   
   -- lvds ios
-  constant c_num_of_lvds_in    : natural := g_top_lvds_in;
-  constant c_num_of_lvds_out   : natural := g_top_lvds_out_libera;
-  constant c_num_of_lvds_inout : natural := g_top_lvds_inout_front + g_top_lvds_inout_mtca;
+  --constant c_num_of_lvds_in    : natural := g_top_lvds_in;
+  --constant c_num_of_lvds_out   : natural := g_top_lvds_out_libera;
+  --constant c_num_of_lvds_inout : natural := g_top_lvds_inout_front + g_top_lvds_inout_mtca;
 
-  signal s_lvds_p_i     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
-  signal s_lvds_n_i     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
-  signal s_lvds_i_led   : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_in -1 downto 0);
+  signal s_lvds_p_i     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_n_i     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_i_led   : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
 
-  signal s_lvds_p_o     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_n_o     : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_o_led   : std_logic_vector(c_num_of_lvds_inout + c_num_of_lvds_out -1 downto 0);
-  signal s_lvds_oen     : std_logic_vector(c_num_of_lvds_inout -1 downto 0);
+  signal s_lvds_p_o     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_n_o     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_o_led   : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
+  signal s_lvds_oen     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
 
   signal s_pcie_rx      : std_logic_vector(3 downto 0);
   signal s_pcie_tx      : std_logic_vector(3 downto 0);
@@ -284,7 +288,7 @@ architecture rtl of microtca_control is
   signal s_monster_mlvd_buf_en  : std_logic_vector(8 downto 1);
   signal s_monster_mlvd_dir     : std_logic_vector(8 downto 1);
 
-  signal s_monster_srio_buf_en  : std_logic_vector(8 downto 1);
+  signal s_monster_hss_buf_en   : std_logic_vector(8 downto 1);
 
   -- registers written by mmc
   signal s_mmc_libera_buf_en_reg  : std_logic_vector(7 downto 0);
@@ -301,9 +305,10 @@ begin
       g_project          => c_project,
       g_flash_bits       => 25,
       g_gpio_out         => 6,  -- 2xfront end+4xuser leds
-      g_lvds_inout       => c_num_of_lvds_inout,
-      g_lvds_out         => c_num_of_lvds_out,
+      g_lvds_inout       => g_top_lvds_inout_front,
       g_lvds_invert      => true,
+      g_clocks_inout     => g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca,
+      g_triggers_out     => g_top_lvds_out_libera,
       g_en_pcie          => true,
       g_en_usb           => true,
       g_en_lcd           => true,
@@ -342,7 +347,20 @@ begin
       lvds_n_o               => s_lvds_n_o,
       lvds_o_led_o           => s_lvds_o_led, 
       lvds_oen_o             => s_lvds_oen, 
-
+      
+      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
+      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
+      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
+      
+      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
+      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+      
+      mtca_libera_trig_p_o   =>lib_trig_p_o,
+      mtca_libera_trig_n_o   =>lib_trig_n_o,
+      
       led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
       led_track_o            => led_track,
@@ -350,8 +368,8 @@ begin
 
       pcie_refclk_i          => pcie_clk_i,
       pcie_rstn_i            => mmc_pcie_rst_n_i,
-      pcie_rx_i              => pcie_rx_i,
-      pcie_tx_o              => pcie_tx_o,
+      pcie_rx_i              => s_pcie_rx,
+      pcie_tx_o              => s_pcie_tx,
 
       usb_rstn_o             => ures,
       usb_ebcyc_i            => pa(3),
@@ -402,6 +420,10 @@ begin
   );
  
   sfp_tx_dis_o <= '0'; -- SFP always enabled
+  
+  -- Using just one PCIe lane
+  s_pcie_rx(0) <= pcie_rx_i;
+  pcie_tx_o    <= s_pcie_tx(0);
 
 
   -- Link LEDs
@@ -433,24 +455,12 @@ begin
 
   -- Logic analyzer
   s_log_in(15 downto 0) <= hpw(15 downto 0);
-  hpwck   <= s_log_out(16) when s_log_oe(16) = '1' else 'Z';
-  hpw(15) <= s_log_out(15) when s_log_oe(15) = '1' else 'Z';
-  hpw(14) <= s_log_out(14) when s_log_oe(14) = '1' else 'Z';
-  hpw(13) <= s_log_out(13) when s_log_oe(13) = '1' else 'Z';
-  hpw(12) <= s_log_out(12) when s_log_oe(12) = '1' else 'Z';
-  hpw(11) <= s_log_out(11) when s_log_oe(11) = '1' else 'Z';
-  hpw(10) <= s_log_out(10) when s_log_oe(10) = '1' else 'Z';
-  hpw(9)  <= s_log_out(9)  when s_log_oe(9)  = '1' else 'Z';
-  hpw(8)  <= s_log_out(8)  when s_log_oe(8)  = '1' else 'Z';
-  hpw(7)  <= s_log_out(7)  when s_log_oe(7)  = '1' else 'Z';
-  hpw(6)  <= s_log_out(6)  when s_log_oe(6)  = '1' else 'Z';
-  hpw(5)  <= s_log_out(5)  when s_log_oe(5)  = '1' else 'Z';
-  hpw(4)  <= s_log_out(4)  when s_log_oe(4)  = '1' else 'Z';
-  hpw(3)  <= s_log_out(3)  when s_log_oe(3)  = '1' else 'Z';
-  hpw(2)  <= s_log_out(2)  when s_log_oe(2)  = '1' else 'Z';
-  hpw(1)  <= s_log_out(1)  when s_log_oe(1)  = '1' else 'Z';
-  hpw(0)  <= s_log_out(0)  when s_log_oe(0)  = '1' else 'Z';
 
+  hpwck   <= s_log_out(16) when s_log_oe(16) = '1' else 'Z';
+
+  ge_log_out : for i in 0 to 15 generate
+    hpw(i)  <= s_log_out(i)  when s_log_oe(i)  = '1' else 'Z';
+  end generate;
 
   -----------------------------------------------------------
   -- lemo io connectors on front panel
@@ -493,64 +503,11 @@ begin
   -----------------------------------------------------------
   -- microTCA.4 backplane triggers, inputs and outputs
   -----------------------------------------------------------
-  s_lvds_p_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_p_i(g_top_lvds_inout_mtca downto 1);
-  s_lvds_n_i((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front) <= mlvdio_in_n_i(g_top_lvds_inout_mtca downto 1);
-
-  mlvdio_out_p_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_p_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
-  mlvdio_out_n_o(g_top_lvds_inout_mtca downto 1)   <= s_lvds_n_o((g_top_lvds_inout_mtca + g_top_lvds_inout_front) - 1 downto g_top_lvds_inout_front);
-
 
   -- select reciver input Type for onboard M-LVDS buffers to backplane
   -- ('0' = Type-1 , '1' = Type-2 )
   mlvdio_buf_fsen_o <= '1'; 
 
-  -- if not all backplane MLVD IOs used in monster
-  gen_mlvdio_not_used : if g_top_lvds_inout_mtca < 8 generate
-    unused_mlvd_ios: for i in (g_top_lvds_inout_mtca + 1) to 8 generate
-      mlvd_obuf : altera_lvds_obuf
-        generic map(
-          g_family  => c_family)
-        port map(
-          datain    => '0',
-          dataout   => mlvdio_out_p_o(i),
-          dataout_b => mlvdio_out_n_o(i)
-        );
-    
-      mlvd_inbuf : altera_lvds_ibuf
-          generic map(
-            g_family  => c_family)
-          port map(
-            datain_b  => mlvdio_in_n_i(i),
-            datain    => mlvdio_in_p_i(i),
-            dataout   => open
-          );
-    end generate;
-  end generate;
-
-  -----------------------------------------------------------
-  -- MTCA.4 clocks, inputs and outputs
-  -----------------------------------------------------------
-    mtca_clk: for i in  1 to 4 generate
--- dummy buffers, just to compile
-      mtca_clk_obuf : altera_lvds_obuf
-        generic map(
-          g_family  => c_family)
-        port map(
-          datain    => '0',
-          dataout   => tclk_out_p_o(i),
-          dataout_b => tclk_out_n_o(i)
-        );
-
--- dummy buffers, just to compile
-      mtca_clk_inbuf : altera_lvds_ibuf
-          generic map(
-            g_family  => c_family)
-          port map(
-            datain_b  => tclk_in_n_i(i),
-            datain    => tclk_in_p_i(i),
-            dataout   => open
-          );
-    end generate;
 
   -----------------------------------------------------------
   -- Libera outputs
@@ -558,8 +515,6 @@ begin
 
   -- no intputs from Libera backplane, outputs only
   -- trigger outputs to backplane for Libera
-  lib_trig_p_o(3 downto 0)   <= s_lvds_p_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto (g_top_lvds_inout_mtca + 5));
-  lib_trig_n_o(3 downto 0)   <= s_lvds_n_o((g_top_lvds_out_libera + g_top_lvds_inout_mtca + 5) -1 downto (g_top_lvds_inout_mtca + 5));
 
 
 
@@ -581,7 +536,7 @@ begin
   s_monster_tclk_dir      <= s_mtca_backplane_conf1(s_monster_tclk_dir'range);
   s_monster_mlvd_buf_en   <= s_mtca_backplane_conf2(s_monster_mlvd_buf_en'range);
   s_monster_mlvd_dir      <= s_mtca_backplane_conf3(s_monster_mlvd_dir'range);
-  s_monster_srio_buf_en   <= s_mtca_backplane_conf4(s_monster_srio_buf_en'range);
+  s_monster_hss_buf_en    <= s_mtca_backplane_conf4(s_monster_hss_buf_en'range);
 
   -----------------------------------------------------------------------
   -- backplane ports configuration status to monster microtca_ctrl registers
@@ -638,7 +593,7 @@ begin
         s_monster_tclk_dir      when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF1_RW, a_mmcspi_addr'length)),
         s_monster_mlvd_buf_en   when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF2_RW, a_mmcspi_addr'length)),
         s_monster_mlvd_dir      when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF3_RW, a_mmcspi_addr'length)),
-        s_monster_srio_buf_en   when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF4_RW, a_mmcspi_addr'length)),
+        s_monster_hss_buf_en    when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF4_RW, a_mmcspi_addr'length)),
         
         s_mmc_libera_buf_en_reg when std_logic_vector(to_unsigned(c_slave_BACKPLANE_STAT0_GET, a_mmcspi_addr'length)),
         s_mmc_mtca4_bpl_dis_reg when std_logic_vector(to_unsigned(c_slave_BACKPLANE_STAT1_GET, a_mmcspi_addr'length)),
@@ -651,13 +606,13 @@ begin
   -- mmc data write to local registers
   ----------------------------------------------------------------------- 
   -- controlled from MMC via SPI - MCH/MMC enable of Libera triggers and 
-  -- disable for MTCA.4 triggers, clocks and SRIO
+  -- disable for MTCA.4 triggers, clocks and HSS links
   p_mmc_write_reg : process(s_clk_mmc_spi)
   begin
     if rising_edge(s_clk_mmc_spi) then
       if s_rstn_mmc_spi = '0' then
         s_mmc_mtca4_bpl_dis_reg    <= (others => '0');
-        s_mmc_libera_buf_en_reg    <= (others => '0');
+        s_mmc_libera_buf_en_reg    <= (others => '1');
       else
         -- store settings given by mmc
         -- for now simply invert libera trigger enable setting
@@ -728,11 +683,21 @@ begin
   -----------------------------------------------------------------------
   -- MTCA.4 PORT 12-15 buffers enable generation
   -----------------------------------------------------------------------
-  gen_srio_buf_oe : for i in  1 to 4 generate
+  gen_hss_buf_oe : for i in  1 to 4 generate
 
-    srio_trxbuf_oe_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
-                                     s_monster_srio_buf_en(i)   = '1')
+    hss_tx_en_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
+                                 s_monster_hss_buf_en(i)   = '1')
+                               else '0';    
+    hss_rx_en_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
+                                 s_monster_hss_buf_en(i+4) = '1')
                                else '0';    
   end generate; -- gen_srio_buf_oe
+
+  -- disable  Transmit Pre-Emphasis and Receive Equalization
+  hss_tx_pe_en_o <= '0';
+  hss_rx_eq_en_o <= '0';
+
+
+
 end rtl;
 

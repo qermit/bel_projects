@@ -117,22 +117,22 @@ begin
   s_slave_regs_clk_sys_i.LOGIC_INPUT <= logic_input_i(16 downto 0);
 
   -- black plane development
-  backplane_conf0_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF0;
-  backplane_conf1_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF1;
-  backplane_conf2_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF2;
-  backplane_conf3_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF3;
-  backplane_conf4_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF4;
-  backplane_conf5_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF5;
-  backplane_conf6_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF6;
-  backplane_conf7_o  <= s_slave_regs_clk_sys_o.BACKPLANE_CONF7;
+  backplane_conf0_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF0;
+  backplane_conf1_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF1;
+  backplane_conf2_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF2;
+  backplane_conf3_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF3;
+  backplane_conf4_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF4;
+  backplane_conf5_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF5;
+  backplane_conf6_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF6;
+  backplane_conf7_o  <= x"0000" & s_slave_regs_clk_sys_o.BACKPLANE_CONF7;
 
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT0 <= backplane_stat0_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT1 <= backplane_stat1_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT2 <= backplane_stat2_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT3 <= backplane_stat3_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT4 <= backplane_stat4_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT5 <= backplane_stat5_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT6 <= backplane_stat6_i;
-  s_slave_regs_clk_sys_i.BACKPLANE_STAT7 <= backplane_stat7_i;
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT0 <= backplane_stat0_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT1 <= backplane_stat1_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT2 <= backplane_stat2_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT3 <= backplane_stat3_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT4 <= backplane_stat4_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT5 <= backplane_stat5_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT6 <= backplane_stat6_i(15 downto 0);
+  s_slave_regs_clk_sys_i.BACKPLANE_STAT7 <= backplane_stat7_i(15 downto 0);
 
 end rtl;
