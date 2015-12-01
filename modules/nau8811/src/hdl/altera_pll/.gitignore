@@ -1,7 +1,6 @@
 audio_pll.bsf
 audio_pll.cmp
 audio_pll.ppf
-audio_pll.qip
 audio_pll.sip
 audio_pll.spd
 audio_pll.vhd
