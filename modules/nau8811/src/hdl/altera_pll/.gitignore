@@ -5,5 +5,4 @@ audio_pll.sip
 audio_pll.spd
 audio_pll.vhd
 audio_pll_sim.f
-audio_pll/
 audio_pll_sim/
