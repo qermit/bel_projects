@@ -350,11 +350,16 @@ begin
       mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
       mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
       
-      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
-      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
-      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
-      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
-      
+--      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
+--      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+--      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+--      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+  
+      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => open,
+      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => open,
+      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+    
       mtca_libera_trig_p_o   =>lib_trig_p_o,
       mtca_libera_trig_n_o   =>lib_trig_n_o,
       
@@ -522,6 +527,36 @@ begin
           dataout   => open
         );
   end generate;
+
+
+
+
+  -- usage of backplane ports currently not defined
+  -- therefore only dummy buffers to keep Quartus happy
+  unused_mlvds_ios: for i in 1 to 8 generate
+    hss_obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => mlvdio_out_p_o(i),
+        dataout_b => mlvdio_out_n_o(i)
+      );
+  end generate;
+
+  -- usage of backplane ports currently not defined
+  -- therefore only dummy buffers to keep Quartus happy
+  unused_tclk_ios: for i in 1 to 4 generate
+    hss_obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => tclk_out_p_o(i),
+        dataout_b => tclk_out_n_o(i)
+      );
+  end generate;
+
 
 
 
