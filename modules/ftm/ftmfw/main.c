@@ -66,7 +66,10 @@ void init()
 
 void showFpqStatus()
 {
-   mprintf("Fpq: Cfg %x HeapCnt %d MsgO %d MsgI %d\n", *(pFpqCtrl + r_FPQ.cfgGet), *(pFpqCtrl + r_FPQ.heapCnt), *(pFpqCtrl + r_FPQ.msgCntO), *(pFpqCtrl + r_FPQ.msgCntI));
+   uint64_t tmp;
+   tmp  = (uint64_t)*(pFpqCtrl + PRIO_CNT_OUT_ALL_GET_0);
+   tmp |= ((uint64_t)*(pFpqCtrl + PRIO_CNT_OUT_ALL_GET_1))<<32; 
+   mprintf("Fpq: Cfg %x MsgO %llu\n", *(pFpqCtrl + PRIO_MODE_GET), tmp);
 }
 
 int insertFpqEntry()
@@ -84,9 +87,7 @@ int insertFpqEntry()
    const unsigned int c_period = 375000000/1;
       
    stime = getSysTime() + ct_sec + ct_trn - ((run++)<<3); //+ (1 + ((run>>5)*5))*ct_sec ;
-   diff = ( *(pFpqCtrl + r_FPQ.capacity) - *(pFpqCtrl + r_FPQ.heapCnt));
-   if(diff > 1)
-    {  
+   
       atomic_on();
       *pFpqData = (unsigned int)(stime>>32);
       *pFpqData = (unsigned int)(stime);
@@ -97,11 +98,7 @@ int insertFpqEntry()
        *pFpqData = 0x33333333;
        *pFpqData = run;
       atomic_off(); 
-    } else {
-       ret = -1;
-       mprintf("Queue full, waiting\n");
-    }   
- 
+  
     
     return ret;
  }

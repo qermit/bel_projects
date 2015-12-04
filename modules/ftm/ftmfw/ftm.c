@@ -2,37 +2,6 @@
 #include "dbg.h"
 
 
-const struct t_FPQ r_FPQ = {    .rst        =  0x00 >> 2,
-               .force      =  0x04 >> 2,
-               .dbgSet     =  0x08 >> 2,
-               .dbgGet     =  0x0c >> 2,
-               .clear      =  0x10 >> 2,
-               .cfgGet     =  0x14 >> 2,
-               .cfgSet     =  0x18 >> 2,
-               .cfgClr     =  0x1C >> 2,
-               .dstAdr     =  0x20 >> 2,
-               .heapCnt    =  0x24 >> 2,
-               .msgCntO    =  0x28 >> 2,
-               .msgCntI    =  0x2C >> 2,
-               .tTrnHi     =  0x30 >> 2,
-               .tTrnLo     =  0x34 >> 2,
-               .tDueHi     =  0x38 >> 2,
-               .tDueLo     =  0x3C >> 2,
-               .capacity   =  0x40 >> 2,
-               .msgMax     =  0x44 >> 2,
-               .ebmAdr     =  0x48 >> 2,
-               .tsAdr      =  0x4C >> 2,
-               .tsCh       =  0x50 >> 2,
-               .cfg_ENA             = 1<<0,
-               .cfg_FIFO            = 1<<1,    
-               .cfg_IRQ             = 1<<2,
-               .cfg_AUTOPOP         = 1<<3,
-               .cfg_AUTOFLUSH_TIME  = 1<<4,
-               .cfg_AUTOFLUSH_MSGS  = 1<<5,
-               .cfg_MSG_ARR_TS      = 1<<6,
-               .force_POP           = 1<<0,
-               .force_FLUSH         = 1<<1
-};
 
 
 uint64_t dbg_sum = 0;
@@ -41,30 +10,16 @@ uint64_t execCnt;
 
 void prioQueueInit()
 {
-   *(pFpqCtrl + r_FPQ.rst)       = 1;
-   *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
-   *(pFpqCtrl + r_FPQ.clear)     = 1;
-   *(pFpqCtrl + r_FPQ.dstAdr)    = (uint32_t)pEca & ~0x80000000;
-#ifndef DEBUGPRIOQDST
-#define DEBUGPRIOQDST 0
-#endif
-   *(pFpqCtrl + r_FPQ.tsAdr)     = (uint32_t)(DEBUGPRIOQDST);
-   *(pFpqCtrl + r_FPQ.ebmAdr)    = ((uint32_t)pEbm & ~0x80000000);
-   *(pFpqCtrl + r_FPQ.msgMax)    = 5;
-   *(pFpqCtrl + r_FPQ.tTrnHi)    = hiW(pFtmIf->tTrn);
-   *(pFpqCtrl + r_FPQ.tTrnLo)    = loW(pFtmIf->tTrn);
-   *(pFpqCtrl + r_FPQ.tDueHi)    = hiW(pFtmIf->tDue);
-   *(pFpqCtrl + r_FPQ.tDueLo)    = loW(pFtmIf->tDue);
-   
-   *(pFpqCtrl + r_FPQ.cfgClr)    = 0xffffffff;
-   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_AUTOFLUSH_TIME | 
-                                   r_FPQ.cfg_AUTOFLUSH_MSGS |
-                                   r_FPQ.cfg_AUTOPOP | 
-                                   r_FPQ.cfg_FIFO |
-                                   r_FPQ.cfg_ENA;
-#if DEBUGPRIOQ == 1                               
-   *(pFpqCtrl + r_FPQ.cfgSet)    = r_FPQ.cfg_MSG_ARR_TS;
-#endif                                      
+   pFpqCtrl[PRIO_RESET_OWR>>2]      = 1;
+   pFpqCtrl[PRIO_MODE_CLR>>2]       = 0xffffffff;
+   pFpqCtrl[PRIO_ECA_ADR_RW>>2]     = (uint32_t)pEca & ~0x80000000;
+   pFpqCtrl[PRIO_EBM_ADR_RW>>2]     = ((uint32_t)pEbm & ~0x80000000);
+   pFpqCtrl[PRIO_TX_MAX_MSGS_RW>>2] = 5;
+   pFpqCtrl[PRIO_TX_MAX_WAIT_RW>>2] = loW(pFtmIf->tDue);
+   pFpqCtrl[PRIO_MODE_SET>>2]       = PRIO_BIT_ENABLE     | 
+                                          PRIO_BIT_MSG_LIMIT  |
+                                          PRIO_BIT_TIME_LIMIT;
+                                    
 }
 
 void ftmInit()
@@ -273,32 +228,26 @@ inline int dispatch(t_ftmMsg* pMsg)
    uint32_t msgCnt, stat; 
    stat = pFtmIf->status;
    
-   diff = ( *(pFpqCtrl + r_FPQ.capacity) - *(pFpqCtrl + r_FPQ.heapCnt));
-   if(diff > 1)
-   {  
-      //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
-      atomic_on();
-      *pFpqData = hiW(pMsg->id);
-      *pFpqData = loW(pMsg->id);
-      #if DEBUGTIME == 1
-      *pFpqData = hiW(then) | 0xff000000;
-      *pFpqData = loW(then);
-      #else
-      *pFpqData = hiW(pMsg->par);
-      *pFpqData = loW(pMsg->par);
-      #endif
-      *pFpqData = pMsg->tef;
-      *pFpqData = pMsg->res;
-      *pFpqData = hiW(pMsg->ts);
-      *pFpqData = loW(pMsg->ts);
-      atomic_off();
-      msgCnt = (stat >> 16); 
-      pFtmIf->status = (stat & 0x0000ffff) | ((msgCnt+1) << 16);
-      
-   } else {
-      ret = 0;
-      DBPRINT1("Queue full, waiting\n");
-   }   
+   
+  //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
+  atomic_on();
+  *pFpqData = hiW(pMsg->id);
+  *pFpqData = loW(pMsg->id);
+  #if DEBUGTIME == 1
+  *pFpqData = hiW(then) | 0xff000000;
+  *pFpqData = loW(then);
+  #else
+  *pFpqData = hiW(pMsg->par);
+  *pFpqData = loW(pMsg->par);
+  #endif
+  *pFpqData = pMsg->tef;
+  *pFpqData = pMsg->res;
+  *pFpqData = hiW(pMsg->ts);
+  *pFpqData = loW(pMsg->ts);
+  atomic_off();
+  msgCnt = (stat >> 16); 
+  pFtmIf->status = (stat & 0x0000ffff) | ((msgCnt+1) << 16);
+   
    
    return ret;
 
