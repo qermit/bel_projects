@@ -40,10 +40,12 @@ use work.wishbone_pkg.all;
 use work.wb_irq_pkg.all;
 use work.ftm_pkg.all;
 
+
 entity ftm_lm32 is
 generic(g_cpu_id              : t_wishbone_data := x"CAFEBABE";
         g_size                : natural := 65536;                 -- size of the dpram
-        g_is_in_cluster       : boolean := false; 
+        g_is_in_cluster       : boolean := false;
+        g_is_ftm              : boolean := false; 
         g_cluster_bridge_sdb  : t_sdb_bridge := c_dummy_bridge;   -- record for optional (superior) cluster bridge
         g_world_bridge_sdb    : t_sdb_bridge;                     -- record for (superior) world bridge
         g_profile             : string  := "medium_icache_debug"; -- lm32 profile
@@ -54,6 +56,11 @@ clk_sys_i      : in  std_logic;  -- system clock
 rst_n_i        : in  std_logic;  -- reset, active low 
 rst_lm32_n_i   : in  std_logic;  -- reset, active low
 tm_tai8ns_i    : in std_logic_vector(63 downto 0) := (others => '0');
+
+-- optional priority queue interface for DataMaster
+prioq_master_o : out t_wishbone_master_out; 
+prioq_master_i : in  t_wishbone_master_in := ('0', '0', '0', '0', '0', x"00000000");
+
 -- optional cluster periphery interface of the lm32
 clu_master_o  : out t_wishbone_master_out; 
 clu_master_i  : in  t_wishbone_master_in := ('0', '0', '0', '0', '0', x"00000000");
@@ -74,42 +81,51 @@ end ftm_lm32;
 architecture rtl of ftm_lm32 is 
    
    -- crossbar layout
-   constant c_lm32_slaves          : natural := 7;
+   constant c_lm32_slaves          : natural := 8;
    constant c_lm32_masters         : natural := 2;
       
    constant c_lm32_ram             : natural := 0;
-  -- constant c_lm32_timer           : natural := 1;
    constant c_lm32_msi_ctrl        : natural := 1;
    constant c_lm32_cpu_info        : natural := 2;
    constant c_lm32_sys_time        : natural := 3;
    constant c_lm32_atomic          : natural := 4;
-   constant c_lm32_clu_bridge      : natural := 5;
-   constant c_lm32_world_bridge    : natural := 6;
+   constant c_lm32_prioq           : natural := 5;
+   constant c_lm32_clu_bridge      : natural := 6;
+   constant c_lm32_world_bridge    : natural := 7;
+
    
    signal   s_cpu_info,
             s_sys_time,
             s_atomic               : t_wishbone_master_in;
                
-   
+    
    
    -- slightly different version of Wesley's function, accepts an optional fixed address
-   function f_sdb_auto_fixed_bridge(bridge : t_sdb_bridge; enable : boolean := true; fixed : boolean := false; adr : t_wishbone_address := (others => '0'))
+   function f_sdb_auto_fixed_bridge(bridge : t_sdb_bridge; enable : boolean := true; adr : t_wishbone_address := (others => '0'))
     return t_sdb_record
    is
-    constant c_zero  : t_wishbone_address := (others => '0');
     variable v_empty : t_sdb_record := (others => '0');
    begin
     v_empty(7 downto 0) := (others => '1');
     if enable then
-      if fixed then
         return f_sdb_embed_bridge(bridge, adr);
-      else
-        return f_sdb_embed_bridge(bridge, c_zero);
-      end if; 
     else
       return v_empty;
     end if;
    end f_sdb_auto_fixed_bridge;
+
+   function f_sdb_auto_fixed_device(device : t_sdb_device; enable : boolean := true; adr : t_wishbone_address := (others => '0'))
+    return t_sdb_record
+  is
+    variable v_empty : t_sdb_record := (others => '0');
+  begin
+    v_empty(7 downto 0) := (others => '1');
+    if enable then
+      return f_sdb_embed_device(device, adr);
+    else
+      return v_empty;
+    end if;
+  end f_sdb_auto_fixed_device;
    
    constant c_lm32_layout : t_sdb_record_array(c_lm32_slaves-1 downto 0) :=
    (c_lm32_ram                => f_sdb_embed_device(f_xwb_dpram_userlm32(g_size),   x"00000000"), -- this CPU's RAM
@@ -117,7 +133,8 @@ architecture rtl of ftm_lm32 is
     c_lm32_cpu_info           => f_sdb_embed_device(c_cpu_info_sdb,        x"3FFFFEE0"),
     c_lm32_sys_time           => f_sdb_embed_device(c_sys_time_sdb,        x"3FFFFEF8"),
     c_lm32_atomic             => f_sdb_embed_device(c_atomic_sdb,          x"3FFFFF00"),
-    c_lm32_clu_bridge         => f_sdb_auto_fixed_bridge(g_cluster_bridge_sdb, g_is_in_cluster, true, x"40000000"),
+    c_lm32_prioq              => f_sdb_auto_fixed_device(c_prio_data_sdb,      g_is_ftm, x"3FFFFFA0"),
+    c_lm32_clu_bridge         => f_sdb_auto_fixed_bridge(g_cluster_bridge_sdb, g_is_in_cluster, x"40000000"),
     c_lm32_world_bridge       => f_sdb_embed_bridge(g_world_bridge_sdb,    x"80000000"));
     
    constant c_lm32_sdb_address : t_wishbone_address := x"3FFFE000";
@@ -139,7 +156,7 @@ architecture rtl of ftm_lm32 is
    signal r_tai_8ns_LO, r_time_freeze_LO : std_logic_vector(31 downto 0);
    signal rst_lm32_n   : std_logic;
    signal r_cyc_atomic : std_logic;
-   signal r_cyc, s_ext_clu_cyc, s_ext_world_cyc : std_logic;
+   signal r_cyc, s_ext_prioq_cyc, s_ext_clu_cyc, s_ext_world_cyc : std_logic;
    
 begin
    
@@ -332,6 +349,22 @@ begin
   end process;
   
   lm32_cb_master_in(c_lm32_atomic) <= s_atomic; 
+
+
+--******************************************************************************
+-- Priority Queue Interface
+--------------------------------------------------------------------------------
+   
+   s_ext_prioq_cyc <= lm32_cb_master_out(c_lm32_prioq).cyc or (r_cyc and r_cyc_atomic);
+   
+   prioq_master_o.cyc <= s_ext_clu_cyc; -- atomic does not raise cyc, but keeps it HI. 
+   prioq_master_o.stb <= lm32_cb_master_out(c_lm32_prioq).stb;                             -- write LO to r_cyc_atomic to deassert
+   prioq_master_o.we  <= lm32_cb_master_out(c_lm32_prioq).we;
+   prioq_master_o.sel <= lm32_cb_master_out(c_lm32_prioq).sel;
+   prioq_master_o.adr <= lm32_cb_master_out(c_lm32_prioq).adr;
+   prioq_master_o.dat <= lm32_cb_master_out(c_lm32_prioq).dat;
+
+   lm32_cb_master_in(c_lm32_prioq)   <= prioq_master_i;
 
 --******************************************************************************
 -- Cluster Interface

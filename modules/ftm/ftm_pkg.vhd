@@ -6,6 +6,7 @@ use ieee.numeric_std.all;
 library work;
 use work.wishbone_pkg.all;
 use work.wb_irq_pkg.all;
+use work.prio_auto_pkg.c_prio_ctrl_sdb;
 
 package ftm_pkg is
 
@@ -14,14 +15,13 @@ package ftm_pkg is
 -- Components declaration
 -------------------------------------------------------------------------------
   
-   constant c_clu_slaves   : natural := 6; 
+   constant c_clu_slaves   : natural := 5; 
    
    constant c_clu_cluster_info  : natural := 0;
    constant c_clu_shared_mem    : natural := 1;
-   constant c_clu_ebm_queue_c   : natural := 2;
-   constant c_clu_ebm_queue_d   : natural := 3;
-   constant c_clu_irq_bridge    : natural := 4;
-   constant c_clu_ram_bridge    : natural := 5;
+   constant c_clu_prioq_ctrl    : natural := 2;
+   constant c_clu_irq_bridge    : natural := 3;
+   constant c_clu_ram_bridge    : natural := 4;
 
 
    function f_xwb_dpram_aux(g_size : natural; product : t_sdb_product) return t_sdb_device;
@@ -67,7 +67,8 @@ package ftm_pkg is
    component ftm_lm32 is
    generic(g_cpu_id              : t_wishbone_data := x"CAFEBABE";
         g_size                : natural := 16384;                 -- size of the dpram
-        g_is_in_cluster       : boolean := false; 
+        g_is_in_cluster       : boolean := false;
+        g_is_ftm              : boolean := false;  
         g_cluster_bridge_sdb  : t_sdb_bridge := c_dummy_bridge;   --
         g_world_bridge_sdb    : t_sdb_bridge;                     -- record for the superior bridge
         g_profile             : string  := "medium_icache_debug"; -- lm32 profile
@@ -78,6 +79,11 @@ package ftm_pkg is
    rst_n_i        : in  std_logic;  -- reset, active low 
    rst_lm32_n_i   : in  std_logic;  -- reset, active low
    tm_tai8ns_i    : in std_logic_vector(63 downto 0);
+
+   -- optional priority queue interface for DataMaster
+   prioq_master_o : out t_wishbone_master_out; 
+   prioq_master_i : in  t_wishbone_master_in := ('0', '0', '0', '0', '0', x"00000000");
+
    -- optional cluster periphery interface of the lm32
    clu_master_o  : out t_wishbone_master_out; 
    clu_master_i  : in  t_wishbone_master_in := ('0', '0', '0', '0', '0', x"00000000");
@@ -148,31 +154,7 @@ package ftm_pkg is
    );
    end component;
    
-   component ftm_priority_queue is
-   generic(
-      g_is_ftm       : boolean := false;  
-      g_idx_width    : natural := 8;
-      g_key_width    : natural := 64;
-      g_val_width    : natural := 192  
-   );            
-   port(
-      clk_sys_i   : in  std_logic;
-      rst_n_i     : in  std_logic;
-
-      time_sys_i  : in  std_logic_vector(63 downto 0) := (others => '1');
-
-      ctrl_i      : in  t_wishbone_slave_in;
-      ctrl_o      : out t_wishbone_slave_out;
-      
-      snk_i       : in  t_wishbone_slave_in;
-      snk_o       : out t_wishbone_slave_out;
-      
-      src_o       : out t_wishbone_master_out;
-      src_i       : in  t_wishbone_master_in
-     
-   );
-   end component;
-   
+  
    
    constant c_atomic_sdb : t_sdb_device := (
     abi_class     => x"0000", -- undocumented device
@@ -222,7 +204,7 @@ package ftm_pkg is
     date          => x"20131009",
     name          => "CPU-Info-ROM       ")));
 
-   constant c_ebm_queue_data_sdb : t_sdb_device := (
+  constant c_prio_data_sdb : t_sdb_device := (
    abi_class     => x"0000", -- undocumented device
    abi_ver_major => x"01",
    abi_ver_minor => x"01",
@@ -230,29 +212,15 @@ package ftm_pkg is
    wbd_width     => x"7", -- 8/16/32-bit port granularity
    sdb_component => (
    addr_first    => x"0000000000000000",
-   addr_last     => x"0000000000000003",
+   addr_last     => x"000000000000001f",
    product => (
    vendor_id     => x"0000000000000651", -- GSI
    device_id     => x"10040201",
    version       => x"00000001",
    date          => x"20131009",
-   name          => "DM-Prio-Queue-Data ")));
+   name          => "DM-PriorityQ-Data  ")));
    
-   constant c_ebm_queue_ctrl_sdb : t_sdb_device := (
-   abi_class     => x"0000", -- undocumented device
-   abi_ver_major => x"01",
-   abi_ver_minor => x"01",
-   wbd_endian    => c_sdb_endian_big,
-   wbd_width     => x"7", -- 8/16/32-bit port granularity
-   sdb_component => (
-   addr_first    => x"0000000000000000",
-   addr_last     => x"000000000000007f",
-   product => (
-   vendor_id     => x"0000000000000651", -- GSI
-   device_id     => x"10040200",
-   version       => x"00000001",
-   date          => x"20131009",
-   name          => "DM-Prio-Queue-Ctrl ")));
+   -- c_prio_ctrl_sdb comes from prio_auto_pkg
                 
 
    constant c_cluster_info_sdb : t_sdb_device := (
@@ -407,8 +375,7 @@ package body ftm_pkg is
       variable v_clu_layout :  t_sdb_record_array(c_clu_slaves-1 downto 0); 
    begin
       v_clu_layout :=   (  c_clu_cluster_info => f_sdb_auto_device(c_cluster_info_sdb,            true),
-                           c_clu_ebm_queue_c  => f_sdb_auto_device(c_ebm_queue_ctrl_sdb,          is_ftm),
-                           c_clu_ebm_queue_d  => f_sdb_auto_device(c_ebm_queue_data_sdb,          is_ftm),
+                           c_clu_prioq_ctrl  => f_sdb_auto_device(c_prio_ctrl_sdb,          is_ftm),
                            c_clu_shared_mem   => f_sdb_auto_device(f_xwb_dpram_shared(shared_ramsize),  (shared_ramsize > 0)),
                            c_clu_irq_bridge   => f_sdb_auto_bridge(f_xwb_bridge_layout_sdb(true, f_sdb_auto_layout(irq_layout), f_sdb_auto_sdb(irq_layout)), true), 
                            c_clu_ram_bridge   => f_sdb_auto_bridge(f_xwb_bridge_layout_sdb(true, f_sdb_auto_layout(ram_layout), f_sdb_auto_sdb(ram_layout)), true) 
