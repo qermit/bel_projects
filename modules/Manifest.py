@@ -27,7 +27,7 @@ modules = {
     "ftm",
     "lvds",
     "monster",
-    "heap",
+    "prioq2",
     "butis_t0",
     "power_test",
     "ssd1325",

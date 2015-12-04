@@ -38,6 +38,8 @@ use ieee.numeric_std.all;
 use work.wishbone_pkg.all;
 use work.wb_irq_pkg.all;
 use work.ftm_pkg.all;
+use work.prio_pkg.all;
+use work.etherbone_pkg.all;
 
 entity ftm_lm32_cluster is
 generic(g_is_ftm        : boolean := false;
@@ -152,8 +154,11 @@ architecture rtl of ftm_lm32_cluster is
           r_rst_lm32_n1 : std_logic_vector(g_cores-1 downto 0);            
    signal s_clu_info   : t_wishbone_master_in;
 
-   signal s_prio_data_in, s_prio_ctrl_in : t_wishbone_master_out;
-   signal s_prio_data_out, s_prio_ctrl_out  : t_wishbone_master_in; 
+   signal s_prio_data_in  : t_wishbone_master_in;
+   signal s_prio_data_out : t_wishbone_master_out; 
+
+   signal prioq_slaves_in    : t_wishbone_slave_in_array(g_cores-1 downto 0);
+   signal prioq_slaves_out   : t_wishbone_slave_out_array(g_cores-1 downto 0); 
 
 
    begin
@@ -163,6 +168,7 @@ architecture rtl of ftm_lm32_cluster is
       LM32 : ftm_lm32
       generic map(g_cpu_id                         => x"BBEE" & std_logic_vector(to_unsigned(I, 16)),
                   g_size                           => g_ram_per_core,
+                  g_is_ftm                         => g_is_ftm,  
                   g_is_in_cluster                  => true,
                   g_cluster_bridge_sdb             => c_clu_bridge_sdb,
                   g_world_bridge_sdb               => g_world_bridge_sdb,
@@ -175,6 +181,9 @@ architecture rtl of ftm_lm32_cluster is
 
                tm_tai8ns_i    => tm_tai8ns_ref_i,            
                
+               prioq_master_o => prioq_slaves_in (I), 
+               prioq_master_i => prioq_slaves_out (I), 
+
                clu_master_o   => clu_cbar_slaveport_in (I), 
                clu_master_i   => clu_cbar_slaveport_out (I),
                --LM32               
@@ -420,57 +429,42 @@ architecture rtl of ftm_lm32_cluster is
 -- FTM Prio Queue
 --------------------------------------------------------------------------------
  prioQ : if(g_is_ftm) generate  
-   prio_queue : ftm_priority_queue
-   generic map(
-      g_idx_width    => 7,
-      g_key_width    => 64, 
-      g_val_width    => 192 -- 2**7 -> 128 entries, 8 * 32b per entry (64b key, 192b value)
-   )           
-   port map(
-      clk_sys_i   => clk_sys_i,
-      rst_n_i     => rst_sys_n_i,
+   prio_queue : prio
+     generic map(
+      g_ebm_bits    => f_hi_adr_bits(c_ebm_sdb),
+      g_depth       => 16,    
+      g_num_masters => g_cores
+    )
+    port map(
+      clk_i         => clk_ref_i,                                        
+      rst_n_i       => rst_ref_n_i,                                          
 
-      time_sys_i  => tm_tai8ns_sys_i,
+      time_i        => tm_tai8ns_ref_i,   
 
-      ctrl_i      => s_prio_ctrl_in,
-      ctrl_o      => s_prio_ctrl_out,
+      ctrl_i        => clu_cbar_masterport_out(c_clu_prioq_ctrl),
+      ctrl_o        => clu_cbar_masterport_in(c_clu_prioq_ctrl),
+      slaves_i      => prioq_slaves_in,
+      slaves_o      => prioq_slaves_out,
+      master_o      => s_prio_data_out,
+      master_i      => s_prio_data_in
       
-      snk_i       => s_prio_data_in,
-      snk_o       => s_prio_data_out,
-      
-      src_o       => ftm_queue_master_o,
-      src_i       => ftm_queue_master_i
-     
-   );
- end generate;
- 
- -- sync from REF to SYS domain
- prioctrl_ref2sys : xwb_clock_crossing
+    );
+  end generate;
+
+	 -- sync from REF to SYS domain
+  priossrc_ref2sys : xwb_clock_crossing
    port map(
       -- Slave control port
       slave_clk_i    => clk_ref_i,
       slave_rst_n_i  => rst_ref_n_i,
-      slave_i        => clu_cbar_masterport_out(c_clu_ebm_queue_c),
-      slave_o        => clu_cbar_masterport_in(c_clu_ebm_queue_c),
+      slave_i        => s_prio_data_out,
+      slave_o        => s_prio_data_in,
       -- Master reader port
       master_clk_i   => clk_sys_i,
       master_rst_n_i => rst_sys_n_i,
-      master_i       => s_prio_ctrl_out,
-      master_o       => s_prio_ctrl_in);
-
-		 -- sync from REF to SYS domain
- priosink_ref2sys : xwb_clock_crossing
-   port map(
-      -- Slave control port
-      slave_clk_i    => clk_ref_i,
-      slave_rst_n_i  => rst_ref_n_i,
-      slave_i        => clu_cbar_masterport_out(c_clu_ebm_queue_d),
-      slave_o        => clu_cbar_masterport_in(c_clu_ebm_queue_d),
-      -- Master reader port
-      master_clk_i   => clk_sys_i,
-      master_rst_n_i => rst_sys_n_i,
-      master_i       => s_prio_data_out,
-      master_o       => s_prio_data_in);
+      master_i       => ftm_queue_master_i,
+      master_o       => ftm_queue_master_o
+  );
 
    sync_individual_resets : process(clk_ref_i)
    begin
