@@ -1,7 +1,7 @@
 --! @file        prio_auto.vhd
 --  DesignUnit   prio_auto
 --! @author      M. Kreider <m.kreider@gsi.de>
---! @date        16/11/2015
+--! @date        04/12/2015
 --! @version     0.0.1
 --! @copyright   2015 GSI Helmholtz Centre for Heavy Ion Research GmbH
 --!

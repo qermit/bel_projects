@@ -1,7 +1,7 @@
 --! @file        prio_auto_pkg.vhd
 --  DesignUnit   prio_auto
 --! @author      M. Kreider <m.kreider@gsi.de>
---! @date        16/11/2015
+--! @date        04/12/2015
 --! @version     0.0.1
 --! @copyright   2015 GSI Helmholtz Centre for Heavy Ion Research GmbH
 --!
@@ -106,10 +106,10 @@ package prio_auto_pkg is
    addr_last     => x"00000000000001ff",
    product => (
    vendor_id     => x"0000000000000651",
-   device_id     => x"01238187",
+   device_id     => x"10040200",
    version       => x"00000001",
-   date          => x"20151116",
-   name          => "DM-PriorityQueue   ")));
+   date          => x"20151204",
+   name          => "DM-PriorityQ-Ctrl  ")));
 
 end prio_auto_pkg;
 package body prio_auto_pkg is

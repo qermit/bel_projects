@@ -7,11 +7,12 @@ SHARED_SIZE     = 8K
 USRCPUCLK       = 125000
 VERSION         = 0.2.1
 
+PRIOPATH  = ../../../modules/prioq2
 PATHFTM   = ../../../modules/ftm
 PATHFW    = $(PATHFTM)/ftmfw
 PATHTOOL  = $(PATHFTM)/ftmx86
 PREFIX    ?= /usr/local
-CFLAGS    = -I$(PATHFW)
+CFLAGS    = -I$(PATHFW) -I$(PRIOPATH)
 
 include ../../build.mk
 
