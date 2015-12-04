@@ -22,12 +22,12 @@ set_clock_groups -asynchronous                           \
           main|\pcie_y:pcie|*|inst_av_pcs|*|tx*        } \
  -group { main|\pcie_y:pcie|*|rx_pmas[0]*|clk90bdes      \
           main|\pcie_y:pcie|*|rx_pmas[0]*|clk90b       } \
- -group { main|\pcie_y:pcie|*|rx_pmas[1]*|clk90bdes      \
-          main|\pcie_y:pcie|*|rx_pmas[1]*|clk90b       } \
- -group { main|\pcie_y:pcie|*|rx_pmas[2]*|clk90bdes      \
-          main|\pcie_y:pcie|*|rx_pmas[2]*|clk90b       } \
- -group { main|\pcie_y:pcie|*|rx_pmas[3]*|clk90bdes      \
-          main|\pcie_y:pcie|*|rx_pmas[3]*|clk90b       } \
+# -group { main|\pcie_y:pcie|*|rx_pmas[1]*|clk90bdes      \
+#          main|\pcie_y:pcie|*|rx_pmas[1]*|clk90b       } \
+# -group { main|\pcie_y:pcie|*|rx_pmas[2]*|clk90bdes      \
+#          main|\pcie_y:pcie|*|rx_pmas[2]*|clk90b       } \
+# -group { main|\pcie_y:pcie|*|rx_pmas[3]*|clk90bdes      \
+#          main|\pcie_y:pcie|*|rx_pmas[3]*|clk90b       } \
  -group { main|\pcie_y:pcie|*|coreclkout               }
 
 # cut: wb sys <=> wb flash   (different frequencies and using xwb_clock_crossing)

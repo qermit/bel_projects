@@ -30,8 +30,8 @@ entity microtca_control is
     -- PCI express pins
     -----------------------------------------
     pcie_clk_i     : in  std_logic;
-    pcie_rx_i      : in  std_logic;
-    pcie_tx_o      : out std_logic;
+    pcie_rx_i      : in  std_logic_vector(3 downto 0);
+    pcie_tx_o      : out std_logic_vector(3 downto 0);
     
     ------------------------------------------------------------------------
     -- WR DAC signals
@@ -102,13 +102,13 @@ entity microtca_control is
     mlvdio_out_p_o      : out std_logic_vector(8 downto 1);
 
     -- enable buffer output towards BACKPLANE (driver enable, active hi)
-    mlvdio_buf_de_o     : out std_logic_vector(8 downto 1);
+    mlvdio_de_o     : out std_logic_vector(8 downto 1);
     -- enable buffer output towards FPGA      (receiver enable, active lo)
-    mlvdio_buf_re_n_o   : out std_logic_vector(8 downto 1); 
+    mlvdio_re_n_o   : out std_logic_vector(8 downto 1); 
 	  -- m-lvds receiver type select ( 0 - type 1, 1 - type 2)
-    mlvdio_buf_fsen_o   : out std_logic;
+    mlvdio_fsen_o   : out std_logic;
 	  -- m-lvds buffer powerdown, active low
-    mlvdio_buf_pd_n_o   : out std_logic; 
+    mlvdio_pd_n_o   : out std_logic; 
 
     -----------------------------------------------------------------------
     -- lvds/lvds MTCA.4 backplane clocks
@@ -118,9 +118,9 @@ entity microtca_control is
     tclk_out_n_o        : out std_logic_vector(4 downto 1);
     tclk_out_p_o        : out std_logic_vector(4 downto 1);
     -- enable clock buffer outputs towards BACKPLANE
-    tclk_buf_de_o       : out std_logic_vector(4 downto 1);
+    tclk_de_o       : out std_logic_vector(4 downto 1);
     -- enable clock buffer outputs towards FPGA
-    tclk_buf_re_n_o     : out std_logic_vector(4 downto 1);
+    tclk_re_n_o     : out std_logic_vector(4 downto 1);
 
     -----------------------------------------------------------------------
     -- MTCA.4 high-speed serial connections to neighbouring slots
@@ -219,9 +219,6 @@ architecture rtl of microtca_control is
   signal s_lvds_o_led   : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
   signal s_lvds_oen     : std_logic_vector(g_top_lvds_inout_front-1 downto 0);
 
-  signal s_pcie_rx      : std_logic_vector(3 downto 0);
-  signal s_pcie_tx      : std_logic_vector(3 downto 0);
-
   
   constant c_family  : string := "Arria V"; 
   constant c_project : string := "microtca_control";
@@ -282,7 +279,7 @@ architecture rtl of microtca_control is
 
 
   -- connections from microtca_ctrl registers
-  signal s_monster_tclk_buf_en  : std_logic_vector(8 downto 1);
+  signal s_monster_tclk_en  : std_logic_vector(8 downto 1);
   signal s_monster_tclk_dir     : std_logic_vector(8 downto 1);
 
   signal s_monster_mlvd_buf_en  : std_logic_vector(8 downto 1);
@@ -368,8 +365,8 @@ begin
 
       pcie_refclk_i          => pcie_clk_i,
       pcie_rstn_i            => mmc_pcie_rst_n_i,
-      pcie_rx_i              => s_pcie_rx,
-      pcie_tx_o              => s_pcie_tx,
+      pcie_rx_i              => pcie_rx_i,
+      pcie_tx_o              => pcie_tx_o,
 
       usb_rstn_o             => ures,
       usb_ebcyc_i            => pa(3),
@@ -421,11 +418,6 @@ begin
  
   sfp_tx_dis_o <= '0'; -- SFP always enabled
   
-  -- Using just one PCIe lane
-  s_pcie_rx(0) <= pcie_rx_i;
-  pcie_tx_o    <= s_pcie_tx(0);
-
-
   -- Link LEDs
   dis_wr_o    <= '0';
   dis_rst_o   <= '1';
@@ -506,7 +498,31 @@ begin
 
   -- select reciver input Type for onboard M-LVDS buffers to backplane
   -- ('0' = Type-1 , '1' = Type-2 )
-  mlvdio_buf_fsen_o <= '1'; 
+  mlvdio_fsen_o <= '1'; 
+
+
+  -- usage of backplane ports currently not defined
+  -- therefore only dummy buffers to keep Quartus happy
+  unused_hss_ios: for i in 1 to 4 generate
+    hss_obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => hss_tx_p_o(i),
+        dataout_b => hss_tx_n_o(i)
+      );
+
+    hss_inbuf : altera_lvds_ibuf
+        generic map(
+          g_family  => c_family)
+        port map(
+          datain_b  => hss_rx_n_i(i),
+          datain    => hss_rx_p_i(i),
+          dataout   => open
+        );
+  end generate;
+
 
 
   -----------------------------------------------------------
@@ -532,7 +548,7 @@ begin
   -----------------------------------------------------------------------
   -- backplane ports configuration from monster microtca_ctrl registers
   ----------------------------------------------------------------------- 
-  s_monster_tclk_buf_en   <= s_mtca_backplane_conf0(s_monster_tclk_buf_en'range);
+  s_monster_tclk_en   <= s_mtca_backplane_conf0(s_monster_tclk_en'range);
   s_monster_tclk_dir      <= s_mtca_backplane_conf1(s_monster_tclk_dir'range);
   s_monster_mlvd_buf_en   <= s_mtca_backplane_conf2(s_monster_mlvd_buf_en'range);
   s_monster_mlvd_dir      <= s_mtca_backplane_conf3(s_monster_mlvd_dir'range);
@@ -589,7 +605,7 @@ begin
   ----------------------------------------------------------------------- 
   with a_mmcspi_addr select    
     s_mmcspi_di(7 downto 0) <= 
-        s_monster_tclk_buf_en   when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF0_RW, a_mmcspi_addr'length)),
+        s_monster_tclk_en   when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF0_RW, a_mmcspi_addr'length)),
         s_monster_tclk_dir      when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF1_RW, a_mmcspi_addr'length)),
         s_monster_mlvd_buf_en   when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF2_RW, a_mmcspi_addr'length)),
         s_monster_mlvd_dir      when std_logic_vector(to_unsigned(c_slave_BACKPLANE_CONF3_RW, a_mmcspi_addr'length)),
@@ -645,13 +661,13 @@ begin
   -----------------------------------------------------------------------
   gen_mlvd_buf_oe : for i in  1 to 8 generate
     -- enable buffer output towards BACKPLANE (m-lvds driver enable, active hi)
-    mlvdio_buf_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
+    mlvdio_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
                                     s_monster_mlvd_buf_en(i)    = '1' and 
                                     s_monster_mlvd_dir(i)       = '1')
                            else '0';
                                
     -- enable buffer output towards FPGA (m-lvds receiver enable, active low)
-    mlvdio_buf_re_n_o(i) <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
+    mlvdio_re_n_o(i) <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
                                       s_monster_mlvd_buf_en(i)    = '1' and 
                                       s_monster_mlvd_dir(i)       = '0')
                              else '1';
@@ -659,23 +675,23 @@ begin
 
   -- m-lvds buffer powerdown, active low
   -- when in Libera or when not enabled from monster
-  mlvdio_buf_pd_n_o    <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '1' or 
+  mlvdio_pd_n_o    <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '1' or 
                                     s_monster_mlvd_buf_en       = x"00")
                            else '1'; 
 
   -----------------------------------------------------------------------
   -- lvds/lvds MTCA.4 backplane clock buffers enable generation
   -----------------------------------------------------------------------
-  gen_tclk_buf_oe : for i in  1 to 4 generate
+  gen_tclk_oe : for i in  1 to 4 generate
     -- enable clock buffer outputs towards BACKPLANE (driver enable, active hi)
-    tclk_buf_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
-                                  s_monster_tclk_buf_en(i)    = '1' and 
+    tclk_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
+                                  s_monster_tclk_en(i)    = '1' and 
                                   s_monster_tclk_dir(i)       = '1')
                            else '0';
   
     -- enable clock buffer outputs towards FPGA (receiver enable, active lo)
-    tclk_buf_re_n_o(i)<= '0' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
-                                   s_monster_tclk_buf_en(i)   = '1' and 
+    tclk_re_n_o(i)<= '0' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
+                                   s_monster_tclk_en(i)   = '1' and 
                                    s_monster_tclk_dir(i)      = '0')
                           else '1';
   end generate; -- gen_mlvd_buf_oe
