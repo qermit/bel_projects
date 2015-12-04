@@ -30,7 +30,6 @@ const uint32_t devID_SharedRAM   = 0x81111444;
 const uint32_t devID_ClusterInfo = 0x10040086;
 const uint32_t devID_ClusterCB   = 0x10041000;
 const uint32_t devID_Ebm         = 0x00000815;
-const uint32_t devID_Prioq       = 0x10040200;
  
 const char     devName_RAM_pre[] = "WB4-BlockRAM_";
 
@@ -331,7 +330,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
 
   // Get prioq
   num_devices = 1;
-  if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_Prioq, &devices[0], &num_devices)) != EB_OK)
+  if ((status = eb_sdb_find_by_identity(device, PRIO_SDB_VENDOR_ID, PRIO_SDB_DEVICE_ID, &devices[0], &num_devices)) != EB_OK)
   {return die(status, "failed to when searching for Priority Queue ");}
   if (num_devices == 0) {
     fprintf(stderr, "%s: No Priority Queue found\n", program);
@@ -676,27 +675,21 @@ int ftmSetDuetime(uint64_t tdue) {
   eb_status_t status;
   
   if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tDueHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(tdue>>35)));
-  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tDueLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue>>3));
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + PRIO_TX_MAX_WAIT_RW), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue>>3));
   if ((status = eb_cycle_close(cycle)) != EB_OK)  return die(status, "failed to close write cycle");
   return 0;    
 }
 
 int ftmSetTrntime(uint64_t ttrn) {
-  eb_cycle_t cycle;
-  eb_status_t status;
-  
-  if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tTrnHi), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)(ttrn>>35)));
-  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + r_FPQ.tTrnLo), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)ttrn>>3));
-  if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close write cycle");
+
+  //FIXME This function is obsolete!!!
   return 0;    
 }
 
 int ftmSetMaxMsgs(uint64_t maxmsg) {
   eb_status_t status;
   
-  if ((status = eb_device_write(device, (eb_address_t)(p->prioQAdr + r_FPQ.msgMax), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)maxmsg), 0, eb_block))  != EB_OK) 
+  if ((status = eb_device_write(device, (eb_address_t)(p->prioQAdr + PRIO_TX_MAX_MSGS_RW), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)maxmsg), 0, eb_block))  != EB_OK) 
     return die(status, "failed to create cycle"); 
   return 0;    
 }
@@ -748,7 +741,7 @@ int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
 int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   uint32_t cpuIdx, thrIdx, offset;
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
-  uint32_t returnedLen = ((EBM_REG_LAST + r_FPQ.tsCh)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
+  uint32_t returnedLen = ((EBM_REG_LAST + PRIO_TX_MAX_WAIT_RW)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
   
   if (len < returnedLen) return (len - returnedLen);
   
@@ -761,13 +754,13 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
 
   // read EBM status
   ftmRamRead(p->ebmAdr + EBM_REG_STATUS, (const uint8_t*)&buff[EBM_REG_STATUS>>2], EBM_REG_LAST, BIG_ENDIAN);
-  ftmRamRead(p->prioQAdr + r_FPQ.cfgGet, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.cfgGet)>>2], 4, BIG_ENDIAN);
+  ftmRamRead(p->prioQAdr + PRIO_MODE_GET, (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_MODE_GET)>>2], 4, BIG_ENDIAN);
   offset += EBM_REG_LAST>>2; //advance offset
 
 
   // read PrioQ status
-  ftmRamRead(p->prioQAdr + r_FPQ.dstAdr, (const uint8_t*)&buff[(EBM_REG_LAST + r_FPQ.dstAdr)>>2], r_FPQ.ebmAdr - r_FPQ.dstAdr +4, BIG_ENDIAN);
-  offset += r_FPQ.tsCh>>2; //advance offset
+  ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET, (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
+  offset += PRIO_CNT_OUT_ALL_GET_1>>2; //advance offset
 
 
   //read WR State
@@ -854,7 +847,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   long long unsigned int ftmTPrep;
   uint32_t* buffEbm   = status;
   uint32_t* buffPrioq = (uint32_t*)&buffEbm[(EBM_REG_LAST>>2)];
-  uint32_t* buffWr    = (uint32_t*)&buffPrioq[(r_FPQ.tsCh>>2)];
+  uint32_t* buffWr    = (uint32_t*)&buffPrioq[(PRIO_CNT_OUT_ALL_GET_1>>2)];
   uint32_t* buffCpu   = (uint32_t*)&buffWr[WR_STATE_SIZE];
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
   char strBuff[65536];
@@ -888,32 +881,21 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
     SNTPRINTF(pSB ,"\u2502 %sFPQ%s                                                                           \u2502\n", KCYN, KNRM);
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    cfg = buffPrioq[r_FPQ.cfgGet>>2];
+    cfg = buffPrioq[PRIO_MODE_GET>>2];
     SNTPRINTF(pSB ,"\u2502 Flags        \u2502 ");
-    if(cfg & r_FPQ.cfg_ENA)            SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & r_FPQ.cfg_FIFO)           SNTPRINTF(pSB ,"   FIFO   ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & r_FPQ.cfg_AUTOPOP)        SNTPRINTF(pSB ,"   APOP   ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & r_FPQ.cfg_AUTOFLUSH_TIME) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & r_FPQ.cfg_AUTOFLUSH_MSGS) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & r_FPQ.cfg_MSG_ARR_TS)     SNTPRINTF(pSB ,"  TS_ARR  ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & 0) SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & 1) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");    
+    if(cfg & 2) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
     SNTPRINTF(pSB ,"   \u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[r_FPQ.dstAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[r_FPQ.ebmAdr>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 ts Adr       \u2502         0x%08x", buffPrioq[r_FPQ.tsAdr>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 ts Ch        \u2502         0x%08x", buffPrioq[r_FPQ.tsCh>>2]);  for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[PRIO_ECA_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[PRIO_EBM_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 Heap Count   \u2502 %18u", buffPrioq[r_FPQ.heapCnt>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 msg CntO     \u2502 %18u", buffPrioq[r_FPQ.msgCntO>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 msg CntI     \u2502 %18u", buffPrioq[r_FPQ.msgCntI>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");  
-    tmp = (((uint64_t)buffPrioq[r_FPQ.tTrnHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tTrnLo>>2]); 
-    SNTPRINTF(pSB ,"\u2502 TTrn         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    tmp = (((uint64_t)buffPrioq[r_FPQ.tDueHi>>2]) <<32) + ((uint64_t)buffPrioq[r_FPQ.tDueLo>>2]);
-    SNTPRINTF(pSB ,"\u2502 TDue         \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    tmp = (((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_1>>2]) <<32) + ((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_0>>2]); 
+    SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 Capacity     \u2502 %18u", buffPrioq[r_FPQ.capacity>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[r_FPQ.msgMax>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[PRIO_TX_MAX_MSGS_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   }
 
