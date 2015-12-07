@@ -304,8 +304,8 @@ begin
       g_gpio_out         => 6,  -- 2xfront end+4xuser leds
       g_lvds_inout       => g_top_lvds_inout_front,
       g_lvds_invert      => true,
-      g_clocks_inout     => g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca,
-      g_triggers_out     => g_top_lvds_out_libera,
+      g_clocks_inout     => 0, -- g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca,
+      g_triggers_out     => 0, -- g_top_lvds_out_libera,
       g_en_pcie          => true,
       g_en_usb           => true,
       g_en_lcd           => true,
@@ -345,10 +345,15 @@ begin
       lvds_o_led_o           => s_lvds_o_led, 
       lvds_oen_o             => s_lvds_oen, 
       
-      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
-      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
-      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
-      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
+--      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
+--      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+--      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
+--      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
+
+      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => open,
+      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => open,
+      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open,
+      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open,
       
 --      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
 --      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
@@ -360,8 +365,11 @@ begin
       mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
       mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
     
-      mtca_libera_trig_p_o   =>lib_trig_p_o,
-      mtca_libera_trig_n_o   =>lib_trig_n_o,
+--      mtca_libera_trig_p_o   =>lib_trig_p_o,
+--      mtca_libera_trig_n_o   =>lib_trig_n_o,
+
+      mtca_libera_trig_p_o   => open,
+      mtca_libera_trig_n_o   => open,
       
       led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
