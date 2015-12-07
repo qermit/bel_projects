@@ -469,8 +469,21 @@ begin
   s_lvds_p_i(4 downto 0) <= lvtio_in_p_i(5 downto 1);
   s_lvds_n_i(4 downto 0) <= lvtio_in_n_i(5 downto 1);
 
-  lvtio_out_p_o(5 downto 1)   <= s_lvds_p_o(4 downto 0);
-  lvtio_out_n_o(5 downto 1)   <= s_lvds_n_o(4 downto 0);
+
+-- disconnecting front pannel outputs from monster  
+--  lvtio_out_p_o(5 downto 1)   <= s_lvds_p_o(4 downto 0);
+--  lvtio_out_n_o(5 downto 1)   <= s_lvds_n_o(4 downto 0);
+  
+  unused_lvtios: for i in 1 to 4 generate
+    hss_obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => lvtio_out_p_o(i),
+        dataout_b => lvtio_out_n_o(i)
+      );  
+  
   
   -- lvds/lvttl lemos output enable
   lvtio_oe_n_o(1) <= '0' when s_lvds_oen(0)='0' else 'Z'; -- LVTTL_IO1
