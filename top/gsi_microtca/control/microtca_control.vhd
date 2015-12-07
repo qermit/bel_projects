@@ -345,16 +345,11 @@ begin
       lvds_o_led_o           => s_lvds_o_led, 
       lvds_oen_o             => s_lvds_oen, 
       
---      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
---      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
---      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
---      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
+      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
+      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
+      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
 
-      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => open,
-      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => open,
-      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open,
-      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open,
-      
 --      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
 --      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
 --      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
@@ -538,6 +533,11 @@ begin
 
 
 
+  -----------------------------------------------------------
+  -- microTCA.4 backplane triggers, inputs and outputs
+  -- outputs driven by lvds ios disconnected to see
+  -- why there is fitter error regarding PLL
+  -----------------------------------------------------------
 
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
@@ -565,7 +565,19 @@ begin
       );
   end generate;
 
-
+  -- usage of backplane ports currently not defined
+  -- therefore only dummy buffers to keep Quartus happy
+  unused_libera_trigs: for i in 0 to 3 generate
+    hss_obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => lib_trig_p_o(i),
+        dataout_b => lib_trig_n_o(i)
+      );
+  end generate;
+  
 
 
   -----------------------------------------------------------
