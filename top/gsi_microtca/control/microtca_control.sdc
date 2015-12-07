@@ -7,7 +7,7 @@ set_clock_groups -asynchronous                           \
  -group { lvttl_clk_i                                  } \
  -group { clk_20m_vcxo_i     main|\dmtd_a5:dmtd_inst|* } \
  -group { clk_125m_local_i   main|\sys_a5:sys_inst|*   } \
- -group { csfp234_ref_clk_i  main|\ref_a5:ref_inst|*     \
+ -group { sfp234_ref_clk_i   main|\ref_a5:ref_inst|*     \
           main|\phy_a5:phy|*.cdr_refclk*                 \
           main|\phy_a5:phy|*.cmu_pll.*                   \
           main|\phy_a5:phy|*|av_tx_pma|*                 \
