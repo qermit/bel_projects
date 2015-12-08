@@ -566,7 +566,17 @@ begin
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
   unused_mlvds_ios: for i in 1 to 8 generate
-    hss_obuf : altera_lvds_obuf
+
+    lvds_inbuf : altera_lvds_ibuf
+        generic map(
+          g_family  => c_family)
+        port map(
+          datain_b  => mlvdio_in_n_i(i),
+          datain    => mlvdio_in_p_i(i),
+          dataout   => open
+        );  
+  
+    lvds_obuf : altera_lvds_obuf
       generic map(
         g_family  => c_family)
       port map(
@@ -579,7 +589,17 @@ begin
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
   unused_tclk_ios: for i in 1 to 4 generate
-    hss_obuf : altera_lvds_obuf
+  
+    lvds_inbuf : altera_lvds_ibuf
+        generic map(
+          g_family  => c_family)
+        port map(
+          datain_b  => tclk_in_n_i(i),
+          datain    => tclk_in_p_i(i),
+          dataout   => open
+        );  
+  
+    lvds_obuf : altera_lvds_obuf
       generic map(
         g_family  => c_family)
       port map(
