@@ -12,9 +12,9 @@ use work.microtca_ctrl_auto_pkg.all;
 entity microtca_control is
   generic(
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
-    g_top_lvds_tclk_mtca   : natural := 1; -- TCLK
-    g_top_lvds_inout_mtca  : natural := 1; -- MicroTCA.4 backplane triggers/gates/clocks(8)
-    g_top_lvds_out_libera  : natural := 1  -- Libera backplane triggers (4) 
+    g_top_lvds_tclk_mtca   : natural := 0; -- TCLK
+    g_top_lvds_inout_mtca  : natural := 0; -- MicroTCA.4 backplane triggers/gates/clocks(8)
+    g_top_lvds_out_libera  : natural := 0  -- Libera backplane triggers (4) 
   );
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
