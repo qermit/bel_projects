@@ -1658,17 +1658,17 @@ c4: eca_ac_wbm
       dat_o        => lvds_i(f_sub1(g_clocks_inout+g_lvds_inout+g_lvds_in) downto 0),
       lvds_p_i((g_lvds_inout+g_lvds_in)-1 downto 0)                                       => lvds_p_i,
       lvds_n_i((g_lvds_inout+g_lvds_in)-1 downto 0)                                       => lvds_n_i,
---      lvds_p_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_p_i,
---      lvds_n_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_n_i,
+      lvds_p_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_p_i,
+      lvds_n_i((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in)) => mtca_clocks_n_i,
       lvds_i_led_o((g_lvds_inout+g_lvds_in)-1 downto 0) => lvds_i_led_o,
       --dat_i        => lvds_o(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
       dat_i        => lvds_dat(f_sub1(g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_out) downto 0),
       lvds_p_o((g_lvds_inout+g_lvds_in)-1 downto 0)     => lvds_p_o,
       lvds_n_o((g_lvds_inout+g_lvds_in)-1 downto 0)     => lvds_n_o,
---      lvds_p_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_p_o,
---      lvds_n_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_n_o,
-      lvds_p_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_p_o,
-      lvds_n_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_n_o,
+      lvds_p_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_p_o,
+      lvds_n_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_n_o,
+--      lvds_p_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_p_o,
+--      lvds_n_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_n_o,
       
       lvds_o_led_o((g_lvds_inout+g_lvds_in)-1 downto 0) => lvds_o_led_o);
   
