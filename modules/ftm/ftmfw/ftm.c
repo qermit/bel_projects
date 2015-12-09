@@ -228,22 +228,23 @@ inline int dispatch(t_ftmMsg* pMsg)
    uint32_t msgCnt, stat; 
    stat = pFtmIf->status;
    
-   
+
+
   //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
   atomic_on();
-  *pFpqData = hiW(pMsg->id);
-  *pFpqData = loW(pMsg->id);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = hiW(pMsg->id);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = loW(pMsg->id);
   #if DEBUGTIME == 1
-  *pFpqData = hiW(then) | 0xff000000;
-  *pFpqData = loW(then);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = hiW(then) | 0xff000000;
+  *(pFpqData + (PRIO_DAT_STD>>2))   = loW(then);
   #else
-  *pFpqData = hiW(pMsg->par);
-  *pFpqData = loW(pMsg->par);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = hiW(pMsg->par);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = loW(pMsg->par);
   #endif
-  *pFpqData = pMsg->tef;
-  *pFpqData = pMsg->res;
-  *pFpqData = hiW(pMsg->ts);
-  *pFpqData = loW(pMsg->ts);
+  *(pFpqData + (PRIO_DAT_STD>>2))   = pMsg->tef;
+  *(pFpqData + (PRIO_DAT_STD>>2))   = pMsg->res;
+  *(pFpqData + (PRIO_DAT_TS_HI>>2)) = hiW(pMsg->ts);
+  *(pFpqData + (PRIO_DAT_TS_LO>>2)) = loW(pMsg->ts);
   atomic_off();
   msgCnt = (stat >> 16); 
   pFtmIf->status = (stat & 0x0000ffff) | ((msgCnt+1) << 16);
