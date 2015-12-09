@@ -14,7 +14,7 @@ entity microtca_control is
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
     g_top_lvds_tclk_mtca   : natural := 0; -- TCLK
     g_top_lvds_inout_mtca  : natural := 0; -- MicroTCA.4 backplane triggers/gates/clocks(8)
-    g_top_lvds_out_libera  : natural := 0  -- Libera backplane triggers (4) 
+    g_top_lvds_out_libera  : natural := 4  -- Libera backplane triggers (4) 
   );
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
@@ -84,7 +84,7 @@ entity microtca_control is
     lvtio_led_dir_o  : out std_logic_vector(5 downto 1);
 
     -- enable clock input from front panel LEMO
-    lvtclk_in_en_o   : out std_logic;
+    lvttl_in_clk_en_n_o   : out std_logic;
 
     -----------------------------------------------------------------------
     -- lvds/lvds libera triggers on backplane
@@ -374,8 +374,8 @@ begin
       mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
       mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
     
---      mtca_libera_trig_p_o   =>lib_trig_p_o,
---      mtca_libera_trig_n_o   =>lib_trig_n_o,
+      mtca_libera_trig_p_o   =>lib_trig_p_o,
+      mtca_libera_trig_n_o   =>lib_trig_n_o,
 
       mtca_libera_trig_p_o   => open,
       mtca_libera_trig_n_o   => open,
@@ -442,7 +442,7 @@ begin
 
   mmc_i2c_sda_io  <= 'Z'; -- mmc's I2C bus
 
-  lvtclk_in_en_o <= s_wr_ext_in;
+  lvttl_in_clk_en_n_o <= s_wr_ext_in;
 
 
   
@@ -620,16 +620,16 @@ begin
 
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
-  unused_libera_trigs: for i in 0 to 3 generate
-    hss_obuf : altera_lvds_obuf
-      generic map(
-        g_family  => c_family)
-      port map(
-        datain    => '0',
-        dataout   => lib_trig_p_o(i),
-        dataout_b => lib_trig_n_o(i)
-      );
-  end generate;
+--  unused_libera_trigs: for i in 0 to 3 generate
+--    hss_obuf : altera_lvds_obuf
+--      generic map(
+--        g_family  => c_family)
+--      port map(
+--        datain    => '0',
+--        dataout   => lib_trig_p_o(i),
+--        dataout_b => lib_trig_n_o(i)
+--      );
+--  end generate;
   
 
 

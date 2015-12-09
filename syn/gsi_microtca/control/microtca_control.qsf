@@ -443,6 +443,9 @@ set_location_assignment PIN_D4 -to lvtio_oe_n_o[3]
 set_location_assignment PIN_B4 -to lvtio_oe_n_o[4]
 set_location_assignment PIN_A4 -to lvtio_oe_n_o[5]
 
+set_location_assignment PIN_B3 -to lvttl_in_clk_en_n_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to lvttl_in_clk_en_n_o
+
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to lvtio_oe_n_o[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to lvtio_oe_n_o[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to lvtio_oe_n_o[3]
@@ -1325,6 +1328,8 @@ set_global_assignment -name VERILOG_FILE "../../../ip_cores/pci-core/src/hdl/ver
 set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_eca/eca_search.vhd"
 set_global_assignment -name QIP_FILE ../../../modules/nau8811/src/hdl/altera_pll/audio_pll_ref.qip
 set_global_assignment -name VHDL_FILE ../../../modules/chopper/Debounce_Skal.vhd
+
+
 
 
 
