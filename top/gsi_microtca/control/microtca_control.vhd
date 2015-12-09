@@ -155,6 +155,9 @@ entity microtca_control is
     mmc_quiesce_out_i       : in  std_logic; -- mmc alert to fpga that amc will be powered off
     mmc_quiesce_in_o        : out std_logic; -- fpga reply to mmc that is ready for power down
 
+    mmc_i2c_sda_io          : inout std_logic; -- mmc's I2C bus
+    mmc_i2c_clk_i           : in    std_logic; -- mmc's I2C bus
+
     -----------------------------------------------------------------------
     -- usb
     -----------------------------------------------------------------------
@@ -436,6 +439,13 @@ begin
   );
  
   sfp_tx_dis_o <= '0'; -- SFP always enabled
+
+  mmc_i2c_sda_io  <= 'Z'; -- mmc's I2C bus
+  mmc_i2c_clk_i   <= 'Z'; -- mmc's I2C bus
+
+  lvtclk_in_en_o <= s_wr_ext_in;
+
+
   
   -- Link LEDs
   dis_wr_o    <= '0';

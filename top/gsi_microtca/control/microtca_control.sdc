@@ -4,7 +4,7 @@ derive_clock_uncertainty
 # Cut the clock domains from each other
 set_clock_groups -asynchronous                           \
  -group { altera_reserved_tck                          } \
- -group { lvttl_clk_i                                  } \
+ -group { lvtclk_i                                     } \
  -group { clk_20m_vcxo_i     main|\dmtd_a5:dmtd_inst|* } \
  -group { clk_125m_local_i   main|\sys_a5:sys_inst|*   } \
  -group { sfp234_ref_clk_i   main|\ref_a5:ref_inst|*     \
@@ -22,12 +22,12 @@ set_clock_groups -asynchronous                           \
           main|\pcie_y:pcie|*|inst_av_pcs|*|tx*        } \
  -group { main|\pcie_y:pcie|*|rx_pmas[0]*|clk90bdes      \
           main|\pcie_y:pcie|*|rx_pmas[0]*|clk90b       } \
-# -group { main|\pcie_y:pcie|*|rx_pmas[1]*|clk90bdes      \
-#          main|\pcie_y:pcie|*|rx_pmas[1]*|clk90b       } \
-# -group { main|\pcie_y:pcie|*|rx_pmas[2]*|clk90bdes      \
-#          main|\pcie_y:pcie|*|rx_pmas[2]*|clk90b       } \
-# -group { main|\pcie_y:pcie|*|rx_pmas[3]*|clk90bdes      \
-#          main|\pcie_y:pcie|*|rx_pmas[3]*|clk90b       } \
+ -group { main|\pcie_y:pcie|*|rx_pmas[1]*|clk90bdes      \
+          main|\pcie_y:pcie|*|rx_pmas[1]*|clk90b       } \
+ -group { main|\pcie_y:pcie|*|rx_pmas[2]*|clk90bdes      \
+          main|\pcie_y:pcie|*|rx_pmas[2]*|clk90b       } \
+ -group { main|\pcie_y:pcie|*|rx_pmas[3]*|clk90bdes      \
+          main|\pcie_y:pcie|*|rx_pmas[3]*|clk90b       } \
  -group { main|\pcie_y:pcie|*|coreclkout               }
 
 # cut: wb sys <=> wb flash   (different frequencies and using xwb_clock_crossing)

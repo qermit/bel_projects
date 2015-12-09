@@ -149,6 +149,18 @@ set_location_assignment PIN_V1 -to mmc2fpga_usr_i[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc2fpga_usr_i[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc2fpga_usr_i[2]
 
+set_location_assignment PIN_R5 -to mmc_quiesce_out_i
+set_location_assignment PIN_T4 -to mmc_quiesce_in_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_quiesce_out_i
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_quiesce_in_o
+
+set_location_assignment PIN_U6 -to mmc_i2c_sda_io
+set_location_assignment PIN_V2 -to mmc_i2c_clk_i
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_i2c_sda_io
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_i2c_clk_i
+
+set_location_assignment PIN_T7 -to mmc_pcie_en_i
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to mmc_pcie_en_i
 
 
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_ai_i[1]
@@ -327,17 +339,19 @@ set_location_assignment PIN_J24 -to sfp_txp_o
 set_location_assignment PIN_J23 -to "sfp_txp_o(n)"
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to sfp_txp_o
 
-set_location_assignment PIN_A22 -to sfp_los
-set_location_assignment PIN_E19 -to sfp_tx_fault
-
-set_location_assignment PIN_D19 -to sfp_mod0
-set_location_assignment PIN_C19 -to sfp_mod1
-set_location_assignment PIN_B19 -to sfp_mod2
-set_location_assignment PIN_F19 -to sfp_tx_dis_o
 set_location_assignment PIN_N19 -to "sfp234_ref_clk_i(n)"
 set_location_assignment PIN_N18 -to sfp234_ref_clk_i
 set_instance_assignment -name IO_STANDARD LVDS -to "sfp234_ref_clk_i(n)"
 set_instance_assignment -name IO_STANDARD LVDS -to sfp234_ref_clk_i
+
+set_location_assignment PIN_D19 -to sfp_mod0
+set_location_assignment PIN_C19 -to sfp_mod1
+set_location_assignment PIN_B19 -to sfp_mod2
+
+set_location_assignment PIN_F19 -to sfp_tx_dis_o
+set_location_assignment PIN_A22 -to sfp_los_i
+set_location_assignment PIN_E19 -to sfp_tx_fault_i
+
 
 set_location_assignment PIN_B16 -to lvtclk_i
 set_location_assignment PIN_C17 -to "lvtclk_i(n)"
