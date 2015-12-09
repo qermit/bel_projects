@@ -754,12 +754,13 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
 
   // read EBM status
   ftmRamRead(p->ebmAdr + EBM_REG_STATUS, (const uint8_t*)&buff[EBM_REG_STATUS>>2], EBM_REG_LAST, BIG_ENDIAN);
-  ftmRamRead(p->prioQAdr + PRIO_MODE_GET, (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_MODE_GET)>>2], 4, BIG_ENDIAN);
+  
   offset += EBM_REG_LAST>>2; //advance offset
 
 
   // read PrioQ status
-  ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET, (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
+  ftmRamRead(p->prioQAdr + PRIO_MODE_GET,     (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_MODE_GET)>>2],    4,                                            BIG_ENDIAN);
+  ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET,  (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
   offset += PRIO_CNT_OUT_ALL_GET_1>>2; //advance offset
 
 
@@ -883,9 +884,9 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     cfg = buffPrioq[PRIO_MODE_GET>>2];
     SNTPRINTF(pSB ,"\u2502 Flags        \u2502 ");
-    if(cfg & 0) SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
-    if(cfg & 1) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");    
-    if(cfg & 2) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & 0x1) SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
+    if(cfg & 0x2) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");    
+    if(cfg & 0x4) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
     SNTPRINTF(pSB ,"   \u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[PRIO_ECA_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
