@@ -12,10 +12,16 @@
 #include "prio_regs.h"
 
 
-#define PRIO_BIT_ENABLE     0
-#define PRIO_BIT_MSG_LIMIT  1
-#define PRIO_BIT_TIME_LIMIT 2
+#define PRIO_BIT_ENABLE     (1<<0)
+#define PRIO_BIT_MSG_LIMIT  (1<<1)
+#define PRIO_BIT_TIME_LIMIT (1<<2)
 
+#define PRIO_DAT_STD     0x00
+#define PRIO_DAT_TS_HI   0x04    
+#define PRIO_DAT_TS_LO   0x08 
+#define PRIO_DRP_TS_HI   0x14    
+#define PRIO_DRP_TS_LO   0x18  
+   
 
 uint32_t cmdCnt;
 
