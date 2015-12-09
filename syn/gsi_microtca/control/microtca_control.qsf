@@ -340,7 +340,7 @@ set_location_assignment PIN_J23 -to "sfp_txp_o(n)"
 set_instance_assignment -name IO_STANDARD "1.5-V PCML" -to sfp_txp_o
 
 set_location_assignment PIN_A22 -to sfp_los_i
-set_location_assignment PIN_E19 -to sfp_tx_fault
+set_location_assignment PIN_E19 -to sfp_tx_fault_i
 
 set_location_assignment PIN_D19 -to sfp_mod0
 set_location_assignment PIN_C19 -to sfp_mod1
