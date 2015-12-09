@@ -357,7 +357,7 @@ begin
    
    s_ext_prioq_cyc <= lm32_cb_master_out(c_lm32_prioq).cyc or (r_cyc and r_cyc_atomic);
    
-   prioq_master_o.cyc <= s_ext_clu_cyc; -- atomic does not raise cyc, but keeps it HI. 
+   prioq_master_o.cyc <= s_ext_prioq_cyc; -- atomic does not raise cyc, but keeps it HI. 
    prioq_master_o.stb <= lm32_cb_master_out(c_lm32_prioq).stb;                             -- write LO to r_cyc_atomic to deassert
    prioq_master_o.we  <= lm32_cb_master_out(c_lm32_prioq).we;
    prioq_master_o.sel <= lm32_cb_master_out(c_lm32_prioq).sel;
