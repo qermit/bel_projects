@@ -12,8 +12,8 @@ use work.microtca_ctrl_auto_pkg.all;
 entity microtca_control is
   generic(
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
-    g_top_lvds_tclk_mtca   : natural := 0; -- TCLK
-    g_top_lvds_inout_mtca  : natural := 8; -- MicroTCA.4 backplane triggers/gates/clocks(8)
+    g_top_lvds_tclk_mtca   : natural := 4; -- TCLK
+    g_top_lvds_inout_mtca  : natural := 0; -- MicroTCA.4 backplane triggers/gates/clocks(8)
     g_top_lvds_out_libera  : natural := 0  -- Libera backplane triggers (4) 
   );
   port(
@@ -348,10 +348,10 @@ begin
       lvds_o_led_o           => s_lvds_o_led, 
       lvds_oen_o             => s_lvds_oen, 
       
-      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
-      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
---      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
---      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
+--      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
+--      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
+      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
 
 --      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => (others => '0'), -- mlvdio_in_p_i(8 downto 1),
 --      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => (others => '1'), -- mlvdio_in_n_i(8 downto 1),
@@ -360,19 +360,19 @@ begin
 
 --      mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => open, -- mlvdio_in_p_i(8 downto 1),
 --      mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => open, -- mlvdio_in_n_i(8 downto 1),
-      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open, -- tclk_in_p_i(4 downto 1),
-      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open, -- tclk_in_n_i(4 downto 1),
+--      mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open, -- tclk_in_p_i(4 downto 1),
+--      mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => open, -- tclk_in_n_i(4 downto 1),
       
       
-      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
-      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
---      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
---      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+--      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
+--      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
   
 --      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => open,
 --      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => open,
-      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
-      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+--      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+--      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
     
 --      mtca_libera_trig_p_o   =>lib_trig_p_o,
 --      mtca_libera_trig_n_o   =>lib_trig_n_o,
@@ -574,37 +574,14 @@ begin
 
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
---  unused_mlvds_ios: for i in 1 to 8 generate
---
---    lvds_inbuf : altera_lvds_ibuf
---        generic map(
---          g_family  => c_family)
---        port map(
---          datain_b  => mlvdio_in_n_i(i),
---          datain    => mlvdio_in_p_i(i),
---          dataout   => open
---        );  
---  
---    lvds_obuf : altera_lvds_obuf
---      generic map(
---        g_family  => c_family)
---      port map(
---        datain    => '0',
---        dataout   => mlvdio_out_p_o(i),
---        dataout_b => mlvdio_out_n_o(i)
---      );
---  end generate;
+  unused_mlvds_ios: for i in 1 to 8 generate
 
-  -- usage of backplane ports currently not defined
-  -- therefore only dummy buffers to keep Quartus happy
-  unused_tclk_ios: for i in 1 to 4 generate
-  
     lvds_inbuf : altera_lvds_ibuf
         generic map(
           g_family  => c_family)
         port map(
-          datain_b  => tclk_in_n_i(i),
-          datain    => tclk_in_p_i(i),
+          datain_b  => mlvdio_in_n_i(i),
+          datain    => mlvdio_in_p_i(i),
           dataout   => open
         );  
   
@@ -613,10 +590,33 @@ begin
         g_family  => c_family)
       port map(
         datain    => '0',
-        dataout   => tclk_out_p_o(i),
-        dataout_b => tclk_out_n_o(i)
+        dataout   => mlvdio_out_p_o(i),
+        dataout_b => mlvdio_out_n_o(i)
       );
   end generate;
+
+  -- usage of backplane ports currently not defined
+  -- therefore only dummy buffers to keep Quartus happy
+--  unused_tclk_ios: for i in 1 to 4 generate
+--  
+--    lvds_inbuf : altera_lvds_ibuf
+--        generic map(
+--          g_family  => c_family)
+--        port map(
+--          datain_b  => tclk_in_n_i(i),
+--          datain    => tclk_in_p_i(i),
+--          dataout   => open
+--        );  
+--  
+--    lvds_obuf : altera_lvds_obuf
+--      generic map(
+--        g_family  => c_family)
+--      port map(
+--        datain    => '0',
+--        dataout   => tclk_out_p_o(i),
+--        dataout_b => tclk_out_n_o(i)
+--      );
+--  end generate;
 
   -- usage of backplane ports currently not defined
   -- therefore only dummy buffers to keep Quartus happy
