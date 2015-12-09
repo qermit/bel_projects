@@ -84,7 +84,7 @@ entity microtca_control is
     lvtio_led_dir_o  : out std_logic_vector(5 downto 1);
 
     -- enable clock input from front panel LEMO
-    lvtclk_in_en_o   : out std_logic;
+    lvttl_in_clk_en_n_o   : out std_logic;
 
     -----------------------------------------------------------------------
     -- lvds/lvds libera triggers on backplane
@@ -154,6 +154,9 @@ entity microtca_control is
 
     mmc_quiesce_out_i       : in  std_logic; -- mmc alert to fpga that amc will be powered off
     mmc_quiesce_in_o        : out std_logic; -- fpga reply to mmc that is ready for power down
+
+    mmc_i2c_sda_io          : inout std_logic; -- mmc's I2C bus
+    mmc_i2c_clk_i           : in    std_logic; -- mmc's I2C bus
 
     -----------------------------------------------------------------------
     -- usb
@@ -350,16 +353,11 @@ begin
       mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
       mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
       
---      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
---      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
---      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
---      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
+      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
   
-      mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => open,
-      mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => open,
-      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
-      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
-    
       mtca_libera_trig_p_o   =>lib_trig_p_o,
       mtca_libera_trig_n_o   =>lib_trig_n_o,
       
@@ -422,6 +420,12 @@ begin
   );
  
   sfp_tx_dis_o <= '0'; -- SFP always enabled
+
+  mmc_i2c_sda_io  <= 'Z'; -- mmc's I2C bus
+
+  lvttl_in_clk_en_n_o <= s_wr_ext_in;
+
+
   
   -- Link LEDs
   dis_wr_o    <= '0';
@@ -506,7 +510,7 @@ begin
   mlvdio_fsen_o <= '1'; 
 
 
-  -- usage of backplane ports currently not defined
+  -- usage of backplane ports 12-15 currently not defined
   -- therefore only dummy buffers to keep Quartus happy
   unused_hss_ios: for i in 1 to 4 generate
     hss_obuf : altera_lvds_obuf
@@ -530,43 +534,13 @@ begin
 
 
 
-
-  -- usage of backplane ports currently not defined
-  -- therefore only dummy buffers to keep Quartus happy
-  unused_mlvds_ios: for i in 1 to 8 generate
-    hss_obuf : altera_lvds_obuf
-      generic map(
-        g_family  => c_family)
-      port map(
-        datain    => '0',
-        dataout   => mlvdio_out_p_o(i),
-        dataout_b => mlvdio_out_n_o(i)
-      );
-  end generate;
-
-  -- usage of backplane ports currently not defined
-  -- therefore only dummy buffers to keep Quartus happy
-  unused_tclk_ios: for i in 1 to 4 generate
-    hss_obuf : altera_lvds_obuf
-      generic map(
-        g_family  => c_family)
-      port map(
-        datain    => '0',
-        dataout   => tclk_out_p_o(i),
-        dataout_b => tclk_out_n_o(i)
-      );
-  end generate;
-
-
-
-
   -----------------------------------------------------------
   -- Libera outputs
   -----------------------------------------------------------
 
   -- no intputs from Libera backplane, outputs only
   -- trigger outputs to backplane for Libera
-
+  -- connected directly to monster
 
 
   ----------------------------------------------
