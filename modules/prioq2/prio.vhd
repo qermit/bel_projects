@@ -98,7 +98,8 @@ architecture rtl of prio is
   signal s_ctrl_cnt_in_i        : matrix(g_num_masters-1 downto 0, 32-1 downto 0); -- Incoming messages per Channel
   
   signal s_ts_valid_o           : std_logic;
-  signal s_ts_o                 : std_logic_vector(64-1 downto 0);  
+  signal s_ts_o                 : std_logic_vector(64-1 downto 0);
+  signal r_late_check           : unsigned(64-1 downto 0); 
   signal s_arbiter_dst          : std_logic_vector(32-1 downto 0);
  
   -- aux and fsm signals 
@@ -108,7 +109,7 @@ architecture rtl of prio is
   signal r_state                : t_state;
   signal r_state_after_wait     : t_state;
   signal r_allow_sending        : std_logic;
-  signal r_ts_first             : unsigned(64-1 downto 0); 
+  signal r_dhol                 : unsigned(64-1 downto 0); 
   signal r_msg_cnt              : unsigned(7 downto 0); 
   signal r_cnt_late             : std_logic_vector(31 downto 0);
 
@@ -128,7 +129,7 @@ begin
         s_ebm_ctrl_o.sel  <= (others => '1');        
         s_ebm_ctrl_o.adr  <= (others => '0');
         s_ebm_ctrl_o.dat  <= (others => '0');
-        r_ts_first        <= (others => '0');
+        r_dhol        <= (others => '0');
         r_allow_sending   <= '0';
         r_cnt_late        <= (others => '0');
         s_ctrl_st_late_i  <= (others => '0');
@@ -136,6 +137,9 @@ begin
         r_state           <= st_PACKET_PREP;
         --r_state           <= st_EBM_CLEAR;
       else
+
+        r_late_check <= unsigned(s_ts_o) + unsigned(s_ctrl_offs_late_o);
+  
         v_state := r_state;
         
         case r_state is
@@ -153,15 +157,14 @@ begin
           when st_PACKET_EMPTY  =>  if(s_ctrl_mode_o(c_ENABLE) = '0') then
                                       v_state := st_IDLE;  
                                     elsif s_ts_valid_o = '1' then
-                                      r_ts_first  <= unsigned(s_ts_o);
+                                      r_dhol  <= unsigned(s_ts_o) + resize(unsigned(s_ctrl_tx_max_wait_o), s_ts_o'length);
                                         
                                       v_state := st_PACKET_GATHER;
                                     end if;
                                            
                                     
           when st_PACKET_GATHER =>  --time limit reached?    
-                                    if ((r_ts_first + unsigned(s_ctrl_tx_max_wait_o)) <= unsigned(time_i))
-                                    and s_ctrl_mode_o(c_TIME_LIMIT) = '1' then
+                                    if (r_dhol  <= unsigned(time_i)) and s_ctrl_mode_o(c_TIME_LIMIT) = '1' then
                                       v_state := st_PACKET_SEND;
                                     end if;
                                     --message limit reached?
@@ -231,7 +234,7 @@ begin
 
         if (s_ts_valid_o and r_allow_sending) = '1' then
           r_msg_cnt <= r_msg_cnt + 1;
-          if (unsigned(s_ts_o) + unsigned(s_ctrl_offs_late_o)) <= unsigned(time_i) then
+          if r_late_check <= unsigned(time_i) then
             -- this message is late
             s_ctrl_st_late_i(0) <= '1';
             r_cnt_late          <= std_logic_vector(unsigned(r_cnt_late) +1);
@@ -330,5 +333,10 @@ begin
     cnt_in_i          => s_ctrl_cnt_in_i,
     ctrl_i            => ctrl_i,
     ctrl_o            => ctrl_o   );
+
+
+
+
+
 
 end architecture;

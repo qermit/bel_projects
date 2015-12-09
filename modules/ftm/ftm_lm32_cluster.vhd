@@ -147,6 +147,9 @@ architecture rtl of ftm_lm32_cluster is
    signal clu_cbar_masterport_out  : t_wishbone_master_out_array (c_clu_slaves-1 downto 0);
    signal clu_cbar_slaveport_in    : t_wishbone_slave_in_array   (c_clu_masters-1 downto 0);
    signal clu_cbar_slaveport_out   : t_wishbone_slave_out_array  (c_clu_masters-1 downto 0);
+
+   signal clu_master_in   : t_wishbone_master_in_array  (c_clu_slaves-1 downto 0);
+   signal clu_master_out  : t_wishbone_master_out_array (c_clu_slaves-1 downto 0); 
    ------------------------------------------------------------------------------
    
    signal s_rst_lm32_n,
@@ -159,6 +162,9 @@ architecture rtl of ftm_lm32_cluster is
 
    signal prioq_slaves_in    : t_wishbone_slave_in_array(g_cores-1 downto 0);
    signal prioq_slaves_out   : t_wishbone_slave_out_array(g_cores-1 downto 0); 
+
+   signal prioq_masters_in    : t_wishbone_master_in_array(g_cores-1 downto 0);
+   signal prioq_masters_out   : t_wishbone_master_out_array(g_cores-1 downto 0);  
 
 
    begin
@@ -181,11 +187,11 @@ architecture rtl of ftm_lm32_cluster is
 
                tm_tai8ns_i    => tm_tai8ns_ref_i,            
                
-               prioq_master_o => prioq_slaves_in (I), 
-               prioq_master_i => prioq_slaves_out (I), 
+               prioq_master_o => prioq_masters_out (I),
+               prioq_master_i => prioq_masters_in (I),  
 
-               clu_master_o   => clu_cbar_slaveport_in (I), 
-               clu_master_i   => clu_cbar_slaveport_out (I),
+               clu_master_o   => clu_master_out (I), 
+               clu_master_i   => clu_master_in (I),
                --LM32               
                world_master_o => world_cbar_slaveport_in  (I),
                world_master_i => world_cbar_slaveport_out (I), 
@@ -198,6 +204,28 @@ architecture rtl of ftm_lm32_cluster is
    
                -------------------------------------------------------------------------------------------------------------------------------------- 
          
+
+          lm32_prio : xwb_register_link
+          port map(
+            clk_sys_i     => clk_ref_i,
+            rst_n_i       => rst_ref_n_i,
+            slave_i       => prioq_masters_out (I),
+            slave_o       => prioq_masters_in (I),
+            master_i      => prioq_slaves_out(I),
+            master_o      => prioq_slaves_in (I)
+          );
+
+          lm32_clu : xwb_register_link
+          port map(
+            clk_sys_i     => clk_ref_i,
+            rst_n_i       => rst_ref_n_i,
+            slave_i       => clu_master_out (I),
+            slave_o       => clu_master_in (I),
+            master_i      => clu_cbar_slaveport_out (I),
+            master_o      => clu_cbar_slaveport_in (I)
+          );
+
+
       end generate G1;  
 
 -- must be transparent, NOT SDB
