@@ -441,7 +441,6 @@ begin
   sfp_tx_dis_o <= '0'; -- SFP always enabled
 
   mmc_i2c_sda_io  <= 'Z'; -- mmc's I2C bus
-  mmc_i2c_clk_i   <= 'Z'; -- mmc's I2C bus
 
   lvtclk_in_en_o <= s_wr_ext_in;
 
