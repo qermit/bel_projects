@@ -119,13 +119,15 @@ void discoverPeriphery(void)
   pCpuSysTime    = find_device_adr(GSI, CPU_SYSTEM_TIME);
   pCpuIrqSlave   = find_device_adr(GSI, CPU_MSI_CTRL_IF);   
   pCpuTimer      = find_device_adr(GSI, CPU_TIMER_CTRL_IF);
-   
+  pFpqData       = find_device_adr(GSI, FTM_PRIOQ_DATA);   
+
+ 
   find_device_multi(&found_sdb[0], &idx, 20, GSI, LM32_CB_CLUSTER);
   pCluCB         = (uint32_t*)getSdbAdr(&found_sdb[0]);
   pSharedRam     = find_device_adr_in_subtree(&found_sdb[0], GSI, LM32_RAM_SHARED);
   pCluInfo       = find_device_adr_in_subtree(&found_sdb[0], GSI, CLU_INFO_ROM);
   pFpqCtrl       = find_device_adr_in_subtree(&found_sdb[0], GSI, FTM_PRIOQ_CTRL); 
-  pFpqData       = find_device_adr_in_subtree(&found_sdb[0], GSI, FTM_PRIOQ_DATA); 
+  
    
   pOledDisplay   = find_device_adr(GSI, OLED_DISPLAY);  
   idx = 0;
