@@ -1248,7 +1248,8 @@ begin
       serr_io       => pmc_serr_io,
       inta_o        => pmc_inta_o,
       req_o         => pmc_req_o,
-      gnt_i         => pmc_gnt_i
+      gnt_i         => pmc_gnt_i,
+      debug_i       => (others => '0')
 );
   end generate;
   
