@@ -572,6 +572,19 @@ begin
   -- no intputs from Libera backplane, outputs only
   -- trigger outputs to backplane for Libera
   -- connected directly to monster
+  
+  -- only dummy buffers to keep Quartus happy
+  libera_triggers: for i in 0 to 3 generate
+    obuf : altera_lvds_obuf
+      generic map(
+        g_family  => c_family)
+      port map(
+        datain    => '0',
+        dataout   => lib_trig_p_o(i),
+        dataout_b => lib_trig_n_o(i)
+      );
+
+  end generate;  
 
 
   ----------------------------------------------
