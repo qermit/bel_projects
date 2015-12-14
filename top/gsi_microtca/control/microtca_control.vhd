@@ -14,7 +14,7 @@ entity microtca_control is
     g_top_lvds_inout_front : natural := 5; -- front end lemos(5)
     g_top_lvds_tclk_mtca   : natural := 4; -- TCLK
     g_top_lvds_inout_mtca  : natural := 8; -- MicroTCA.4 backplane triggers/gates/clocks(8)
-    g_top_lvds_out_libera  : natural := 0  -- Libera backplane triggers (4) 
+    g_top_lvds_out_libera  : natural := 4  -- Libera backplane triggers (4) 
   );
   port(
     clk_20m_vcxo_i      : in std_logic;  -- 20MHz VCXO clock
@@ -355,15 +355,17 @@ begin
       
       mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
       mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
-
       mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
       mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
 
---      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
---      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+		mtca_libera_trig_p_o => lib_trig_p_o,
+		mtca_libera_trig_n_o => lib_trig_n_o,
+	 
+--    mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
+--    mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
   
---      mtca_libera_trig_p_o   =>lib_trig_p_o,
---      mtca_libera_trig_n_o   =>lib_trig_n_o,
+    --mtca_libera_trig_p_o   =>lib_trig_p_o,
+    --mtca_libera_trig_n_o   =>lib_trig_n_o,
 
 --      mtca_libera_trig_p_o   => open,
 --      mtca_libera_trig_n_o   => open,
@@ -573,18 +575,18 @@ begin
   -- trigger outputs to backplane for Libera
   -- connected directly to monster
   
-  -- only dummy buffers to keep Quartus happy
-  libera_triggers: for i in 0 to 3 generate
-    obuf : altera_lvds_obuf
-      generic map(
-        g_family  => c_family)
-      port map(
-        datain    => '0',
-        dataout   => lib_trig_p_o(i),
-        dataout_b => lib_trig_n_o(i)
-      );
-
-  end generate;  
+--  -- only dummy buffers to keep Quartus happy
+--  libera_triggers: for i in 0 to 3 generate
+--    obuf : altera_lvds_obuf
+--      generic map(
+--        g_family  => c_family)
+--      port map(
+--        datain    => '0',
+--        dataout   => lib_trig_p_o(i),
+--        dataout_b => lib_trig_n_o(i)
+--      );
+--
+--  end generate;  
 
 
   ----------------------------------------------

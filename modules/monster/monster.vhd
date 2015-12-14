@@ -1668,8 +1668,8 @@ c4: eca_ac_wbm
       lvds_n_o((g_lvds_inout+g_lvds_in)-1 downto 0)     => lvds_n_o,
       lvds_p_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_p_o,
       lvds_n_o((g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_lvds_inout+g_lvds_in))     => mtca_clocks_n_o,
---      lvds_p_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_p_o,
---      lvds_n_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_n_o,
+      lvds_p_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_p_o,
+      lvds_n_o((g_triggers_out+g_clocks_inout+g_lvds_inout+g_lvds_in)-1 downto (g_clocks_inout+g_lvds_inout+g_lvds_in))     => mtca_libera_trig_n_o,
       
       lvds_o_led_o((g_lvds_inout+g_lvds_in)-1 downto 0) => lvds_o_led_o);
   
