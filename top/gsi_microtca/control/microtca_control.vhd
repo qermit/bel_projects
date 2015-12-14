@@ -356,8 +356,8 @@ begin
       mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
       mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
 
---      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
---      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
+      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
+      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
 
 --      mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
 --      mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
@@ -517,17 +517,17 @@ begin
   mlvdio_fsen_o <= '1'; 
 
 
-  -- usage of backplane ports 12-15 currently not defined
-  -- therefore only dummy buffers to keep Quartus happy
-  unused_tclk_ios: for i in 1 to 4 generate
-    obuf : altera_lvds_obuf
-      generic map(
-        g_family  => c_family)
-      port map(
-        datain    => '0',
-        dataout   => tclk_out_p_o(i),
-        dataout_b => tclk_out_n_o(i)
-      );
+--  -- usage of backplane ports 12-15 currently not defined
+--  -- therefore only dummy buffers to keep Quartus happy
+--  unused_tclk_ios: for i in 1 to 4 generate
+--    obuf : altera_lvds_obuf
+--      generic map(
+--        g_family  => c_family)
+--      port map(
+--        datain    => '0',
+--        dataout   => tclk_out_p_o(i),
+--        dataout_b => tclk_out_n_o(i)
+--      );
 
 --    inbuf : altera_lvds_ibuf
 --        generic map(
@@ -537,7 +537,7 @@ begin
 --          datain    => hss_rx_p_i(i),
 --          dataout   => open
 --        );
-  end generate;
+--  end generate;
 
 
 
