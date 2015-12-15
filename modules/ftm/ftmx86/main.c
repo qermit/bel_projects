@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
    if (!strcasecmp(command, "status")) {
   
     uint32_t* stateBuff = (uint32_t*)malloc(STATUS_BUF_SIZE);
-    ftmFetchStatus(stateBuff, STATUS_BUF_SIZE/4);
+    ftmFetchStatus(stateBuff, STATUS_BUF_SIZE);
     printf("%s### FTM @ %s - %u Cores ####%s\n", KCYN, netaddress, p->cpuQty, KNRM);
     ftmShowStatus(targetCpus, stateBuff, verbose);
     free(stateBuff);

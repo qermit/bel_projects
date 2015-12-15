@@ -1,6 +1,7 @@
+EBMPATH   = ../../../ip_cores/etherbone-core/hdl/eb_master_core
 PRIOPATH  = ../../../modules/prioq2
 XMLPATH   = /usr/include/libxml2
-FLAGS   = -fPIC -Wall -O2 -g -I$(PRIOPATH) -I$(XMLPATH)
+FLAGS   = -fPIC -Wall -O2 -g -I$(PRIOPATH) -I$(EBMPATH) -I$(XMLPATH)
 CFLAGS  = $(FLAGS) -Wmissing-declarations -Wmissing-prototypes -DPLATFORM=$(BUILD) -std=gnu99
 SOURCES	= ftmx86.c xmlaux.c access.c
 LIBS    = -Wl,-rpath,/usr/local/lib -letherbone -lxml2
