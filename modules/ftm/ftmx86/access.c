@@ -39,6 +39,42 @@ static int die(eb_status_t status, const char* what)
   return -1;
 }
 
+
+static void hexDump (char *desc, void *addr, int len) {
+    int i;
+    unsigned char buff[17];
+    unsigned char *pc = (unsigned char*)addr;
+
+    // Output description if given.
+    if (desc != NULL)
+       printf ("%s:\n", desc);
+
+    // Process every byte in the data.
+    for (i = 0; i < len; i++) {
+        // Multiple of 16 means new line (with line offset).
+
+        if ((i % 16) == 0) {
+            // Just don't print ASCII for the zeroth line.
+            if (i != 0)
+               printf ("  %s\n", buff);
+
+            // Output the offset.
+           printf ("  %04x ", i);
+        }
+
+        // Now the hex code for the specific character.
+       printf (" %02x", pc[i]);
+
+        // And store a printable ASCII character for later.
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+            buff[i % 16] = '.';
+        else
+            buff[i % 16] = pc[i];
+        buff[(i % 16) + 1] = '\0';
+    }
+}
+
+
 static int ftmRamRead(uint32_t address, const uint8_t* buf, uint32_t len, uint32_t bufEndian)
 {
    
@@ -741,7 +777,7 @@ int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
 int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   uint32_t cpuIdx, thrIdx, offset;
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
-  uint32_t returnedLen = ((EBM_REG_LAST + PRIO_TX_MAX_WAIT_RW)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
+  uint32_t returnedLen = ((EBM_SEMA_RW + PRIO_TX_MAX_WAIT_RW)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
   
   if (len < returnedLen) return (len - returnedLen);
   
@@ -753,16 +789,15 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   offset = 0;
 
   // read EBM status
-  ftmRamRead(p->ebmAdr + EBM_REG_STATUS, (const uint8_t*)&buff[EBM_REG_STATUS>>2], EBM_REG_LAST, BIG_ENDIAN);
-  
-  offset += EBM_REG_LAST>>2; //advance offset
+  ftmRamRead(p->ebmAdr + EBM_STATUS_GET, (const uint8_t*)&buff[EBM_STATUS_GET>>2], EBM_SEMA_RW, BIG_ENDIAN);
 
+  offset += (EBM_SEMA_RW)>>2; //advance offset
 
   // read PrioQ status
-  ftmRamRead(p->prioQAdr + PRIO_MODE_GET,     (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_MODE_GET)>>2],    4,                                            BIG_ENDIAN);
-  ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET,  (const uint8_t*)&buff[(EBM_REG_LAST + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
-  offset += PRIO_CNT_OUT_ALL_GET_1>>2; //advance offset
-
+  ftmRamRead(p->prioQAdr + PRIO_MODE_GET,     (const uint8_t*)&buff[(EBM_SEMA_RW + PRIO_MODE_GET)>>2],    4,                                            BIG_ENDIAN);
+  ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET,  (const uint8_t*)&buff[(EBM_SEMA_RW + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
+  offset += (PRIO_CNT_OUT_ALL_GET_1 + 4)>>2; //advance offset
+ 
 
   //read WR State
   if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
@@ -776,13 +811,15 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   buff[offset + WR_UTC_HI] = (uint32_t)tmpRead[1] & 0xff;
   buff[offset + WR_UTC_LO] = (uint32_t)tmpRead[2];
   
-  offset += WR_STATE_SIZE; 
 
+  offset += WR_STATE_SIZE; 
 
   // read CPU status'
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((p->validCpus >> cpuIdx) & 0x1) {
       tmpAdr = p->pCores[cpuIdx].ramAdr + ftm_shared_offs;
+
+
       if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_STAT_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_SHARED_PTR_OFFSET,  EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]); 
@@ -791,16 +828,15 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_PACT_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[4]);
       eb_cycle_read(cycle, tmpAdr + (eb_address_t)FTM_PINA_OFFSET,        EB_BIG_ENDIAN | EB_DATA32, &tmpRead[5]);
       if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
-      
-      //TODO
+
       //Future work: change everything to new register layout in v03
       buff[offset + cpuIdx*coreStateSize  + CPU_STATUS]   = (uint32_t)tmpRead[0] & 0xffff;
       buff[offset + cpuIdx*coreStateSize  + CPU_MSGS]     = (uint32_t)tmpRead[0] >> 16;
       buff[offset + cpuIdx*coreStateSize  + CPU_SHARED]   = (uint32_t)tmpRead[1];
       buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_HI] = (uint32_t)tmpRead[2];
       buff[offset + cpuIdx*coreStateSize  + CPU_TPREP_LO] = (uint32_t)tmpRead[3];
-      
-      //TODO
+    
+//TODO
       //Future work: change everything to new register layout in v03. And include real threads !!!
       uint32_t tmp = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];
       if(tmp & STAT_RUNNING) buff[offset + cpuIdx*coreStateSize  + CPU_THR_RUNNING] = 1;
@@ -818,7 +854,7 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
                                                                   
       buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_A] = 1;
       buff[offset + cpuIdx*coreStateSize  + CPU_THR_RDY_B] = 1;
-        
+    
       thrIdx = 0;
       buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_STATUS]  = buff[offset + cpuIdx*coreStateSize  + CPU_STATUS];  
       buff[offset + cpuIdx*coreStateSize  + CPU_STATE_SIZE + thrIdx*THR_STATE_SIZE + THR_MSGS]    = buff[offset + cpuIdx*coreStateSize  + CPU_MSGS];
@@ -833,7 +869,8 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
       memset((uint8_t*)&buff[offset + cpuIdx*coreStateSize  + 0], 0, coreStateSize*4);
     }
   }
-  
+
+
   return returnedLen;
 }
 
@@ -847,8 +884,8 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   uint64_t tmp;
   long long unsigned int ftmTPrep;
   uint32_t* buffEbm   = status;
-  uint32_t* buffPrioq = (uint32_t*)&buffEbm[(EBM_REG_LAST>>2)];
-  uint32_t* buffWr    = (uint32_t*)&buffPrioq[(PRIO_CNT_OUT_ALL_GET_1>>2)];
+  uint32_t* buffPrioq = (uint32_t*)&buffEbm[((EBM_SEMA_RW)>>2)];
+  uint32_t* buffWr    = (uint32_t*)&buffPrioq[((PRIO_CNT_OUT_ALL_GET_1 + 4)>>2)];
   uint32_t* buffCpu   = (uint32_t*)&buffWr[WR_STATE_SIZE];
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
   char strBuff[65536];
@@ -858,24 +895,24 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   char sSyncState[20];
   char* pS = (char*)&sSyncState;
 
+
   if(verbose) {
     //Generate EBM Status
     SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
     SNTPRINTF(pSB ,"\u2502 %sEBM%s                                                                           \u2502\n", KCYN, KNRM);
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 Status       \u2502 0x%08x",  buffEbm[EBM_REG_STATUS>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Src Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_SRC_MAC_HI>>2],  buffEbm[EBM_REG_SRC_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Src IP       \u2502 0x%08x", buffEbm[EBM_REG_SRC_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Src Port     \u2502 0x%04x", buffEbm[EBM_REG_SRC_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Status       \u2502 0x%08x",  buffEbm[EBM_STATUS_GET>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src Mac      \u2502 0x%04x%08x", buffEbm[EBM_SRC_MAC_RW_1>>2],  buffEbm[EBM_SRC_MAC_RW_0>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src IP       \u2502 0x%08x", buffEbm[EBM_SRC_IP_RW>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Src Port     \u2502 0x%04x", buffEbm[EBM_SRC_PORT_RW>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n"); 
-    SNTPRINTF(pSB ,"\u2502 Dst Mac      \u2502 0x%08x%04x", buffEbm[EBM_REG_DST_MAC_HI>>2],  buffEbm[EBM_REG_DST_MAC_LO>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Dst IP       \u2502 0x%08x", buffEbm[EBM_REG_DST_IPV4>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Dst Port     \u2502 0x%04x", buffEbm[EBM_REG_DST_UDP_PORT>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst Mac      \u2502 0x%04x%08x", buffEbm[EBM_DST_MAC_RW_1>>2],  buffEbm[EBM_DST_MAC_RW_0>>2]); for(i=0;i<49;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst IP       \u2502 0x%08x", buffEbm[EBM_DST_IP_RW>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Dst Port     \u2502 0x%04x", buffEbm[EBM_DST_PORT_RW>>2]); for(i=0;i<57;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 MTU          \u2502 %10u", buffEbm[EBM_REG_MTU>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Adr Hi       \u2502 0x%08x", buffEbm[EBM_REG_ADR_HI>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 Ops Max      \u2502 %10u", buffEbm[EBM_REG_OPS_MAX>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
-    SNTPRINTF(pSB ,"\u2502 EB Opt       \u2502 0x%08x", buffEbm[EBM_REG_EB_OPT>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 MTU          \u2502 %10u", buffEbm[EBM_MTU_RW>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Adr Hi       \u2502 0x%08x", buffEbm[EBM_ADR_HI_RW>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 EB Opt       \u2502 0x%08x", buffEbm[EBM_EB_OPT_RW>>2]); for(i=0;i<53;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
     
     //Generate PrioQ Status
@@ -887,15 +924,16 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     if(cfg & 0x1) SNTPRINTF(pSB ,"    ENA   ");  else SNTPRINTF(pSB ,"     -    ");
     if(cfg & 0x2) SNTPRINTF(pSB ," AFL_MSGS ");  else SNTPRINTF(pSB ,"     -    ");    
     if(cfg & 0x4) SNTPRINTF(pSB ," AFL_TIME ");  else SNTPRINTF(pSB ,"     -    ");
-    SNTPRINTF(pSB ,"   \u2502\n");
+    for(i=0;i<33;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     SNTPRINTF(pSB ,"\u2502 Dst Adr      \u2502         0x%08x", buffPrioq[PRIO_ECA_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[PRIO_EBM_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     tmp = (((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_1>>2]) <<32) + ((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_0>>2]); 
+   
     SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[PRIO_TX_MAX_MSGS_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   }
