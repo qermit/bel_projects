@@ -48,6 +48,7 @@
 #define OLED_DISPLAY          0x93a6f3c4
 #define SSD1325_SER_DRIVER    0x55d1325d
 #define ETHERBONE_MASTER      0x00000815
+#define ETHERBONE_CFG         0x68202b22
 
 #define ECA_EVENT             0x8752bf45
 #define ECA_CTRL              0x8752bf44
@@ -68,6 +69,7 @@
 volatile uint32_t* pTlu; 
 volatile uint32_t* pEbm;
 volatile uint32_t* pEbmLast;
+volatile uint32_t* pEbCfg;
 volatile uint32_t* pOledDisplay;     
 volatile uint32_t* pFpqCtrl;
 volatile uint32_t* pFpqData;

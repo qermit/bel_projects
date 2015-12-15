@@ -34,43 +34,46 @@ void isr1()
 }
 
 
+
 void ebmInit()
 {
+  
+   int j;
+   while (*(pEbCfg + (EBC_SRC_IP>>2)) == EBC_DEFAULT_IP) {
+     for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+   } 
+
    ebm_init();
-   ebm_config_if(LOCAL,   "hw/08:00:30:e3:b0:5a/udp/192.168.0.100/port/60368");
-   //ebm_config_if(REMOTE,  "hw/00:14:d1:fa:01:aa/udp/192.168.191.131/port/60368");
-   //ebm_config_if(REMOTE,  "hw/00:26:7b:00:04:08/udp/192.168.191.72/port/60368");
-   ebm_config_if(REMOTE,  "hw/ff:ff:ff:ff:ff:ff/udp/192.168.0.101/port/60368");
-   ebm_config_meta(1500, 0x11, 255, 0x00000000 );
+   ebm_config_meta(1500, 42, 0x00000000 );
+   ebm_config_if(DESTINATION, 0xffffffffffff, 0xffffffff,                0xebd0); //Dst: EB broadcast 
+   ebm_config_if(SOURCE,      0xd15ea5edbeef, *(pEbCfg + (EBC_SRC_IP>>2)), 0xebd0); //Src: bogus mac (will be replaced by WR), WR IP
+   
+
 }
 
 void init()
 { 
    discoverPeriphery();
    uart_init_hw();
-   ebmInit();
-   ftmInit();
- 
    cmdCnt = 0;
    cpuId = getCpuIdx();
+   ftmInit();
+
+   if (cpuId == 0) {
+
+     ebmInit();
+     prioQueueInit();
+     mprintf("#%02u: Configured EBM and PQ\n", cpuId); 
+   }
    
    isr_table_clr();
-   isr_ptr_table[0] = isr0; //timer
-   isr_ptr_table[1] = isr1;   
-   irq_set_mask(0x03);
-   irq_enable();
+   irq_set_mask(0x00);
+   irq_disable(); 
    
 }
 
 
 
-void showFpqStatus()
-{
-   uint64_t tmp;
-   tmp  = (uint64_t)*(pFpqCtrl + PRIO_CNT_OUT_ALL_GET_0);
-   tmp |= ((uint64_t)*(pFpqCtrl + PRIO_CNT_OUT_ALL_GET_1))<<32; 
-   mprintf("Fpq: Cfg %x MsgO %llu\n", *(pFpqCtrl + PRIO_MODE_GET), tmp);
-}
 
 int insertFpqEntry()
 {
