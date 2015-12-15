@@ -931,7 +931,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     tmp = (((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_1>>2]) <<32) + ((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_0>>2]); 
    
-    SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[PRIO_TX_MAX_MSGS_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
