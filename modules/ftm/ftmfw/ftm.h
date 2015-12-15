@@ -12,6 +12,7 @@
 #include "prio_regs.h"
 
 
+
 #define PRIO_BIT_ENABLE     (1<<0)
 #define PRIO_BIT_MSG_LIMIT  (1<<1)
 #define PRIO_BIT_TIME_LIMIT (1<<2)
@@ -110,11 +111,11 @@ typedef struct {
 volatile t_ftmIf* pFtmIf;
 t_ftmChain* pCurrentChain;
 
-void              prioQueueInit();
-void              ftmInit(void);
-void              processFtm();
+void prioQueueInit();
+void ftmInit(void);
+void processFtm();
 
-void              cmdEval();
+void cmdEval();
 void showFtmPage(t_ftmPage* pPage);
 void showStatus();
 

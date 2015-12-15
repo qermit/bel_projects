@@ -7,12 +7,13 @@ SHARED_SIZE     = 8K
 USRCPUCLK       = 125000
 VERSION         = 0.2.1
 
+EBMPATH   = ../../../ip_cores/etherbone-core/hdl/eb_master_core
 PRIOPATH  = ../../../modules/prioq2
 PATHFTM   = ../../../modules/ftm
 PATHFW    = $(PATHFTM)/ftmfw
 PATHTOOL  = $(PATHFTM)/ftmx86
 PREFIX    ?= /usr/local
-CFLAGS    = -I$(PATHFW) -I$(PRIOPATH)
+CFLAGS    = -I$(PATHFW) -I$(PRIOPATH) -I$(EBMPATH)
 
 include ../../build.mk
 
