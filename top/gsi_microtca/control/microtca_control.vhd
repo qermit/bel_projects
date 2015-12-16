@@ -350,25 +350,18 @@ begin
       
       mtca_clocks_p_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_p_i(8 downto 1),
       mtca_clocks_n_i(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_in_n_i(8 downto 1),
+
       mtca_clocks_p_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_p_i(4 downto 1),
       mtca_clocks_n_i(g_top_lvds_inout_mtca+g_top_lvds_tclk_mtca-1 downto g_top_lvds_inout_mtca) => tclk_in_n_i(4 downto 1),
       
       mtca_clocks_p_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_p_o(8 downto 1),
       mtca_clocks_n_o(g_top_lvds_inout_mtca-1 downto 0) => mlvdio_out_n_o(8 downto 1),
+
       mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_p_o(4 downto 1),
       mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => tclk_out_n_o(4 downto 1),
 
-		mtca_libera_trig_p_o => lib_trig_p_o,
-		mtca_libera_trig_n_o => lib_trig_n_o,
-	 
---    mtca_clocks_p_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
---    mtca_clocks_n_o(g_top_lvds_tclk_mtca+g_top_lvds_inout_mtca-1 downto g_top_lvds_inout_mtca) => open,
-  
-    --mtca_libera_trig_p_o   =>lib_trig_p_o,
-    --mtca_libera_trig_n_o   =>lib_trig_n_o,
-
---      mtca_libera_trig_p_o   => open,
---      mtca_libera_trig_n_o   => open,
+		  mtca_libera_trig_p_o => lib_trig_p_o,
+		  mtca_libera_trig_n_o => lib_trig_n_o,
       
       led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
@@ -459,7 +452,7 @@ begin
   led_user(8 downto 5) <= s_leds_user;                        -- gpio5 ... gpio2
   
   
-  -- wires to CPLD, currently unused
+  -- wires to CPLD, currently used only as inputs
   --con <= (others => 'Z');
 
 
@@ -518,31 +511,6 @@ begin
   -- ('0' = Type-1 , '1' = Type-2 )
   mlvdio_fsen_o <= '1'; 
 
-
---  -- usage of backplane ports 12-15 currently not defined
---  -- therefore only dummy buffers to keep Quartus happy
---  unused_tclk_ios: for i in 1 to 4 generate
---    obuf : altera_lvds_obuf
---      generic map(
---        g_family  => c_family)
---      port map(
---        datain    => '0',
---        dataout   => tclk_out_p_o(i),
---        dataout_b => tclk_out_n_o(i)
---      );
-
---    inbuf : altera_lvds_ibuf
---        generic map(
---          g_family  => c_family)
---        port map(
---          datain_b  => hss_rx_n_i(i),
---          datain    => hss_rx_p_i(i),
---          dataout   => open
---        );
---  end generate;
-
-
-
   -- usage of backplane ports 12-15 currently not defined
   -- therefore only dummy buffers to keep Quartus happy
   unused_hss_ios: for i in 1 to 4 generate
@@ -574,20 +542,6 @@ begin
   -- no intputs from Libera backplane, outputs only
   -- trigger outputs to backplane for Libera
   -- connected directly to monster
-  
---  -- only dummy buffers to keep Quartus happy
---  libera_triggers: for i in 0 to 3 generate
---    obuf : altera_lvds_obuf
---      generic map(
---        g_family  => c_family)
---      port map(
---        datain    => '0',
---        dataout   => lib_trig_p_o(i),
---        dataout_b => lib_trig_n_o(i)
---      );
---
---  end generate;  
-
 
   ----------------------------------------------
   fpga2mmc_int_o  <= '0'; -- irq to mmc
@@ -603,7 +557,7 @@ begin
   -----------------------------------------------------------------------
   -- backplane ports configuration from monster microtca_ctrl registers
   ----------------------------------------------------------------------- 
-  s_monster_tclk_en   <= s_mtca_backplane_conf0(s_monster_tclk_en'range);
+  s_monster_tclk_en       <= s_mtca_backplane_conf0(s_monster_tclk_en'range);
   s_monster_tclk_dir      <= s_mtca_backplane_conf1(s_monster_tclk_dir'range);
   s_monster_mlvd_buf_en   <= s_mtca_backplane_conf2(s_monster_mlvd_buf_en'range);
   s_monster_mlvd_dir      <= s_mtca_backplane_conf3(s_monster_mlvd_dir'range);
@@ -717,21 +671,21 @@ begin
   gen_mlvd_buf_oe : for i in  1 to 8 generate
     -- enable buffer output towards BACKPLANE (m-lvds driver enable, active hi)
     mlvdio_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
-                                    s_monster_mlvd_buf_en(i)    = '1' and 
-                                    s_monster_mlvd_dir(i)       = '1')
+                                s_monster_mlvd_buf_en(i)    = '1' and 
+                                s_monster_mlvd_dir(i)       = '1')
                            else '0';
                                
     -- enable buffer output towards FPGA (m-lvds receiver enable, active low)
     mlvdio_re_n_o(i) <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
-                                      s_monster_mlvd_buf_en(i)    = '1' and 
-                                      s_monster_mlvd_dir(i)       = '0')
+                                  s_monster_mlvd_buf_en(i)    = '1' and 
+                                  s_monster_mlvd_dir(i)       = '0')
                              else '1';
   end generate; -- gen_mlvd_buf_oe
 
   -- m-lvds buffer powerdown, active low
   -- when in Libera or when not enabled from monster
   mlvdio_pd_n_o    <= '0' when (s_mmc_mtca4_bpl_dis_reg(0)  = '1' or 
-                                    s_monster_mlvd_buf_en       = x"00")
+                                s_monster_mlvd_buf_en       = x"00")
                            else '1'; 
 
   -----------------------------------------------------------------------
@@ -740,14 +694,14 @@ begin
   gen_tclk_oe : for i in  1 to 4 generate
     -- enable clock buffer outputs towards BACKPLANE (driver enable, active hi)
     tclk_de_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0)  = '0' and 
-                                  s_monster_tclk_en(i)    = '1' and 
-                                  s_monster_tclk_dir(i)       = '1')
+                              s_monster_tclk_en(i)        = '1' and 
+                              s_monster_tclk_dir(i)       = '1')
                            else '0';
   
     -- enable clock buffer outputs towards FPGA (receiver enable, active lo)
     tclk_re_n_o(i)<= '0' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
-                                   s_monster_tclk_en(i)   = '1' and 
-                                   s_monster_tclk_dir(i)      = '0')
+                               s_monster_tclk_en(i)       = '1' and 
+                               s_monster_tclk_dir(i)      = '0')
                           else '1';
   end generate; -- gen_mlvd_buf_oe
 
@@ -762,7 +716,7 @@ begin
     hss_rx_en_o(i) <= '1' when (s_mmc_mtca4_bpl_dis_reg(0) = '0' and 
                                  s_monster_hss_buf_en(i+4) = '1')
                                else '0';    
-  end generate; -- gen_srio_buf_oe
+  end generate; -- gen_hss_buf_oe
 
   -- disable  Transmit Pre-Emphasis and Receive Equalization
   hss_tx_pe_en_o <= '0';
