@@ -245,7 +245,7 @@ begin
       g_en_pcie     => true,
       g_en_usb      => true,
       g_en_lcd      => false, 
-      g_lm32_profile        => "medium_icache",
+      g_lm32_profile        => "dm_core",
       g_lm32_are_ftm        => true,	
       g_lm32_cores          => 4,
       g_lm32_ramsizes       => 65536/4,
