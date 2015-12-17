@@ -39,11 +39,11 @@ function configure_eca()
   # LEDs/ channel0 (pulse width = 100ms)
   eca-ctl $2 activate -c 0
   eca-table $2 add $eca_pattern/64 +0.0 0 0x0000ffff
-  eca-table $2 add $eca_pattern/64 +0.1 0 0xffff0000
+  eca-table $2 add $eca_pattern/64 +0.01 0 0xffff0000
   # LEMOs/channel2 (pulse width = 100ms))
   eca-ctl $2 activate -c 2
-  eca-table $2 add $eca_pattern/64 +0.0 2 0x000fff
-  eca-table $2 add $eca_pattern/64 +0.1 2 0xfff000
+  eca-table $2 add $eca_pattern/64 +0.0 2 0x000ffe
+  eca-table $2 add $eca_pattern/64 +0.01 2 0xffe000
   eca-table $2 flip-active
   echo "done."
 }

@@ -30,14 +30,14 @@ printf "Start time at Data Master:   0x%x (%d)\n" $start_time $start_time
 eca-ctl $data_master enable # Enable
 eca-ctl $data_master idisable # Disable interrupts
 eca-table $data_master flush # Flush old stuff
-# LEDs/ channel0 (pulse width = 100ms)
+# LEDs/channel0 (pulse width = 100ms)
 eca-ctl $data_master activate -c 0
 eca-table $data_master add $eca_pattern/0 +0.0 0 0x0000ffff
 eca-table $data_master add $eca_pattern/0 +0.1 0 0xffff0000
 # LEMOs/channel2 (pulse width = 100ms))
 eca-ctl $data_master activate -c 2
-eca-table $data_master add $eca_pattern/64 +0.0 2 0x000fff
-eca-table $data_master add $eca_pattern/64 +0.1 2 0xfff000
+eca-table $data_master add $eca_pattern/64 +0.0 2 0x000ffe
+eca-table $data_master add $eca_pattern/64 +0.1 2 0xffe000
 eca-table $data_master flip-active
 
 # Get right start time in the schedule
@@ -46,13 +46,16 @@ sed -i "s/$schedule_keyword/$start_time/g" "$schedule_next"
 # Finally set up the Data Master
 mv $schedule_next $data_master_bin
 cd $data_master_bin
-./ftm-ctl $data_master -c -1 loadfw ftm.bin
+#./ftm-ctl $data_master -c -1 loadfw ftm.bin
+#sleep 1
+eb-write $data_master 0x100224/4 0x1 #HACK 3.3            0000000000000651:10040200            100200  DM-PriorityQ-Ctr
+./ftm-ctl $data_master -c 0 preptime 9500000 # preptime: 150us*8*8 (divided internally by 8)
 sleep 1
-./ftm-ctl $data_master -c  0 put    $schedule_next
+./ftm-ctl $data_master -c 0 put $schedule_next
 sleep 1
-./ftm-ctl $data_master -c  0 swap 
+./ftm-ctl $data_master -c 0 swap 
 sleep 1
-./ftm-ctl $data_master -c  0 run
+./ftm-ctl $data_master -c 0 run
 sleep 1
 cd ..
 
