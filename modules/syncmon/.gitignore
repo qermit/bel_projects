@@ -1,3 +1,4 @@
 syncmon
 oe-config
 dm_pps.xml
+*.log
