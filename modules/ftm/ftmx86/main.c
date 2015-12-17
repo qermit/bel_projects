@@ -21,8 +21,7 @@ uint8_t verbose, readonly, error;
 static void help(void) {
   fprintf(stderr, "\nUsage: %s [OPTION] <etherbone-device> [command]\n", program);
   fprintf(stderr, "\n");
-  fprintf(stderr, "  duetime <Time / ns>       Set due time for priority queue\n");
-  fprintf(stderr, "  trntime <Time / ns>       Set transmission delay for priority queue\n");
+  fprintf(stderr, "  gathertime <Time / ns>    Set msg gathering time for priority queue\n");
   fprintf(stderr, "  maxmsg <Message Quantity> Set maximum messages in a packet for priority queue\n\n");
   fprintf(stderr, "  -c <core-idx>             select a core by index, -1 selects all\n");
   fprintf(stderr, "  -v                        verbose operation, print more details\n");
@@ -151,11 +150,10 @@ int main(int argc, char** argv) {
       } else { sigMask = 0xffffffffffffffff; }
    } 
    
-   if ( (!strcasecmp(command, "preptime")) || (!strcasecmp(command, "duetime")) || (!strcasecmp(command, "trntime")) || (!strcasecmp(command, "maxmsg"))) { 
+   if ( (!strcasecmp(command, "preptime")) || (!strcasecmp(command, "gathertime")) || (!strcasecmp(command, "maxmsg"))) { 
       if (optind+1 < argc) {
          long long unsigned int tmp = strtoll(argv[optind+1], NULL, 10);
-         if(!strcasecmp(command, "maxmsg"))  uint64val = (uint64_t)tmp;
-         else                                uint64val = (uint64_t)(tmp>>3);
+         uint64val = (uint64_t)tmp;
       } else {
          if(!strcasecmp(command, "maxmsg")) fprintf(stderr, "%s: expecting one non-optional argument: <Message Quantity>\n", program);
          else fprintf(stderr, "%s: expecting one non-optional argument: <Time / ns>\n", program);
@@ -198,13 +196,10 @@ int main(int argc, char** argv) {
   
          
 // DM prioQ Operations   
-  if(!strcasecmp(command, "duetime")) {
+  if(!strcasecmp(command, "gathertime")) {
     return ftmSetDuetime(uint64val);
   }
  
-  if(!strcasecmp(command, "trntime")) {
-    return ftmSetTrntime(uint64val);
-  }
  
   if(!strcasecmp(command, "maxmsg")) {
     return ftmSetMaxMsgs(uint64val);
