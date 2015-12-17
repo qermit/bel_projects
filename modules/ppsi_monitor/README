@@ -1,0 +1,20 @@
+ppsi_monitor
+------------
+
+This script runs/stops the monitoring of the ppsi on the cards connected to the host where  
+ppsi_monitor runs. The connection has to be stablished using USB cables. 
+
+#ctl_meas run
+
+Stars the script and the logging of the ppsi console, the default verbosity is set to  011303.
+It creates a folder with the current date-time with the following layout:
+\DATE-TIME:
+	\log\ACMX .- log of ppsi verbose of the ACMX usb interface
+	\resutls .- this file contain the correlation between ttyACMX and the MAC address of the timing receiver.
+	\dump-logs .- contain a dump image of the ppsi before the monitoring is finished.
+
+#ctl_meas stop 
+
+Stops the script and the logging of the ppsi console, besides it makes a dump from ppsi memory space.
+
+All the log files are stored in the management server tsl004.acc.gsi.de
