@@ -118,90 +118,6 @@ void cmdEval()
 
 void showFtmPage(t_ftmPage* pPage)
 {
-   uint32_t planIdx, chainIdx, msgIdx;
-   t_ftmChain* pChain  = NULL;
-   t_ftmMsg*   pMsg  = NULL;
-   
-   mprintf("---PAGE %08x\n", pPage);
-   mprintf("StartPlan:\t");
-   
-   if(pPage->pStart == &(pFtmIf->idle) ) mprintf("idle\n");
-   else { 
-          if(pPage->pStart == NULL) mprintf("NULL\n");
-          else mprintf("%08x\n", pPage->pStart);
-        } 
-   
-   mprintf("AltPlan:\t");
-   if(pPage->pBp == &(pFtmIf->idle) ) mprintf("idle\n");
-   else { 
-          if(pPage->pBp == NULL) mprintf("NULL\n");
-          else mprintf("%08x\n", pPage->pBp);
-        }  
-   mprintf("PlanQty:\t%u\t%08x\n", pPage->planQty, &(pPage->planQty));
-    
-   for(planIdx = 0; planIdx < pPage->planQty; planIdx++)
-   {
-      mprintf("\t---PLAN %c\n", planIdx+'A');
-      chainIdx = 0;
-      pChain = pPage->plans[planIdx];
-      while(pChain != NULL)
-      {
-         mprintf("\t\t---CHAIN %c%u\n", planIdx+'A', chainIdx);
-         mprintf("\t\tpNext: 0x%08x\n", pChain->pNext);
-         mprintf("\t\tStart:\t\t%08x%08x\n\t\tperiod:\t\t%08x%08x\n\t\trep:\t\t\t%08x\nrepcnt:\t\t%08x\n\t\tmsg:\t\t\t%08x\nmsgIdx:\t\t%08x\n", 
-         (uint32_t)(pChain->tStart>>32), (uint32_t)pChain->tStart, 
-         (uint32_t)(pChain->tPeriod>>32), (uint32_t)pChain->tPeriod,
-         pChain->repQty,
-         pChain->repCnt,
-         pChain->msgQty,
-         pChain->msgIdx);
-         
-         mprintf("\t\tFlags:\t");
-         if(pChain->flags & FLAGS_IS_BP) mprintf("-IS_BP\t");
-         if(pChain->flags & FLAGS_IS_COND_MSI) mprintf("-IS_CMSI\t");
-         if(pChain->flags & FLAGS_IS_COND_SHARED) mprintf("-IS_CSHA\t");
-         if(pChain->flags & FLAGS_IS_SIG_SHARED) mprintf("-IS_SIG_SHARED");
-         if(pChain->flags & FLAGS_IS_SIG_MSI)    mprintf("-IS_SIG_MSI");
-         if(pChain->flags & FLAGS_IS_END) mprintf("-IS_END");
-         if(pChain->flags & FLAGS_IS_ENDLOOP) mprintf("-IS_ENDLOOP");
-         mprintf("\n");
-         
-         mprintf("\t\tCondSrc:\t%08x\n\t\tCondVal:\t%08x\n\t\tCondMsk:\t%08x\n\t\tSigDst:\t\t\t%08x\n\t\tSigVal:\t\t\t%08x\n", 
-         (uint32_t)pChain->condSrc,
-         (uint32_t)pChain->condVal, 
-         (uint32_t)pChain->condMsk,
-         pChain->sigDst,
-         pChain->sigVal);  
-         
-         pMsg = pChain->pMsg;
-         
-         for(msgIdx = 0; msgIdx < pChain->msgQty; msgIdx++)
-         {
-            mprintf("\t\t\t---MSG %u\n", msgIdx);
-            mprintf("\t\t\tid:\t%08x%08x\n\t\t\tFID:\t%u\n\t\t\tGID:\t%u\n\t\t\tEVTNO:\t%u\n\t\t\tSID:\t%u\n\t\t\tBPID:\t%u\n\t\t\tpar:\t%08x%08x\n\t\t\ttef:\t\t%08x\n\t\t\toffs:\t%08x%08x\n", 
-            (uint32_t)(pMsg[msgIdx].id>>32), (uint32_t)pMsg[msgIdx].id,
-            getIdFID(pMsg[msgIdx].id),
-            getIdGID(pMsg[msgIdx].id),
-            getIdEVTNO(pMsg[msgIdx].id),
-            getIdSID(pMsg[msgIdx].id),
-            getIdBPID(pMsg[msgIdx].id), 
-            (uint32_t)(pMsg[msgIdx].par>>32), (uint32_t)pMsg[msgIdx].par,
-            pMsg[msgIdx].tef,
-            (uint32_t)(pMsg[msgIdx].offs>>32), (uint32_t)pMsg[msgIdx].offs);   
-         }
-         
-   
-         
-         if(pChain->flags & FLAGS_IS_END) pChain = NULL;
-         else pChain = (t_ftmChain*)pChain->pNext;
-      }
-           
-   }
-   uint64_t j;
-  for (j = 0; j < (250000000); ++j) {
-        asm("# noop"); // no-op the compiler can't optimize away
-      }    
-   
 }
 
 void showStatus()
@@ -220,15 +136,11 @@ void showStatus()
 inline int dispatch(t_ftmMsg* pMsg)
 {
   
-   unsigned int diff;
-   int ret = 1;
-
+  unsigned int diff;
+  int ret = 1;
+  uint32_t msgCnt, stat; 
+  stat = pFtmIf->status;
    
-   uint32_t msgCnt, stat; 
-   stat = pFtmIf->status;
-   
-
-
   //incIdSCTR(&pMsg->id, &pFtmIf->sctr); //copy sequence counter (sctr) into msg id and inc sctr
   atomic_on();
   *(pFpqData + (PRIO_DAT_STD>>2))   = hiW(pMsg->id);
@@ -249,7 +161,7 @@ inline int dispatch(t_ftmMsg* pMsg)
   pFtmIf->status = (stat & 0x0000ffff) | ((msgCnt+1) << 16);
    
    
-   return ret;
+  return ret;
 
 }
 
@@ -353,10 +265,6 @@ inline t_ftmChain* processChainAux(t_ftmChain* c)
             pCurMsg->ts = c->tStart + pCurMsg->offs; //set execution time for msg 
             if( now + pFtmIf->tPrep >= pCurMsg->ts)  //### time to hand it over to prio queue ? ###
             {
-
-               
-   
-               
                uint32_t msgCnt = (pFtmIf->status >> 16); 
                
                //dbg_then = getSysTime();
@@ -376,8 +284,6 @@ inline t_ftmChain* processChainAux(t_ftmChain* c)
          } 
          if(c->msgIdx == c->msgQty)
          {
-           
-      
             c->msgIdx = 0; c->repCnt++; //repetions left, stay with this chain
                  
             if( (c->flags & FLAGS_IS_END) && (c->flags & FLAGS_IS_ENDLOOP)) 
@@ -437,8 +343,6 @@ inline t_ftmChain* processChain(t_ftmChain* c)
    //if starttime is 0 or in the past, set to earliest possible time
    //   || c->tStart < now
    if ( !c->tStart ) {c->tStart = now + pFtmIf->tPrep; DBPRINT2("Adjust time\n#ST: %08x %08x \n TS: %08x %08x\n", now, c->tStart);}
-   
-   
    if(pFtmIf->sema.cond) condValid(c);
    
    if(!pFtmIf->sema.cond) pCur = processChainAux(c); 
@@ -447,7 +351,6 @@ inline t_ftmChain* processChain(t_ftmChain* c)
       if((c->flags & FLAGS_IS_BP) && pFtmIf->pAct->pBp != NULL)
       { 
          pCur = pFtmIf->pAct->pBp; 
-         
          pFtmIf->sctr      = 0;
          pFtmIf->pAct->pBp = NULL;
       } 
