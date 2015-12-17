@@ -138,7 +138,7 @@ begin
         --r_state           <= st_EBM_CLEAR;
       else
 
-        r_late_check <= unsigned(s_ts_o) + unsigned(s_ctrl_offs_late_o);
+        r_late_check <= unsigned(s_ts_o) - unsigned(s_ctrl_offs_late_o);
   
         v_state := r_state;
         
@@ -157,7 +157,7 @@ begin
           when st_PACKET_EMPTY  =>  if(s_ctrl_mode_o(c_ENABLE) = '0') then
                                       v_state := st_IDLE;  
                                     elsif s_ts_valid_o = '1' then
-                                      r_dhol  <= unsigned(s_ts_o) + resize(unsigned(s_ctrl_tx_max_wait_o), s_ts_o'length);
+                                      r_dhol  <= unsigned(time_i) + resize(unsigned(s_ctrl_tx_max_wait_o), time_i'length);
                                         
                                       v_state := st_PACKET_GATHER;
                                     end if;
