@@ -48,9 +48,6 @@ mv $schedule_next $data_master_bin
 cd $data_master_bin
 #./ftm-ctl $data_master -c -1 loadfw ftm.bin
 #sleep 1
-eb-write $data_master 0x100224/4 0x1 #HACK 3.3            0000000000000651:10040200            100200  DM-PriorityQ-Ctr
-./ftm-ctl $data_master -c 0 preptime 9500000 # preptime: 150us*8*8 (divided internally by 8)
-sleep 1
 ./ftm-ctl $data_master -c 0 put $schedule_next
 sleep 1
 ./ftm-ctl $data_master -c 0 swap 
