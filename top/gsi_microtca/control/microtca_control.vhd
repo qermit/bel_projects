@@ -305,10 +305,10 @@ begin
       g_project          => c_project,
       g_flash_bits       => 25,
       g_gpio_out         => 6,  -- 2xfront end+4xuser leds
-      g_lvds_inout       => g_top_lvds_inout_front,
+      g_lvds_inout       => g_top_lvds_inout_front, -- 5
       g_lvds_invert      => true,
-      g_clocks_inout     => g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca,
-      g_triggers_out     => g_top_lvds_out_libera,
+      g_clocks_inout     => g_top_lvds_inout_mtca + g_top_lvds_tclk_mtca, -- 12
+      g_triggers_out     => g_top_lvds_out_libera, -- 4
       g_en_pcie          => true,
       g_en_usb           => true,
       g_en_lcd           => true,
@@ -334,7 +334,8 @@ begin
       wr_dac_sclk_o          => wr_dac_sclk_o,
       wr_dac_din_o           => wr_dac_din_o,
       wr_ndac_cs_o           => wr_ndac_cs_o,
-
+      wr_ext_clk_i           => lvtclk_i,
+      
       gpio_o(5 downto 2)     => s_leds_user(3 downto 0),
       gpio_o(1)              => s_led_frnt_blue,
       gpio_o(0)              => s_led_frnt_red,
