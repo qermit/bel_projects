@@ -38,6 +38,7 @@ t_ftmMsg* createMsg(xmlNode* msgNode, t_ftmMsg* pMsg)
 {
    xmlNode *fieldNode, *subFieldNode = NULL;
    uint32_t i;
+   uint64_t offset;
    uint16_t vals[5];
    
    fieldNode =  checkNode(msgNode->children, "id") ;
@@ -64,16 +65,19 @@ t_ftmMsg* createMsg(xmlNode* msgNode, t_ftmMsg* pMsg)
    if(fieldNode != NULL) pMsg->par = strtou64( (const char*)xmlNodeGetContent(fieldNode));
    else printf("ERROR par\n");
    
-   fieldNode = checkNode(xmlNextElementSibling(fieldNode), "tef");
-   if(fieldNode != NULL) pMsg->tef = strtou64( (const char*)xmlNodeGetContent(fieldNode));
-   else printf("ERROR tef\n");
-   
+   //FIXME eca v1 only
+
+   //fieldNode = checkNode(xmlNextElementSibling(fieldNode), "tef");
+   //if(fieldNode != NULL) pMsg->tef = strtou64( (const char*)xmlNodeGetContent(fieldNode));
+   //else printf("ERROR tef\n");   
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "offs");
    
-   if(fieldNode != NULL) pMsg->offs = strtou64( (const char*)xmlNodeGetContent(fieldNode))>>3;
-   else printf("ERROR offs\n");
+   if(fieldNode != NULL) offset = strtou64( (const char*)xmlNodeGetContent(fieldNode))>>3;
+   else {offset = 0; printf("ERROR offs\n");}
    
+   pMsg->offs  = offset >> 3;           //offset is a multiple of 8ns
+   pMsg->tef   = ((uint32_t)offset & 0x7) << 29;  //Tef is 0-7ns, but left shifted because it's a fixed point fraction
 
    return pMsg;       
 }
