@@ -58,6 +58,7 @@ use work.fg_quad_pkg.all;
 use work.cfi_flash_pkg.all;
 use work.psram_pkg.all;
 use work.wb_serdes_clk_gen_pkg.all;
+use work.pmc_ctrl_pkg.all;
 
 entity monster is
   generic(
@@ -87,6 +88,7 @@ entity monster is
     g_en_user_ow           : boolean;
     g_en_fg                : boolean;
     g_en_psram             : boolean;
+    g_en_pmc_ctrl          : boolean;
     g_lm32_cores           : natural;
     g_lm32_MSIs            : natural;
     g_lm32_ramsizes        : natural;
@@ -281,6 +283,15 @@ entity monster is
     ps_cre                 : out   std_logic := 'Z';
     ps_advn                : out   std_logic := 'Z';
     ps_wait                : in    std_logic;
+    -- g_en_pmc_ctrl
+    pmc_ctrl_hs_i          : in    std_logic_vector(3 downto 0);
+    pmc_pb_i               : in    std_logic;
+    pmc_ctrl_hs_cpld_i     : in    std_logic_vector(3 downto 0);
+    pmc_pb_cpld_i          : in    std_logic;
+    pmc_clk_oe_o           : out   std_logic := 'Z';
+    pmc_log_oe_o           : out   std_logic_vector(16 downto 0) := (others => 'Z');
+    pmc_log_out_o          : out   std_logic_vector(16 downto 0) := (others => 'Z');
+    pmc_log_in_i           : in    std_logic_vector(16 downto 0);
     -- g_en_user_ow
     ow_io                  : inout std_logic_vector(1 downto 0);
     hw_version             : in    std_logic_vector(31 downto 0));
@@ -370,7 +381,7 @@ architecture rtl of monster is
   constant c_topm_eca_wbm   : natural := 7;
   
   -- required slaves
-  constant c_top_slaves     : natural := 27;
+  constant c_top_slaves     : natural := 28;
   constant c_tops_irq       : natural := 0;
   constant c_tops_wrc       : natural := 1;
   constant c_tops_lm32      : natural := 2;
@@ -400,6 +411,7 @@ architecture rtl of monster is
   constant c_tops_nau8811   : natural := 24;
   constant c_tops_psram     : natural := 25;
   constant c_tops_iocfg     : natural := 26;
+  constant c_tops_pmc_ctrl  : natural := 27;
 
   -- We have to specify the values for WRC as there is no generic out in vhdl
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
@@ -441,7 +453,8 @@ architecture rtl of monster is
     c_tops_fgirq     => f_sdb_auto_device(c_fg_irq_ctrl_sdb,                g_en_fg),
     c_tops_psram     => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
     c_tops_eca_wbm   => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true),
-    c_tops_iocfg     => f_sdb_auto_bridge(c_iocfg_bridge_sdb,               true)
+    c_tops_iocfg     => f_sdb_auto_bridge(c_iocfg_bridge_sdb,               true),
+    c_tops_pmc_ctrl  => f_sdb_auto_device(c_pmc_ctrl_slave_sdb,             g_en_pmc_ctrl)
 );
     
   constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
@@ -1911,7 +1924,27 @@ c4: eca_ac_wbm
       ps_advn   => ps_advn,
       ps_wait   => ps_wait);
   end generate;
- 
+
+  pmc_ctrl_n : if not g_en_pmc_ctrl generate
+    top_cbar_master_i(c_tops_pmc_ctrl) <= cc_dummy_slave_out;
+  end generate;
+  pmc_ctrl_y : if g_en_pmc_ctrl generate
+    pmc_ctrl_unit : pmc_ctrl
+      port map (
+        clk_sys_i             => clk_sys,
+        rst_n_i               => rstn_sys,
+        slave_i               => top_cbar_master_o(c_tops_pmc_ctrl),
+        slave_o               => top_cbar_master_i(c_tops_pmc_ctrl),
+        hex_switch_i          => pmc_ctrl_hs_i,
+        push_button_i(0)      => pmc_pb_i,
+        hex_switch_cpld_i     => pmc_ctrl_hs_cpld_i,
+        push_button_cpld_i(0) => pmc_pb_cpld_i,
+        clock_control_oe_o    => pmc_clk_oe_o,
+        logic_control_oe_o    => pmc_log_oe_o,
+        logic_output_o        => pmc_log_out_o,
+        logic_input_i         => pmc_log_in_i
+      );
+  end generate;  
   -- END OF Wishbone slaves
   ----------------------------------------------------------------------------------
   

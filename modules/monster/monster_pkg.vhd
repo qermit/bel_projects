@@ -61,6 +61,7 @@ package monster_pkg is
       g_en_user_ow           : boolean := false;
       g_en_fg                : boolean := false;  
       g_en_psram             : boolean := false;
+      g_en_pmc_ctrl          : boolean := false;
       g_lm32_cores           : natural := 1;
       g_lm32_MSIs            : natural := 1;
       g_lm32_ramsizes        : natural := 131072/4; -- in 32b words
@@ -256,6 +257,15 @@ package monster_pkg is
       ps_cre                 : out   std_logic;
       ps_advn                : out   std_logic;
       ps_wait                : in    std_logic := '0';
+      -- g_en_pmc_ctrl
+      pmc_ctrl_hs_i          : in    std_logic_vector(3 downto 0) := (others => '0');
+      pmc_pb_i               : in    std_logic := '0';
+      pmc_ctrl_hs_cpld_i     : in    std_logic_vector(3 downto 0) := (others => '0');
+      pmc_pb_cpld_i          : in    std_logic := '0';
+      pmc_clk_oe_o           : out   std_logic;
+      pmc_log_oe_o           : out   std_logic_vector(16 downto 0);
+      pmc_log_out_o          : out   std_logic_vector(16 downto 0);
+      pmc_log_in_i           : in    std_logic_vector(16 downto 0):= (others => '0');
       -- g_en_user_ow
       ow_io                  : inout std_logic_vector(1 downto 0) := (others => 'Z');
       hw_version             : in std_logic_vector(31 downto 0) := (others => 'Z'));

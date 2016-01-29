@@ -10,6 +10,7 @@ entity vetar5 is
     clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
     clk_125m_pllref_i : in std_logic;  -- 125 MHz PLL reference
     clk_125m_local_i  : in std_logic;  -- local clk from 125Mhz oszillator
+    
     -----------------------------------------------------------------------
     -- VME bus
     -----------------------------------------------------------------------
@@ -210,6 +211,7 @@ begin
       --g_lvds_out        => 2, -- 2x OUT 10 pin boxed header
       g_lvds_inout      => 12, -- 10x addon board(s) + 2 base board
       g_lvds_invert     => true,
+      g_en_pmc_ctrl     => true,
       g_en_vme          => true,
       g_en_usb          => true,
       g_en_lcd          => true,
@@ -275,6 +277,14 @@ begin
       usb_slwrn_o            => slwr,
       usb_pktendn_o          => pa(6),
       usb_fd_io              => fd,
+      pmc_ctrl_hs_i          => s_hsw_fpga,
+      pmc_pb_i               => s_pbs_fpga,
+      pmc_ctrl_hs_cpld_i     => con(4 downto 1),
+      pmc_pb_cpld_i          => con(5),
+      pmc_clk_oe_o           => s_wr_ext_in,
+      pmc_log_oe_o           => s_log_oe,
+      pmc_log_out_o          => s_log_out,
+      pmc_log_in_i           => s_log_in,
       lcd_scp_o              => di(3),
       lcd_lp_o               => di(1),
       lcd_flm_o              => di(2),
