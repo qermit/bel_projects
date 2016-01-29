@@ -141,6 +141,12 @@ pexarria5::	firmware
 pexarria5-clean::
 	$(MAKE) -C syn/gsi_pexarria5/control PATH=$(PWD)/toolchain/bin:$(PATH) clean
 
+vetar5::	firmware
+	$(MAKE) -C syn/gsi_vetar5/control PATH=$(PWD)/toolchain/bin:$(PATH) all
+
+vetar5-clean::
+	$(MAKE) -C syn/gsi_vetar5/control PATH=$(PWD)/toolchain/bin:$(PATH) clean
+
 microtca::	firmware
 	$(MAKE) -C syn/gsi_microtca/control PATH=$(PWD)/toolchain/bin:$(PATH) all
 
