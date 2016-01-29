@@ -73,12 +73,12 @@ t_ftmMsg* createMsg(xmlNode* msgNode, t_ftmMsg* pMsg)
    
    fieldNode = checkNode(xmlNextElementSibling(fieldNode), "offs");
    
-   if(fieldNode != NULL) offset = strtou64( (const char*)xmlNodeGetContent(fieldNode))>>3;
+   if(fieldNode != NULL) offset = strtou64( (const char*)xmlNodeGetContent(fieldNode));
    else {offset = 0; printf("ERROR offs\n");}
    
    pMsg->offs  = offset >> 3;           //offset is a multiple of 8ns
    pMsg->tef   = ((uint32_t)offset & 0x7) << 29;  //Tef is 0-7ns, but left shifted because it's a fixed point fraction
-
+   
    return pMsg;       
 }
 

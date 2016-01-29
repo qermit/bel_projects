@@ -187,11 +187,11 @@ static uint8_t* serMsg(  t_ftmMsg* pMsg, uint8_t* pBuf)
 {
    uint64ToBytes(&pBuf[FTM_MSG_ID],     pMsg->id);
    uint64ToBytes(&pBuf[FTM_MSG_PAR],    pMsg->par);
+   
    uint32ToBytes(&pBuf[FTM_MSG_TEF],    pMsg->tef); 
    uint32ToBytes(&pBuf[FTM_MSG_RES],    pMsg->res); 
    uint64ToBytes(&pBuf[FTM_MSG_TS],     0);
    uint64ToBytes(&pBuf[FTM_MSG_OFFS],   pMsg->offs);
-   
    return pBuf + FTM_MSG_END_;
 }
 
@@ -297,8 +297,8 @@ static uint8_t* deserMsg(uint8_t* pBuf, t_ftmMsg* pMsg)
    //printf("desermsg\n");   
    pMsg->id    = bytesToUint64(&pBuf[FTM_MSG_ID]);
    pMsg->par   = bytesToUint64(&pBuf[FTM_MSG_PAR]); 
-   pMsg->tef   = bytesToUint64(&pBuf[FTM_MSG_TEF]);
-   pMsg->res   = bytesToUint64(&pBuf[FTM_MSG_RES]);
+   pMsg->tef   = bytesToUint32(&pBuf[FTM_MSG_TEF]);
+   pMsg->res   = bytesToUint32(&pBuf[FTM_MSG_RES]);
    pMsg->ts    = bytesToUint64(&pBuf[FTM_MSG_TS]); 
    pMsg->offs  = bytesToUint64(&pBuf[FTM_MSG_OFFS]); 
    
@@ -434,7 +434,7 @@ int showFtmPage(t_ftmPage* pPage, char* buff)
             getIdEVTNO(pMsg[msgIdx].id), getIdSID(pMsg[msgIdx].id), getIdBPID(pMsg[msgIdx].id), getIdSCTR(pMsg[msgIdx].id));
             SNTPRINTF(sB , "\t\t\tpar:\t0x%08x%08x\n\t\t\ttef:\t\t0x%08x\n", 
             (uint32_t)(pMsg[msgIdx].par>>32), (uint32_t)pMsg[msgIdx].par, pMsg[msgIdx].tef);
-            SNTPRINTF(sB , "\t\t\toffs:\t%18llu \n", (long long unsigned int)(pMsg[msgIdx].offs<<3));  
+            SNTPRINTF(sB , "\t\t\toffs:\t%18llu \n", (long long unsigned int)((pMsg[msgIdx].offs<<3) + (uint64_t)(pMsg[msgIdx].tef >> 29)));  
          }
          pChain = (t_ftmChain*)pChain->pNext;
       }
