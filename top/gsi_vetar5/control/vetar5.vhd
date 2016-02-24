@@ -7,171 +7,286 @@ use work.monster_pkg.all;
 
 entity vetar5 is
   port(
-    clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
-    clk_125m_pllref_i : in std_logic;  -- 125 MHz PLL reference
-    clk_125m_local_i  : in std_logic;  -- local clk from 125Mhz oszillator
+--    clk_20m_vcxo_i    : in std_logic;  -- 20MHz VCXO clock
+--    clk_125m_pllref_i : in std_logic;  -- 125 MHz PLL reference
+--    clk_125m_local_i  : in std_logic;  -- local clk from 125Mhz oszillator
+
+
+-- clocks, resets
+--clk_125m_wrpll_c_n_i : in std_logic_vector(1 downto 0);
+clk_125m_wrpll_i : in std_logic_vector(1 downto 0);
+
+--clk_lvttl_n_i : in std_logic;
+clk_lvttl_i : in std_logic;
+
+--clk_osc_i(n) : in std_logic_vector(1 downto 0);
+clk_osc_i : in std_logic_vector(1 downto 0);
+
+clk_20m_vcxo_i : in std_logic;
+
     
     -----------------------------------------------------------------------
     -- VME bus
     -----------------------------------------------------------------------
-    vme_as_n_i          : in    std_logic;
-    vme_rst_n_i         : in    std_logic;
-    vme_write_n_i       : in    std_logic;
-    vme_am_i            : in    std_logic_vector(5 downto 0);
-    vme_ds_n_i          : in    std_logic_vector(1 downto 0);
-    vme_ga_i            : in    std_logic_vector(3 downto 0);
-    vme_ga_extended_i   : in    std_logic_vector(3 downto 0);
-    vme_addr_data_b     : inout std_logic_vector(31 downto 0);
-    vme_iackin_n_i      : in    std_logic;
-    vme_iackout_n_o     : out   std_logic;
-    vme_iack_n_i        : in    std_logic;
-    vme_irq_n_o         : out   std_logic_vector(6 downto 0);
-    vme_berr_o          : out   std_logic;
-    vme_dtack_oe_o      : out   std_logic;
-    vme_buffer_latch_o  : out   std_logic_vector(3 downto 0);
-    vme_data_oe_ab_o    : out   std_logic;
-    vme_data_oe_ba_o    : out   std_logic;
-    vme_addr_oe_ab_o    : out   std_logic;
-    vme_addr_oe_ba_o    : out   std_logic;
+--    vme_as_n_i          : in    std_logic;
+--    vme_rst_n_i         : in    std_logic;
+--    vme_write_n_i       : in    std_logic;
+--    vme_am_i            : in    std_logic_vector(5 downto 0);
+--    vme_ds_n_i          : in    std_logic_vector(1 downto 0);
+--    vme_ga_i            : in    std_logic_vector(3 downto 0);
+--    vme_ga_extended_i   : in    std_logic_vector(3 downto 0);
+--    vme_addr_data_b     : inout std_logic_vector(31 downto 0);
+--    vme_iackin_n_i      : in    std_logic;
+--    vme_iackout_n_o     : out   std_logic;
+--    vme_iack_n_i        : in    std_logic;
+--    vme_irq_n_o         : out   std_logic_vector(6 downto 0);
+--    vme_berr_o          : out   std_logic;
+--    vme_dtack_oe_o      : out   std_logic;
+
+
+vmeb_as_n_i : in std_logic;
+vmeb_sysrst_n_i : in std_logic;
+vmeb_write_n_i : in std_logic;	 
+vmeb_am_i : in std_logic_vector(5 downto 0);
+vmeb_ds_n_i : in std_logic_vector(1 downto 0);
+vmeb_ga_n_i : in std_logic_vector(4 downto 0);
+vmeb_gap_n_i : in std_logic;
+vmeb_ad_io : inout std_logic_vector(31 downto 0);
+vmeb_iackin_n_i : in std_logic;
+vmeb_iackout_n_o : out std_logic;
+vmeb_iack_n_i : in std_logic;
+vmeb_irq_n_o : out std_logic_vector(7 downto 1);
+vmeb_berr_n_o : out std_logic;
+vmeb_dtack_n_o : out std_logic;
+
+vmeb_retry_n_o : out std_logic;
+
+vme_hsa_i : in std_logic_vector(7 downto 0); -- GA address from HEX switches
+	 
+----------------------------------------------------------
+-- VME buffers control
+----------------------------------------------------------
+--    vme_buffer_latch_o  : out   std_logic_vector(3 downto 0);
+--    vme_data_oe_ab_o    : out   std_logic;
+--    vme_data_oe_ba_o    : out   std_logic;
+--    vme_addr_oe_ab_o    : out   std_logic;
+--    vme_addr_oe_ba_o    : out   std_logic;
+
+
+laiv_o : out std_logic;
+caiv_o : out std_logic;
+oaiv_o : out std_logic;
+lavi_o : out std_logic;
+cavi_o : out std_logic;
+oavi_o : out std_logic;
+
+ldiv_o : out std_logic;
+cdiv_o : out std_logic;
+odiv_o : out std_logic;
+ldvi_o : out std_logic;
+cdvi_o : out std_logic;
+odvi_o : out std_logic;
+  
   
     ------------------------------------------------------------------------
     -- WR DAC signals
     ------------------------------------------------------------------------
-    dac_sclk       : out std_logic;
-    dac_din        : out std_logic;
-    ndac_cs        : out std_logic_vector(2 downto 1);
+--    dac_sclk       : out std_logic;
+--    dac_din        : out std_logic;
+--    ndac_cs        : out std_logic_vector(2 downto 1);
+
+wr_dac_sclk_o : out std_logic;
+wr_dac_din_o : out std_logic;
+wr_dac_cs_n_o : out std_logic;
     
     -----------------------------------------------------------------------
     -- OneWire
     -----------------------------------------------------------------------
-    rom_data        : inout std_logic;
-    
+--    rom_data        : inout std_logic;
+rom_data_io : inout std_logic;
     -----------------------------------------------------------------------
     -- display
     -----------------------------------------------------------------------
-    di              : out std_logic_vector(6 downto 0);
-    ai              : in  std_logic_vector(1 downto 0);
-    dout_LCD        : in  std_logic;
-    wrdis           : out std_logic := '0';
-    dres            : out std_logic := '1';
+--    di              : out std_logic_vector(6 downto 0);
+--    ai              : in  std_logic_vector(1 downto 0);
+--    dout_LCD        : in  std_logic;
+--    wrdis           : out std_logic := '0';
+--    dres            : out std_logic := '1';
+	 
+dis_rst_o : out std_logic;
+dis_di_o : out std_logic_vector(6 downto 0);
+dis_ai_i : in std_logic_vector(1 downto 0);
+dis_do_o : out std_logic;
+dis_wr_o : out std_logic;
+	 
     
     -----------------------------------------------------------------------
     -- io
     -----------------------------------------------------------------------
-    fpga_res        : in std_logic;
-    nres            : in std_logic;
-    pbs2            : in std_logic;
-    hpw             : inout std_logic_vector(15 downto 0) := (others => 'Z'); -- logic analyzer
-    ant             : inout std_logic_vector(26 downto 1) := (others => 'Z'); -- trigger bus
+--    fpga_res        : in std_logic;
+--    nres            : in std_logic;
+--    pbs2            : in std_logic;
+--    hpw             : inout std_logic_vector(15 downto 0) := (others => 'Z'); -- logic analyzer
+--    ant             : inout std_logic_vector(26 downto 1) := (others => 'Z'); -- trigger bus
+
+nres_i : in std_logic;
+fpga_res_i : in std_logic;
+
+pbs_f_i : in std_logic;
+	 
+dip_sel_i : in std_logic_vector(2 downto 1);
+
+hswf_i : in std_logic_vector(4 downto 1);
+
+   -----------------------------------------------------------------------
+	-- LOGIC ANALZER
+   -----------------------------------------------------------------------
+	 
+hpwck_io : inout std_logic;
+hpw_io : inout std_logic_vector(15 downto 0);
+    
     
     -----------------------------------------------------------------------
-    -- pexaria5db1/2
+    -- CPLD
     -----------------------------------------------------------------------
-    p1              : inout std_logic := 'Z'; -- HPWX0 logic analyzer: 3.3V
-    n1              : inout std_logic := 'Z'; -- HPWX1
-    p2              : inout std_logic := 'Z'; -- HPWX2
-    n2              : inout std_logic := 'Z'; -- HPWX3
-    p3              : inout std_logic := 'Z'; -- HPWX4
-    n3              : inout std_logic := 'Z'; -- HPWX5
-    p4              : inout std_logic := 'Z'; -- HPWX6
-    n4              : inout std_logic := 'Z'; -- HPWX7
-    p5              : out   std_logic := 'Z'; -- LED1 1-6: 3.3V (red)   1|Z=off, 0=on
-    n5              : out   std_logic := 'Z'; -- LED2           (blue)
-    p6              : out   std_logic := 'Z'; -- LED3           (green)
-    n6              : out   std_logic := 'Z'; -- LED4           (white)
-    p7              : out   std_logic := 'Z'; -- LED5           (red)
-    n7              : out   std_logic := 'Z'; -- LED6           (blue)
-    p8              : out   std_logic := 'Z'; -- LED7 7-8: 2.5V (green)
-    n8              : out   std_logic := 'Z'; -- LED8           (white)
-    
-    p9              : out   std_logic := 'Z'; -- TERMEN1 = terminate TTLIO1, 1=x, 0|Z=x (Q2 BSH103 -- G pin)
-    n9              : out   std_logic := 'Z'; -- TERMEN2 = terminate TTLIO2, 1=x, 0|Z=x
-    p10             : out   std_logic := 'Z'; -- TERMEN3 = terminate TTLIO3, 1=x, 0|Z=x
-    n10             : out   std_logic := 'Z'; -- TTLEN1  = TTLIO1 output enable, 0=enable, 1|Z=disable
-    p11             : out   std_logic := 'Z'; -- n/c
-    n11             : out   std_logic := 'Z'; -- TTLEN3  = TTLIO2 output enable, 0=enable, 1|Z=disable
-    p12             : out   std_logic := 'Z'; -- n/c
-    n12             : out   std_logic := 'Z'; -- n/c
-    p13             : out   std_logic := 'Z'; -- n/c
-    n13             : out   std_logic := 'Z'; -- n/c
-    p14             : out   std_logic := 'Z'; -- n/c
-    n14             : out   std_logic := 'Z'; -- TTLEN5  = TTLIO3 output enable, 0=enable, 1|Z=disable
-    p15             : out   std_logic := 'Z'; -- n/c
-    n15             : inout std_logic := 'Z'; -- ROM_DATA
-    p16             : out   std_logic := 'Z'; -- FPLED5  = TTLIO3 (red)  0=on, Z=off
-    n16             : out   std_logic := 'Z'; -- FPLED6           (blue)
-    
-    p17             : in    std_logic;        -- N_LVDS_1 / SYnIN
-    n17             : in    std_logic;        -- P_LVDS_1 / SYpIN
-    p18             : in    std_logic;        -- N_LVDS_2 / TRnIN
-    n18             : in    std_logic;        -- P_LVDS_2 / TRpIN
-    p19             : out   std_logic;        -- N_LVDS_3 / CK200n
---    n19             : out   std_logic;        -- P_LVDS_3 / CK200p
-    p21             : in    std_logic;        -- N_LVDS_6  = TTLIO1 in
-    n21             : in    std_logic;        -- P_LVDS_6
-    p22             : in    std_logic;        -- N_LVDS_8  = TTLIO2 in
-    n22             : in    std_logic;        -- P_PVDS_8
-    p23             : in    std_logic;        -- N_LVDS_10 = TTLIO3 in
-    n23             : in    std_logic;        -- P_LVDS_10
-    p24             : out   std_logic;        -- N_LVDS_4 / SYnOU
---    n24             : out   std_logic;        -- P_LVDS_4 / SYpOU
-    p25             : out   std_logic;        -- N_LVDS_5  = TTLIO1 out
-    n25             : out   std_logic;        -- P_LVDS_5
-    p26             : out   std_logic := 'Z'; -- FPLED3    = TTLIO2 (red)  0=on, Z=off
-    n26             : out   std_logic := 'Z'; -- FPLED4             (blue)
-    p27             : out   std_logic;        -- N_LVDS_7  = TTLIO2 out
-    n27             : out   std_logic;        -- P_LVDS_7
-    p28             : out   std_logic;        -- N_LVDS_9  = TTLIO3 out
-    n28             : out   std_logic;        -- P_LVDS_9
-    p29             : out   std_logic := 'Z'; -- FPLED1    = TTLIO1 (red)  0=on, Z=off
-    n29             : out   std_logic := 'Z'; -- FPLED2             (blue)
-    p30             : out   std_logic := 'Z'; -- n/c
-    n30             : out   std_logic := 'Z'; -- n/c
-    
-    -----------------------------------------------------------------------
-    -- connector cpld
-    -----------------------------------------------------------------------
-    con             : out std_logic_vector(5 downto 1);
+--    con             : out std_logic_vector(5 downto 1);
+
+con_io : inout std_logic_vector(5 downto 1);
     
     -----------------------------------------------------------------------
     -- usb
     -----------------------------------------------------------------------
-    slrd            : out   std_logic;
-    slwr            : out   std_logic;
-    fd              : inout std_logic_vector(7 downto 0) := (others => 'Z');
-    pa              : inout std_logic_vector(7 downto 0) := (others => 'Z');
-    ctl             : in    std_logic_vector(2 downto 0);
-    uclk            : in    std_logic;
-    ures            : out   std_logic;
+--    slrd            : out   std_logic;
+--    slwr            : out   std_logic;
+--    fd              : inout std_logic_vector(7 downto 0) := (others => 'Z');
+--    pa              : inout std_logic_vector(7 downto 0) := (others => 'Z');
+--    ctl             : in    std_logic_vector(2 downto 0);
+--    uclk            : in    std_logic;
+--    ures            : out   std_logic;
+
+
+slrd_o : out std_logic;
+slwr_o : out std_logic;
+fd_io : inout std_logic_vector(7 downto 0);
+pa_io : inout std_logic_vector(7 downto 0);
+ctl_i : in std_logic_vector(2 downto 0);
+uclk_i : in std_logic;
+ures_o : out std_logic;
+ifclk_i : in std_logic;
     
     -----------------------------------------------------------------------
     -- leds onboard
     -----------------------------------------------------------------------
-    led             : out std_logic_vector(8 downto 1) := (others => '1');
-    
-    -----------------------------------------------------------------------
-    -- leds SFPs
-    -----------------------------------------------------------------------
-    ledsfpr          : out std_logic_vector(4 downto 1);
-    ledsfpg          : out std_logic_vector(4 downto 1);
+--    led             : out std_logic_vector(8 downto 1) := (others => '1');
 
-    sfp234_ref_clk_i    : in  std_logic;
+led_status_o : out std_logic_vector(6 downto 1);
+led_user_o : out std_logic_vector(8 downto 1);
+    
 
     -----------------------------------------------------------------------
     -- SFP 
     -----------------------------------------------------------------------
     
-    sfp4_tx_disable_o : out std_logic := '0';
-    sfp4_tx_fault     : in std_logic;
-    sfp4_los          : in std_logic;
+--    sfp4_tx_disable_o : out std_logic := '0';
+--    sfp4_tx_fault     : in std_logic;
+--    sfp4_los          : in std_logic;
+
+sfp_los_i : in std_logic;
+sfp_tx_fault_i : in std_logic;
+sfp_tx_dis_o : out std_logic;
     
-    sfp4_txp_o        : out std_logic;
-    sfp4_rxp_i        : in  std_logic;
+--sfp_rxd_i(n) : in std_logic;
+sfp_rxd_i : in std_logic;
+--sfp_txd_o(n) : out std_logic;
+sfp_txd_o : out std_logic;
     
-    sfp4_mod0         : in    std_logic; -- grounded by module
-    sfp4_mod1         : inout std_logic; -- SCL
-    sfp4_mod2         : inout std_logic); -- SDA
-    
+--    sfp4_mod0         : in    std_logic; -- grounded by module
+--    sfp4_mod1         : inout std_logic; -- SCL
+--    sfp4_mod2         : inout std_logic); -- SDA
+
+sfp_mod0_i : in std_logic;
+sfp_mod1_io : inout std_logic;
+sfp_mod2_io : inout std_logic;
+
+----------------------------------------------------------
+-- PG1 mezzanine connector
+----------------------------------------------------------
+
+-- LOG1 L, BANK 8D
+-- receiver channels
+pg1_n_o : out std_logic_vector(7 downto 1);
+pg1_p_o : out std_logic_vector(7 downto 1);
+
+-- transmitter channels
+pg1_n_o : out std_logic_vector(15 downto 9);
+pg1_p_o : out std_logic_vector(15 downto 9);
+
+-- LOG1 J, BANK 7D
+-- high speed differential IOs
+-- receiver channels
+pg1_n_i : in std_logic_vector(24 downto 17);
+pg1_p_i : in std_logic_vector(24 downto 17);
+
+-- transmitter channels
+pg1_n_o : out std_logic_vector(31 downto 25);
+pg1_p_o : out std_logic_vector(31 downto 25);
+
+
+pg1_card_present_n_i : in std_logic;
+pg1_power_good_f_i : in std_logic;
+pg1_power_run_f_o : out std_logic;
+
+pg1_rom_data_io : inout std_logic;
+
+
+----------------------------------------------------------
+-- PG2 mezzanine connector
+----------------------------------------------------------
+
+-- LOG1 B, BANK 3D
+-- receiver channels
+pg2_n_o : out std_logic_vector(7 downto 1);
+pg2_p_o : out std_logic_vector(7 downto 1);
+
+-- transmitter channels
+pg2_n_o : out std_logic_vector(15 downto 9);
+pg2_p_o : out std_logic_vector(15 downto 9);
+
+-- LOG1 I, BANK 7C
+-- high speed differential IOs
+
+-- receiver channels
+pg2_n_i : in std_logic_vector(24 downto 17);
+pg2_p_i : in std_logic_vector(24 downto 17);
+
+-- transmitter channels
+pg2_n_o : out std_logic_vector(31 downto 25);
+pg2_p_o : out std_logic_vector(31 downto 25);
+
+pg2_card_present_n_i : in std_logic;
+pg2_power_good_f_i : in std_logic;
+pg2_power_run_f_o : out std_logic;
+
+pg2_rom_data_io : inout std_logic;
+
+----------------------------------------------------------
+-- carrier lemo IOs
+----------------------------------------------------------
+
+lvtio_in_n_i : in std_logic_vector(2 downto 1);
+lvtio_in_p_i : in std_logic_vector(2 downto 1);
+
+lvtio_out_n_o : out std_logic_vector(2 downto 1);
+lvtio_out_p_o : out std_logic_vector(2 downto 1);
+
+lvtio_term_en_o : out std_logic_vector(2 downto 1);
+lvtio_led_dir_o : out std_logic_vector(2 downto 1);
+lvtio_led_act_o : out std_logic_vector(2 downto 1);
+
+lvtio_oe_n_o : out std_logic_vector(2 downto 1);
+lvttl_in_clk_en_n_o : out std_logic
+
+);    
 end vetar5;
 
 architecture rtl of vetar5 is
@@ -185,13 +300,23 @@ architecture rtl of vetar5 is
   signal s_hex_vn2_i  : std_logic_vector(3 downto 0);
   
   signal gpio_o       : std_logic_vector(7 downto 0);
-  signal lvds_p_i     : std_logic_vector(4 downto 0);
-  signal lvds_n_i     : std_logic_vector(4 downto 0);
-  signal lvds_i_led   : std_logic_vector(4 downto 0);
-  signal lvds_p_o     : std_logic_vector(2 downto 0);
-  signal lvds_n_o     : std_logic_vector(2 downto 0);
-  signal lvds_o_led   : std_logic_vector(2 downto 0);
-  signal lvds_oen     : std_logic_vector(2 downto 0);
+  
+  signal lvds_in_p    : std_logic_vector(11 downto 0);
+  signal lvds_in_n    : std_logic_vector(11 downto 0);
+  signal lvds_i_led   : std_logic_vector(11 downto 0);
+  signal lvds_out_p   : std_logic_vector(11 downto 0);
+  signal lvds_out_n   : std_logic_vector(11 downto 0);
+  signal lvds_o_led   : std_logic_vector(11 downto 0);
+  signal lvds_oen     : std_logic_vector(11 downto 0);
+  
+  signal vme_ga_internal	: std_logic_vector(5 downto 0);
+  
+  signal vme_buffer_latch : std_logic_vector(3 downto 0);
+  signal vme_data_oe_ab : std_logic;
+  signal vme_data_oe_ba : std_logic;
+  signal vme_addr_oe_ab : std_logic;
+  signal vme_addr_oe_ba : std_logic;
+  
 
   constant c_family  : string := "Arria V"; 
   constant c_project : string := "vetar5";
@@ -219,98 +344,208 @@ begin
     )  
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
-      core_clk_125m_pllref_i => clk_125m_pllref_i,
-      core_clk_125m_sfpref_i => sfp234_ref_clk_i,
-      core_clk_125m_local_i  => clk_125m_local_i,
-      core_rstn_i            => pbs2,
-      core_clk_butis_o       => p19,
-      core_clk_butis_t0_o    => p24,
-      wr_onewire_io          => rom_data,
-      wr_sfp_sda_io          => sfp4_mod2,
-      wr_sfp_scl_io          => sfp4_mod1,
-      wr_sfp_det_i           => sfp4_mod0,
-      wr_sfp_tx_o            => sfp4_txp_o,
-      wr_sfp_rx_i            => sfp4_rxp_i,
-      wr_dac_sclk_o          => dac_sclk,
-      wr_dac_din_o           => dac_din,
-      wr_ndac_cs_o           => ndac_cs,
-      gpio_o                 => gpio_o,
-      lvds_p_i               => lvds_p_i,
-      lvds_n_i               => lvds_n_i,
+      core_clk_125m_pllref_i => clk_125m_wrpll_i(1),
+      core_clk_125m_sfpref_i => clk_125m_wrpll_i(0),
+      core_clk_125m_local_i  => clk_osc_i(1),
+      core_rstn_i            => pbs_f_i,
+      core_clk_butis_o       => open,
+      core_clk_butis_t0_o    => open,
+      
+		wr_onewire_io          => rom_data_io,
+      
+		wr_sfp_sda_io          => sfp_mod2_io,
+      wr_sfp_scl_io          => sfp_mod1_io,
+      wr_sfp_det_i           => sfp_mod0_i,
+      wr_sfp_tx_o            => sfp_txp_o,
+      wr_sfp_rx_i            => sfp_rxp_i,
+      wr_dac_sclk_o          => wr_dac_sclk_o,
+      wr_dac_din_o           => wr_dac_din_o,
+      wr_ndac_cs_o           => wr_dac_cs_n_o,
+      
+		gpio_o                 => gpio_o,
+      
+		lvds_p_i               => lvds_in_p,
+      lvds_n_i               => lvds_in_n,
       lvds_i_led_o           => lvds_i_led,
-      lvds_p_o               => lvds_p_o,
-      lvds_n_o               => lvds_n_o,
+      lvds_p_o               => lvds_out_p,
+      lvds_n_o               => lvds_out_n,
       lvds_o_led_o           => lvds_o_led,
       lvds_oen_o             => lvds_oen,
-      led_link_up_o          => led_link_up,
+      
+		led_link_up_o          => led_link_up,
       led_link_act_o         => led_link_act,
       led_track_o            => led_track,
       led_pps_o              => led_pps,
-      vme_as_n_i             => vme_as_n_i,
-      vme_rst_n_i            => vme_rst_n_i,
-      vme_write_n_i          => vme_write_n_i,
-      vme_am_i               => vme_am_i,
-      vme_ds_n_i             => vme_ds_n_i,
-      vme_ga_i               => vme_ga_i,
-      vme_addr_data_b        => vme_addr_data_b,
-      vme_iack_n_i           => vme_iack_n_i,
-      vme_iackin_n_i         => vme_iackin_n_i,
-      vme_iackout_n_o        => vme_iackout_n_o,
-      vme_irq_n_o            => vme_irq_n_o,
-      vme_berr_o             => vme_berr_o,
-      vme_dtack_oe_o         => vme_dtack_oe_o,
-      vme_buffer_latch_o     => vme_buffer_latch_o,
-      vme_data_oe_ab_o       => vme_data_oe_ab_o,
-      vme_data_oe_ba_o       => vme_data_oe_ba_o,
-      vme_addr_oe_ab_o       => vme_addr_oe_ab_o,
-      vme_addr_oe_ba_o       => vme_addr_oe_ba_o,
-      usb_rstn_o             => ures,
-      usb_ebcyc_i            => pa(3),
-      usb_speed_i            => pa(0),
-      usb_shift_i            => pa(1),
-      usb_readyn_io          => pa(7),
-      usb_fifoadr_o          => pa(5 downto 4),
-      usb_sloen_o            => pa(2),
-      usb_fulln_i            => ctl(1),
-      usb_emptyn_i           => ctl(2),
-      usb_slrdn_o            => slrd,
-      usb_slwrn_o            => slwr,
-      usb_pktendn_o          => pa(6),
-      usb_fd_io              => fd,
-      pmc_ctrl_hs_i          => s_hsw_fpga,
-      pmc_pb_i               => s_pbs_fpga,
-      pmc_ctrl_hs_cpld_i     => con(4 downto 1),
-      pmc_pb_cpld_i          => con(5),
-      pmc_clk_oe_o           => s_wr_ext_in,
-      pmc_log_oe_o           => s_log_oe,
-      pmc_log_out_o          => s_log_out,
-      pmc_log_in_i           => s_log_in,
-      lcd_scp_o              => di(3),
-      lcd_lp_o               => di(1),
-      lcd_flm_o              => di(2),
-      lcd_in_o               => di(0));
+		
+      vme_as_n_i             => vmeb_as_n_i,
+      vme_rst_n_i            => vmeb_sysrst_n_i,
+      vme_write_n_i          => vmeb_write_n_i,
+      vme_am_i               => vmeb_am_i,
+      vme_ds_n_i             => vmeb_ds_n_i,
+      vme_ga_i               => vme_ga_internal,
+      vme_addr_data_b        => vmeb_ad_io,
+      vme_iack_n_i           => vmeb_iack_n_i,
+      vme_iackin_n_i         => vmeb_iackin_n_i,
+      vme_iackout_n_o        => vmeb_iackout_n_o,
+      vme_irq_n_o            => vmeb_irq_n_o,
+      vme_berr_o             => vmeb_berr_n_o,
+      vme_dtack_oe_o         => vmeb_dtack_n_o,
+		
+      vme_buffer_latch_o     => vme_buffer_latch,
+      vme_data_oe_ab_o       => vme_data_oe_ab,
+      vme_data_oe_ba_o       => vme_data_oe_ba,
+      vme_addr_oe_ab_o       => vme_addr_oe_ab,
+      vme_addr_oe_ba_o       => vme_addr_oe_ba,
+      
+		  usb_rstn_o             => ures_o,
+      usb_ebcyc_i            => pa_io(3),
+      usb_speed_i            => pa_io(0),
+      usb_shift_i            => pa_io(1),
+      usb_readyn_io          => pa_io(7),
+      usb_fifoadr_o          => pa_io(5 downto 4),
+      usb_sloen_o            => pa_io(2),
+      usb_fulln_i            => ctl_i(1),
+      usb_emptyn_i           => ctl_i(2),
+      usb_slrdn_o            => slrd_o,
+      usb_slwrn_o            => slwr_o,
+      usb_pktendn_o          => pa_io(6),
+      usb_fd_io              => fd_io,
+      
+      lcd_scp_o              => dis_di_o(3),
+      lcd_lp_o               => dis_di_o(1),
+      lcd_flm_o              => dis_di_o(2),
+      lcd_in_o               => dis_di_o(0)
+      );
 
-  -- SFP1-3 are not mounted
-  sfp4_tx_disable_o <= '0';
+  -- SFP
+  sfp_tx_disable_o <= '0';
 
   -- Link LEDs
-  wrdis <= '0';
-  dres  <= '1';
-  di(5) <= '0' when (not led_link_up)                   = '1' else 'Z'; -- red
-  di(6) <= '0' when (    led_link_up and not led_track) = '1' else 'Z'; -- blue
-  di(4) <= '0' when (    led_link_up and     led_track) = '1' else 'Z'; -- green
+  dis_wr_o <= '0';
+  dis_rst_o  <= '1';
+  dis_di_o(5) <= '0' when (not led_link_up)                   = '1' else 'Z'; -- red
+  dis_di_o(6) <= '0' when (    led_link_up and not led_track) = '1' else 'Z'; -- blue
+  dis_di_o(4) <= '0' when (    led_link_up and     led_track) = '1' else 'Z'; -- green
 
   led(1) <= not (led_link_act and led_link_up); -- red   = traffic/no-link
   led(2) <= not led_link_up;                    -- blue  = link
   led(3) <= not led_track;                      -- green = timing valid
   led(4) <= not led_pps;                        -- white = PPS
   
-  ledsfpg(3 downto 1) <= (others => '1');
-  ledsfpr(3 downto 1) <= (others => '1');
-  ledsfpg(4) <= not led_link_up;
-  ledsfpr(4) <= not led_link_act;
   
-  -- Wires to CPLD, currently unused
-  con <= (others => 'Z');
+  -- Wires to CPLD, currently only used as inputs
+  con_io <= (others => 'Z');
+  
+  
+-- mezzanine control signals  
+pg1_power_run_f_o <= '1';
+pg1_rom_data_io   <= 'Z';
+
+pg2_power_run_f_o <= '1';
+pg2_rom_data_io   <= 'Z';
+
+
+-- VME buffer control
+
+--    vme_buffer_latch_o  : out   std_logic_vector(3 downto 0);
+--    vme_data_oe_ab_o    : out   std_logic;
+--    vme_data_oe_ba_o    : out   std_logic;
+--    vme_addr_oe_ab_o    : out   std_logic;
+--    vme_addr_oe_ba_o    : out   std_logic;
+
+
+laiv_o <= vme_buffer_latch(1);
+caiv_o <= '0';
+oaiv_o <= vme_addr_oe_ba;
+
+lavi_o <= vme_buffer_latch(0);
+cavi_o <= '0';
+oavi_o <= vme_addr_oe_ab;
+
+ldiv_o <= vme_buffer_latch(3);
+cdiv_o <= '0';
+odiv_o <= vme_data_oe_ba;
+
+ldvi_o <= vme_buffer_latch(2);
+cdvi_o <= '0';
+odvi_o <= vme_data_oe_ab;
+
+-- mezzanine ios
+---------------------------------------------------------
+-- Mezzanine PG1
+-- control outputs (LEDS, OE, TERM en)
+pg1_p_o(5 downto 1)  <= lvds_oen(4 downto 0);
+pg1_n_o(5 downto 1)  <= lvds_oen(4 downto 0);
+
+pg1_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+pg1_p_o(13 downto 9)  <= lvds_i_led(4 downto 0);
+pg1_n_o(13 downto 9)  <= lvds_o_led(4 downto 0);
+
+pg1_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+-- differential IOs
+lvds_in_n(4 downto 0) <= pg1_n_i(21 downto 17);
+lvds_in_p(4 downto 0) <= pg1_p_i(21 downto 17);
+
+-- pg1_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg1_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+
+pg1_n_o(29 downto 25) <= lvds_out_n(4 downto 0);
+pg1_p_o(29 downto 25) <= lvds_out_p(4 downto 0);
+
+pg1_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+---------------------------------------------------------
+-- Mezzanine PG2
+-- control outputs (LEDS, OE, TERM en)
+pg2_p_o(5 downto 1)  <= lvds_oen(9 downto 5);
+pg2_n_o(5 downto 1)  <= lvds_oen(9 downto 5);
+
+pg2_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+pg2_p_o(13 downto 9)  <= lvds_i_led(9 downto 5);
+pg2_n_o(13 downto 9)  <= lvds_o_led(9 downto 5);
+
+pg2_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+-- differential IOs
+lvds_in_n(9 downto 5) <= pg2_n_i(21 downto 17);
+lvds_in_p(9 downto 5) <= pg2_p_i(21 downto 17);
+
+-- pg2_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg2_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+
+pg2_n_o(29 downto 25) <= lvds_out_n(9 downto 5);
+pg2_p_o(29 downto 25) <= lvds_out_p(9 downto 5);
+
+pg2_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+
+
+---------------------------------------------------
+-- on carrier LEMO IOs
+
+lvds_in_n(11 downto 10) <= lvtio_in_n_i;
+lvds_in_p(11 downto 10) <= lvtio_in_p_i;
+
+lvtio_out_n_o <= lvds_out_n(11 downto 10);
+lvtio_out_p_o <= lvds_out_p(11 downto 10);
+
+-- output enable (oe) is active low, termination enable is active hi
+lvtio_term_en_o <= lvds_oen(11 downto 10); 
+lvtio_led_dir_o <= not lvds_oen(11 downto 10);
+lvtio_led_act_o <= lvds_i_led(11 downto 10);
+
+-- output enable (oe) is active low
+lvtio_oe_n_o <= lvds_oen(11 downto 10);
+
+lvttl_in_clk_en_n_o <= '1'; -- input buffers for clock input disabled
+
   
 end rtl;
