@@ -420,7 +420,8 @@ begin
   -- SFP
   sfp_tx_dis_o <= '0';
   
-  vme_ga_internal <= vmeb_gap_n_i & vmeb_ga_n_i;
+  -- select VME Geagraphicall Address source with DIP SW
+  vme_ga_internal <= vmeb_gap_n_i & vmeb_ga_n_i when dip_sel_i(1)= '1' else vme_hsa_i(5 downto 0);
 
   -- Link LEDs
   dis_wr_o <= '0';
