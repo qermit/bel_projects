@@ -20,7 +20,7 @@ clk_125m_wrpll_i : in std_logic_vector(1 downto 0);
 clk_lvttl_i : in std_logic;
 
 --clk_osc_i(n) : in std_logic_vector(1 downto 0);
-clk_osc_i : in std_logic_vector(1 downto 0);
+clk_osc_i : in std_logic;
 
 clk_20m_vcxo_i : in std_logic;
 
@@ -97,7 +97,7 @@ odvi_o : out std_logic;
 
 wr_dac_sclk_o : out std_logic;
 wr_dac_din_o : out std_logic;
-wr_dac_cs_n_o : out std_logic;
+wr_dac_cs_n_o : out std_logic_vector(2 downto 1);
     
     -----------------------------------------------------------------------
     -- OneWire
@@ -214,22 +214,22 @@ sfp_mod2_io : inout std_logic;
 
 -- LOG1 L, BANK 8D
 -- receiver channels
-pg1_n_o : out std_logic_vector(7 downto 1);
-pg1_p_o : out std_logic_vector(7 downto 1);
+pg1_7_1_n_o : out std_logic_vector(7 downto 1);
+pg1_7_1_p_o : out std_logic_vector(7 downto 1);
 
 -- transmitter channels
-pg1_n_o : out std_logic_vector(15 downto 9);
-pg1_p_o : out std_logic_vector(15 downto 9);
+pg1_15_9_n_o : out std_logic_vector(15 downto 9);
+pg1_15_9_p_o : out std_logic_vector(15 downto 9);
 
 -- LOG1 J, BANK 7D
 -- high speed differential IOs
 -- receiver channels
-pg1_n_i : in std_logic_vector(24 downto 17);
-pg1_p_i : in std_logic_vector(24 downto 17);
+pg1_24_17_n_i : in std_logic_vector(24 downto 17);
+pg1_24_17_p_i : in std_logic_vector(24 downto 17);
 
 -- transmitter channels
-pg1_n_o : out std_logic_vector(31 downto 25);
-pg1_p_o : out std_logic_vector(31 downto 25);
+pg1_31_15_n_o : out std_logic_vector(31 downto 25);
+pg1_31_15_p_o : out std_logic_vector(31 downto 25);
 
 
 pg1_card_present_n_i : in std_logic;
@@ -245,23 +245,23 @@ pg1_rom_data_io : inout std_logic;
 
 -- LOG1 B, BANK 3D
 -- receiver channels
-pg2_n_o : out std_logic_vector(7 downto 1);
-pg2_p_o : out std_logic_vector(7 downto 1);
+pg2_7_1_n_o : out std_logic_vector(7 downto 1);
+pg2_7_1_p_o : out std_logic_vector(7 downto 1);
 
 -- transmitter channels
-pg2_n_o : out std_logic_vector(15 downto 9);
-pg2_p_o : out std_logic_vector(15 downto 9);
+pg2_15_9_n_o : out std_logic_vector(15 downto 9);
+pg2_15_9_p_o : out std_logic_vector(15 downto 9);
 
 -- LOG1 I, BANK 7C
 -- high speed differential IOs
 
 -- receiver channels
-pg2_n_i : in std_logic_vector(24 downto 17);
-pg2_p_i : in std_logic_vector(24 downto 17);
+pg2_24_17_n_i : in std_logic_vector(24 downto 17);
+pg2_24_17_p_i : in std_logic_vector(24 downto 17);
 
 -- transmitter channels
-pg2_n_o : out std_logic_vector(31 downto 25);
-pg2_p_o : out std_logic_vector(31 downto 25);
+pg2_31_15_n_o : out std_logic_vector(31 downto 25);
+pg2_31_15_p_o : out std_logic_vector(31 downto 25);
 
 pg2_card_present_n_i : in std_logic;
 pg2_power_good_f_i : in std_logic;
@@ -299,7 +299,7 @@ architecture rtl of vetar5 is
   signal s_hex_vn1_i  : std_logic_vector(3 downto 0);
   signal s_hex_vn2_i  : std_logic_vector(3 downto 0);
   
-  signal gpio_o       : std_logic_vector(7 downto 0);
+  signal gpio_o       : std_logic_vector(1 downto 0);
   
   signal lvds_in_p    : std_logic_vector(11 downto 0);
   signal lvds_in_n    : std_logic_vector(11 downto 0);
@@ -346,7 +346,7 @@ begin
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
       core_clk_125m_pllref_i => clk_125m_wrpll_i(1),
       core_clk_125m_sfpref_i => clk_125m_wrpll_i(0),
-      core_clk_125m_local_i  => clk_osc_i(1),
+      core_clk_125m_local_i  => clk_osc_i,
       core_rstn_i            => pbs_f_i,
       core_clk_butis_o       => open,
       core_clk_butis_t0_o    => open,
@@ -356,8 +356,8 @@ begin
 		wr_sfp_sda_io          => sfp_mod2_io,
       wr_sfp_scl_io          => sfp_mod1_io,
       wr_sfp_det_i           => sfp_mod0_i,
-      wr_sfp_tx_o            => sfp_txp_o,
-      wr_sfp_rx_i            => sfp_rxp_i,
+      wr_sfp_tx_o            => sfp_txd_o,
+      wr_sfp_rx_i            => sfp_rxd_i,
       wr_dac_sclk_o          => wr_dac_sclk_o,
       wr_dac_din_o           => wr_dac_din_o,
       wr_ndac_cs_o           => wr_dac_cs_n_o,
@@ -382,7 +382,7 @@ begin
       vme_write_n_i          => vmeb_write_n_i,
       vme_am_i               => vmeb_am_i,
       vme_ds_n_i             => vmeb_ds_n_i,
-      vme_ga_i               => vme_ga_internal,
+      vme_ga_i               => vme_ga_internal(3 downto 0),
       vme_addr_data_b        => vmeb_ad_io,
       vme_iack_n_i           => vmeb_iack_n_i,
       vme_iackin_n_i         => vmeb_iackin_n_i,
@@ -418,7 +418,9 @@ begin
       );
 
   -- SFP
-  sfp_tx_disable_o <= '0';
+  sfp_tx_dis_o <= '0';
+  
+  vme_ga_internal <= vmeb_gap_n_i & vmeb_ga_n_i;
 
   -- Link LEDs
   dis_wr_o <= '0';
@@ -427,10 +429,10 @@ begin
   dis_di_o(6) <= '0' when (    led_link_up and not led_track) = '1' else 'Z'; -- blue
   dis_di_o(4) <= '0' when (    led_link_up and     led_track) = '1' else 'Z'; -- green
 
-  led(1) <= not (led_link_act and led_link_up); -- red   = traffic/no-link
-  led(2) <= not led_link_up;                    -- blue  = link
-  led(3) <= not led_track;                      -- green = timing valid
-  led(4) <= not led_pps;                        -- white = PPS
+  led_status_o(1) <= not (led_link_act and led_link_up); -- red   = traffic/no-link
+  led_status_o(2) <= not led_link_up;                    -- blue  = link
+  led_status_o(3) <= not led_track;                      -- green = timing valid
+  led_status_o(4) <= not led_pps;                        -- white = PPS
   
   
   -- Wires to CPLD, currently only used as inputs
@@ -474,58 +476,58 @@ odvi_o <= vme_data_oe_ab;
 ---------------------------------------------------------
 -- Mezzanine PG1
 -- control outputs (LEDS, OE, TERM en)
-pg1_p_o(5 downto 1)  <= lvds_oen(4 downto 0);
-pg1_n_o(5 downto 1)  <= lvds_oen(4 downto 0);
+pg1_7_1_p_o(5 downto 1)  <= lvds_oen(4 downto 0);
+pg1_7_1_n_o(5 downto 1)  <= lvds_oen(4 downto 0);
 
-pg1_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg1_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_7_1_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_7_1_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg1_p_o(13 downto 9)  <= lvds_i_led(4 downto 0);
-pg1_n_o(13 downto 9)  <= lvds_o_led(4 downto 0);
+pg1_15_9_p_o(13 downto 9)  <= lvds_i_led(4 downto 0);
+pg1_15_9_n_o(13 downto 9)  <= lvds_o_led(4 downto 0);
 
-pg1_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg1_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_15_9_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_15_9_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 -- differential IOs
-lvds_in_n(4 downto 0) <= pg1_n_i(21 downto 17);
-lvds_in_p(4 downto 0) <= pg1_p_i(21 downto 17);
+lvds_in_n(4 downto 0) <= pg1_24_17_n_i(21 downto 17);
+lvds_in_p(4 downto 0) <= pg1_24_17_p_i(21 downto 17);
 
--- pg1_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
--- pg1_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg1_24_17_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg1_24_17_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg1_n_o(29 downto 25) <= lvds_out_n(4 downto 0);
-pg1_p_o(29 downto 25) <= lvds_out_p(4 downto 0);
+pg1_31_15_n_o(29 downto 25) <= lvds_out_n(4 downto 0);
+pg1_31_15_p_o(29 downto 25) <= lvds_out_p(4 downto 0);
 
-pg1_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg1_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_31_15_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg1_31_15_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 ---------------------------------------------------------
 -- Mezzanine PG2
 -- control outputs (LEDS, OE, TERM en)
-pg2_p_o(5 downto 1)  <= lvds_oen(9 downto 5);
-pg2_n_o(5 downto 1)  <= lvds_oen(9 downto 5);
+pg2_7_1_p_o(5 downto 1)  <= lvds_oen(9 downto 5);
+pg2_7_1_n_o(5 downto 1)  <= lvds_oen(9 downto 5);
 
-pg2_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg2_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_7_1_p_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_7_1_n_o(7 downto 6)  <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg2_p_o(13 downto 9)  <= lvds_i_led(9 downto 5);
-pg2_n_o(13 downto 9)  <= lvds_o_led(9 downto 5);
+pg2_15_9_p_o(13 downto 9)  <= lvds_i_led(9 downto 5);
+pg2_15_9_n_o(13 downto 9)  <= lvds_o_led(9 downto 5);
 
-pg2_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg2_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_15_9_p_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_15_9_n_o(15 downto 14) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 -- differential IOs
-lvds_in_n(9 downto 5) <= pg2_n_i(21 downto 17);
-lvds_in_p(9 downto 5) <= pg2_p_i(21 downto 17);
+lvds_in_n(9 downto 5) <= pg2_24_17_n_i(21 downto 17);
+lvds_in_p(9 downto 5) <= pg2_24_17_p_i(21 downto 17);
 
--- pg2_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
--- pg2_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg2_24_17_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
+-- pg2_24_17_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg2_n_o(29 downto 25) <= lvds_out_n(9 downto 5);
-pg2_p_o(29 downto 25) <= lvds_out_p(9 downto 5);
+pg2_31_15_n_o(29 downto 25) <= lvds_out_n(9 downto 5);
+pg2_31_15_p_o(29 downto 25) <= lvds_out_p(9 downto 5);
 
-pg2_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg2_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_31_15_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+pg2_31_15_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 
 ---------------------------------------------------
