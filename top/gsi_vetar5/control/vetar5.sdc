@@ -5,7 +5,7 @@ derive_clock_uncertainty
 set_clock_groups -asynchronous                              \
  -group { altera_reserved_tck                             } \
  -group { clk_20m_vcxo_i       main|\dmtd_a5:dmtd_inst|*  } \
- -group { clk_osc_i[1]         main|\sys_a5:sys_inst|*    } \
+ -group { clk_osc_i            main|\sys_a5:sys_inst|*    } \
  -group { clk_125m_wrpll_i[0]  main|\ref_a5:ref_inst|*      \
           main|\phy_a5:phy|*.cdr_refclk*                    \
           main|\phy_a5:phy|*.cmu_pll.*                      \

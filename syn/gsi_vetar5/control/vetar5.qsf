@@ -103,13 +103,13 @@ set_location_assignment PIN_AA14 -to pg2_15_9_p_o[15]
 set_location_assignment PIN_Y1 -to cdiv_o
 set_location_assignment PIN_AA2 -to rom_data_io
 set_location_assignment PIN_AA3 -to dis_rst_o
-set_location_assignment PIN_AA4 -to dis_di[0]
-set_location_assignment PIN_Y5 -to dis_di[1]
-set_location_assignment PIN_Y4 -to dis_di[2]
-set_location_assignment PIN_W3 -to dis_di[3]
-set_location_assignment PIN_W4 -to dis_di[4]
-set_location_assignment PIN_AA1 -to dis_di[5]
-set_location_assignment PIN_AB1 -to dis_di[6]
+set_location_assignment PIN_AA4 -to dis_di_o[0]
+set_location_assignment PIN_Y5 -to dis_di_o[1]
+set_location_assignment PIN_Y4 -to dis_di_o[2]
+set_location_assignment PIN_W3 -to dis_di_o[3]
+set_location_assignment PIN_W4 -to dis_di_o[4]
+set_location_assignment PIN_AA1 -to dis_di_o[5]
+set_location_assignment PIN_AB1 -to dis_di_o[6]
 set_location_assignment PIN_W7 -to dis_ai_i[0]
 set_location_assignment PIN_W6 -to dis_ai_i[1]
 set_location_assignment PIN_AA5 -to dis_do_o
@@ -119,13 +119,13 @@ set_location_assignment PIN_V7 -to fpga_res_i
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to cdiv_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to rom_data_io
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_rst_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[0]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[1]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[2]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[3]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[4]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[5]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_di_o[6]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_ai_i[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_ai_i[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to dis_do_o
@@ -134,8 +134,8 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to pbs_f_i
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to fpga_res_i
 set_location_assignment PIN_AC8 -to wr_dac_sclk_o
 set_location_assignment PIN_AD8 -to wr_dac_din_o
-set_location_assignment PIN_AF8 -to wr_ndac_cs_o[1]
-set_location_assignment PIN_AF7 -to wr_ndac_cs_o[2]
+set_location_assignment PIN_AF8 -to wr_dac_cs_n_o[1]
+set_location_assignment PIN_AF7 -to wr_dac_cs_n_o[2]
 set_location_assignment PIN_AC7 -to vmeb_berr_n_o
 set_location_assignment PIN_AD7 -to vmeb_write_n_i
 set_location_assignment PIN_AF5 -to slrd_o
@@ -164,8 +164,8 @@ set_location_assignment PIN_AB6 -to uclk_i
 set_location_assignment PIN_AC6 -to ures_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_dac_sclk_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_dac_din_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_ndac_cs1_o
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_ndac_cs2_o
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_dac_cs_n_o[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to wr_dac_cs_n_o[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to vmeb_berr_n_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to vmeb_write_n_i
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to slrd_o
@@ -407,7 +407,7 @@ set_location_assignment PIN_J6 -to vmeb_dtack_n_o
 set_location_assignment PIN_G6 -to vmeb_retry_n_o
 set_location_assignment PIN_J7 -to vmeb_iackout_n_o
 set_location_assignment PIN_F6 -to vmeb_sysrst_n_i
-set_location_assignment PIN_A3 -to crc_error_o
+#set_location_assignment PIN_A3 -to crc_error_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to laiv_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to caiv_o
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to oaiv_o
@@ -435,12 +435,7 @@ set_location_assignment PIN_C6 -to pg2_24_17_n_i[20]
 set_location_assignment PIN_B6 -to pg2_24_17_p_i[20]
 set_location_assignment PIN_H9 -to pg2_24_17_n_i[21]
 set_location_assignment PIN_G9 -to pg2_24_17_p_i[21]
-set_location_assignment PIN_D8 -to pg2_24_17_n_i[22]
-set_location_assignment PIN_C8 -to pg2_24_17_p_i[22]
-set_location_assignment PIN_E9 -to pg2_24_17_n_i[23]
-set_location_assignment PIN_D9 -to pg2_24_17_p_i[23]
-set_location_assignment PIN_H10 -to pg2_24_17_n_i[24]
-set_location_assignment PIN_G10 -to pg2_24_17_p_i[24]
+
 
 set_location_assignment PIN_J8 -to pg2_31_25_n_o[25]
 set_location_assignment PIN_J9 -to pg2_31_25_p_o[25]
@@ -452,10 +447,7 @@ set_location_assignment PIN_C7 -to pg2_31_25_n_o[28]
 set_location_assignment PIN_B7 -to pg2_31_25_p_o[28]
 set_location_assignment PIN_A9 -to pg2_31_25_n_o[29]
 set_location_assignment PIN_A8 -to pg2_31_25_p_o[29]
-set_location_assignment PIN_K10 -to pg2_31_25_n_o[30]
-set_location_assignment PIN_J10 -to pg2_31_25_p_o[30]
-set_location_assignment PIN_C9 -to pg2_31_25_n_o[31]
-set_location_assignment PIN_B9 -to pg2_31_25_p_o[31]
+
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[17]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[17]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[18]
@@ -466,12 +458,7 @@ set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[20]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[20]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[21]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[21]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[22]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[22]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[23]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[23]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_n_i[24]
-#set_instance_assignment -name IO_STANDARD LVDS -to pg2_24_17_p_i[24]
+
 
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_n_o[25]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_p_o[25]
@@ -483,10 +470,6 @@ set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_n_o[28]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_p_o[28]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_n_o[29]
 set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_p_o[29]
-set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_n_o[30]
-set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_p_o[30]
-set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_n_o[31]
-set_instance_assignment -name IO_STANDARD LVDS -to pg2_31_25_p_o[31]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[17]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[17]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[18]
@@ -497,13 +480,9 @@ set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[2
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[20]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[21]
 set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[21]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[22]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[22]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[23]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[23]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_n_i[24]
-#set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg2_24_17_p_i[24]
+
 set_location_assignment PIN_E10 -to pg2_card_present_n_i
+
 set_location_assignment PIN_C10 -to pg1_24_17_n_i[17]
 set_location_assignment PIN_B10 -to pg1_24_17_p_i[17]
 set_location_assignment PIN_K12 -to pg1_24_17_n_i[18]
@@ -514,12 +493,8 @@ set_location_assignment PIN_J12 -to pg1_24_17_n_i[20]
 set_location_assignment PIN_H12 -to pg1_24_17_p_i[20]
 set_location_assignment PIN_C12 -to pg1_24_17_n_i[21]
 set_location_assignment PIN_B12 -to pg1_24_17_p_i[21]
-set_location_assignment PIN_B13 -to pg1_24_17_n_i[22]
-set_location_assignment PIN_A13 -to pg1_24_17_p_i[22]
-set_location_assignment PIN_E13 -to pg1_24_17_n_i[23]
-set_location_assignment PIN_D13 -to pg1_24_17_p_i[23]
-set_location_assignment PIN_A14 -to pg1_24_17_n_i[24]
-set_location_assignment PIN_A15 -to pg1_24_17_p_i[24]
+
+
 set_location_assignment PIN_G11 -to pg1_31_25_n_o[25]
 set_location_assignment PIN_F11 -to pg1_31_25_p_o[25]
 set_location_assignment PIN_D11 -to pg1_31_25_n_o[26]
@@ -530,13 +505,45 @@ set_location_assignment PIN_E12 -to pg1_31_25_n_o[28]
 set_location_assignment PIN_D12 -to pg1_31_25_p_o[28]
 set_location_assignment PIN_D14 -to pg1_31_25_n_o[29]
 set_location_assignment PIN_C14 -to pg1_31_25_p_o[29]
-set_location_assignment PIN_G14 -to pg1_31_25_n_o[30]
-set_location_assignment PIN_F14 -to pg1_31_25_p_o[30]
-set_location_assignment PIN_J14 -to pg1_31_25_n_o[31]
-set_location_assignment PIN_J13 -to pg1_31_25_p_o[31]
+
+
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_n_i[17]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_p_i[17]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_n_i[18]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_p_i[18]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_n_i[19]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_p_i[19]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_n_i[20]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_p_i[20]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_n_i[21]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_24_17_p_i[21]
+
+
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_n_o[25]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_p_o[25]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_n_o[26]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_p_o[26]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_n_o[27]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_p_o[27]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_n_o[28]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_p_o[28]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_n_o[29]
+set_instance_assignment -name IO_STANDARD LVDS -to pg1_31_25_p_o[29]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_n_i[17]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_p_i[17]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_n_i[18]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_p_i[18]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_n_i[19]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_p_i[19]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_n_i[20]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_p_i[20]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_n_i[21]
+set_instance_assignment -name INPUT_TERMINATION DIFFERENTIAL -to pg1_24_17_p_i[21]
+
+
 set_location_assignment PIN_G13 -to pg1_card_present_n_i
-set_location_assignment PIN_A23 -to "clk_lvttl_i(n)"
-set_location_assignment PIN_B22 -to clk_lvttl_i
+
+
 set_location_assignment PIN_C22 -to "clk_osc_i(n)"
 set_location_assignment PIN_C23 -to clk_osc_i
 set_location_assignment PIN_D19 -to lvtio_in_n_i[1]
@@ -1143,6 +1150,9 @@ set_global_assignment -name VHDL_FILE "../../../ip_cores/wr-cores/modules/wr_eca
 set_global_assignment -name VHDL_FILE "../../../ip_cores/general-cores/modules/wishbone/wb_simple_timer/xwb_tics.vhd"
 set_global_assignment -name VHDL_FILE ../../../modules/chopper/Debounce_Skal.vhd
 set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:vetar5.tcl"
+
+
+
 
 
 

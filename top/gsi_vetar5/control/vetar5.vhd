@@ -228,8 +228,8 @@ pg1_24_17_n_i : in std_logic_vector(24 downto 17);
 pg1_24_17_p_i : in std_logic_vector(24 downto 17);
 
 -- transmitter channels
-pg1_31_15_n_o : out std_logic_vector(31 downto 25);
-pg1_31_15_p_o : out std_logic_vector(31 downto 25);
+pg1_31_25_n_o : out std_logic_vector(31 downto 25);
+pg1_31_25_p_o : out std_logic_vector(31 downto 25);
 
 
 pg1_card_present_n_i : in std_logic;
@@ -260,8 +260,8 @@ pg2_24_17_n_i : in std_logic_vector(24 downto 17);
 pg2_24_17_p_i : in std_logic_vector(24 downto 17);
 
 -- transmitter channels
-pg2_31_15_n_o : out std_logic_vector(31 downto 25);
-pg2_31_15_p_o : out std_logic_vector(31 downto 25);
+pg2_31_25_n_o : out std_logic_vector(31 downto 25);
+pg2_31_25_p_o : out std_logic_vector(31 downto 25);
 
 pg2_card_present_n_i : in std_logic;
 pg2_power_good_f_i : in std_logic;
@@ -496,11 +496,11 @@ lvds_in_p(4 downto 0) <= pg1_24_17_p_i(21 downto 17);
 -- pg1_24_17_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 -- pg1_24_17_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg1_31_15_n_o(29 downto 25) <= lvds_out_n(4 downto 0);
-pg1_31_15_p_o(29 downto 25) <= lvds_out_p(4 downto 0);
+pg1_31_25_n_o(29 downto 25) <= lvds_out_n(4 downto 0);
+pg1_31_25_p_o(29 downto 25) <= lvds_out_p(4 downto 0);
 
-pg1_31_15_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg1_31_15_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+--pg1_31_25_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+--pg1_31_25_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 ---------------------------------------------------------
 -- Mezzanine PG2
@@ -524,11 +524,11 @@ lvds_in_p(9 downto 5) <= pg2_24_17_p_i(21 downto 17);
 -- pg2_24_17_n_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 -- pg2_24_17_p_i(24 downto 22); -- not used on mezzanine MZNN_VME_A_REVA
 
-pg2_31_15_n_o(29 downto 25) <= lvds_out_n(9 downto 5);
-pg2_31_15_p_o(29 downto 25) <= lvds_out_p(9 downto 5);
+pg2_31_25_n_o(29 downto 25) <= lvds_out_n(9 downto 5);
+pg2_31_25_p_o(29 downto 25) <= lvds_out_p(9 downto 5);
 
-pg2_31_15_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
-pg2_31_15_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+--pg2_31_25_n_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
+--pg2_31_25_p_o(31 downto 30) <= (others => '0'); -- not used on mezzanine MZNN_VME_A_REVA
 
 
 ---------------------------------------------------
