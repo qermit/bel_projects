@@ -103,12 +103,12 @@ int ftmRst(void) {
 }  
 
 int ftmSetDuetime(uint64_t tdue) {
-  vTdue = tdue>>3;
+  vTdue = tdue;
   return 0;
 }
 
 int ftmSetTrntime(uint64_t ttrn) {
-  vTtrn = ttrn>>3;
+  vTtrn = ttrn;
   return 0;
 }
 
@@ -146,7 +146,7 @@ int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep) {
   int cpuIdx;
   for(cpuIdx = 0; cpuIdx < p->cpuQty; cpuIdx++) {
     if(dstCpus & (1 << cpuIdx)) {
-      vTprep[cpuIdx] = tprep>>3;
+      vTprep[cpuIdx] = tprep;
     }  
   }
   return 0;  
@@ -318,7 +318,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
     SNTPRINTF(pSB ,"\u2502 EBM Adr      \u2502         0x%08x", buffPrioq[PRIO_EBM_ADR_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     tmp = (((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_1>>2]) <<32) + ((uint64_t)buffPrioq[PRIO_CNT_OUT_ALL_GET_0>>2]); 
-    SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
     SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[PRIO_TX_MAX_MSGS_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
@@ -351,7 +351,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
       SNTPRINTF(pSB ,"\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
-       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), ftmMsgs, ftmTPrep<<3);
+       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), ftmMsgs, ftmTPrep);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*CPU_SHARED_SIZE);
       if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) SNTPRINTF(pSB ,"   Act Page: A 0x%08x  Inact Page: B 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);

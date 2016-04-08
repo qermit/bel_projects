@@ -89,7 +89,7 @@ int insertFpqEntry()
 
    const unsigned int c_period = 375000000/1;
       
-   stime = getSysTime() + ct_sec + ct_trn - ((run++)<<3); //+ (1 + ((run>>5)*5))*ct_sec ;
+   stime = getSysTime() + ct_sec + ct_trn - ((run++)); //+ (1 + ((run>>5)*5))*ct_sec ;
    
       atomic_on();
       *pFpqData = (unsigned int)(stime>>32);

@@ -699,7 +699,7 @@ int ftmSetPreptime(uint32_t dstCpus, uint64_t tprep) {
     if((dstCpus >> cpuIdx) & 0x1) {
       if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
       eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +0), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(tprep>>35));
-      eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(tprep>>3));
+      eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_TPREP_OFFSET +4), EB_BIG_ENDIAN | EB_DATA32, (uint32_t)(tprep));
       if ((status = eb_cycle_close(cycle)) != EB_OK)  return die(status, "failed to close write cycle");
     }
   }
@@ -711,7 +711,7 @@ int ftmSetDuetime(uint64_t tdue) {
   eb_status_t status;
   
   if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + PRIO_TX_MAX_WAIT_RW), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue>>3));
+  eb_cycle_write(cycle, (eb_address_t)(p->prioQAdr + PRIO_TX_MAX_WAIT_RW), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)((uint32_t)tdue));
   if ((status = eb_cycle_close(cycle)) != EB_OK)  return die(status, "failed to close write cycle");
   return 0;    
 }
@@ -933,7 +933,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
    
     SNTPRINTF(pSB ,"\u2502 Msgs Out     \u2502 %18llu", (long long unsigned int)tmp); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u251C"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
-    SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]<<3); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
+    SNTPRINTF(pSB ,"\u2502 TGather      \u2502 %18u", buffPrioq[PRIO_TX_MAX_WAIT_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2502 msg max      \u2502 %18u", buffPrioq[PRIO_TX_MAX_MSGS_RW>>2]); for(i=0;i<45;i++) SNTPRINTF(pSB ," "); SNTPRINTF(pSB ,"\u2502\n");
     SNTPRINTF(pSB ,"\u2514"); for(i=0;i<14;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<64;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
   }
@@ -971,7 +971,7 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
       SNTPRINTF(pSB ,"\u2502 %sCore #%02u%s                                                                      \u2502\n", KCYN, cpuIdx, KNRM);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Status: %02x ErrCnt: %3u \u2502   MsgCnt: %9u       TPrep: %13llu ns    \u2502\n", \
-       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), ftmMsgs, ftmTPrep<<3);
+       (uint8_t)ftmStatus, (uint8_t)(ftmStatus >> 8), ftmMsgs, ftmTPrep);
       SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u253C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
       SNTPRINTF(pSB ,"\u2502 Shared Mem: 0x%08x \u2502", mySharedMem + cpuIdx*CPU_SHARED_SIZE);
       if(p->pCores[cpuIdx].actOffs < p->pCores[cpuIdx].inaOffs) SNTPRINTF(pSB ,"   Act Page: A 0x%08x  Inact Page: B 0x%08x", p->pCores[cpuIdx].actOffs, p->pCores[cpuIdx].inaOffs);
