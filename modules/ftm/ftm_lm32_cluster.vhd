@@ -148,8 +148,8 @@ architecture rtl of ftm_lm32_cluster is
    signal clu_cbar_slaveport_in    : t_wishbone_slave_in_array   (c_clu_masters-1 downto 0);
    signal clu_cbar_slaveport_out   : t_wishbone_slave_out_array  (c_clu_masters-1 downto 0);
 
-   signal clu_master_in   : t_wishbone_master_in_array  (c_clu_slaves-1 downto 0);
-   signal clu_master_out  : t_wishbone_master_out_array (c_clu_slaves-1 downto 0); 
+   signal clu_master_in   : t_wishbone_master_in_array  (c_clu_masters-1 downto 0);
+   signal clu_master_out  : t_wishbone_master_out_array (c_clu_masters-1 downto 0); 
    ------------------------------------------------------------------------------
    
    signal s_rst_lm32_n,

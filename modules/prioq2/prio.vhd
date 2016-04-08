@@ -129,7 +129,7 @@ begin
         s_ebm_ctrl_o.sel  <= (others => '1');        
         s_ebm_ctrl_o.adr  <= (others => '0');
         s_ebm_ctrl_o.dat  <= (others => '0');
-        r_dhol        <= (others => '0');
+        r_dhol            <= (others => '0');
         r_allow_sending   <= '0';
         r_cnt_late        <= (others => '0');
         s_ctrl_st_late_i  <= (others => '0');
@@ -158,7 +158,6 @@ begin
                                       v_state := st_IDLE;  
                                     elsif s_ts_valid_o = '1' then
                                       r_dhol  <= unsigned(time_i) + resize(unsigned(s_ctrl_tx_max_wait_o), time_i'length);
-                                        
                                       v_state := st_PACKET_GATHER;
                                     end if;
                                            
@@ -175,8 +174,8 @@ begin
           
            when st_PACKET_SEND  =>  if s_ebm_ctrl_i.stall = '0' then
                                       report "Sending Packet containing " & integer'image(to_integer(r_msg_cnt)) severity note;
-                                      r_msg_cnt   <= (others => '0');
-                                      r_state_after_wait <= st_PACKET_EMPTY;
+                                      r_msg_cnt           <= (others => '0');
+                                      r_state_after_wait  <= st_PACKET_EMPTY;
                                       v_state := st_WAIT_FOR_EBM;
                                     end if;
 
@@ -208,7 +207,6 @@ begin
          end if;       
   
      
-
          if v_state = st_PACKET_PREP  then
             -- set EBM high address to ECA 
             s_ebm_ctrl_o.cyc <= '1';
@@ -226,10 +224,10 @@ begin
          end if;
 
 
-        if (s_ctrl_clear_o = "1") then
-          s_ctrl_st_late_i(0) <= '0';
-            r_cnt_late <= (others => '0');
-        end if;
+         if (s_ctrl_clear_o = "1") then
+            s_ctrl_st_late_i(0) <= '0';
+            r_cnt_late          <= (others => '0');
+         end if;
 
 
         if (s_ts_valid_o and r_allow_sending) = '1' then
