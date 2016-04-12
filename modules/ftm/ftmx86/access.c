@@ -30,9 +30,17 @@ const uint32_t devID_SharedRAM   = 0x81111444;
 const uint32_t devID_ClusterInfo = 0x10040086;
 const uint32_t devID_ClusterCB   = 0x10041000;
 const uint32_t devID_Ebm         = 0x00000815;
- 
+
+const uint32_t devID_ECA         = 0xb2afc251;
+const uint32_t eva_time_hi_get   = 0x18;
+const uint32_t eva_time_low_get  = 0x1c;
+
 const char     devName_RAM_pre[] = "WB4-BlockRAM_";
 
+extern uint8_t show_time;
+uint32_t currentTimeHigh;
+uint32_t currentTimeLow;
+  
 static int die(eb_status_t status, const char* what)
 {  
   fprintf(stderr, "%s: %s -- %s\n", program, what, eb_status(status));
@@ -778,7 +786,11 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   uint32_t cpuIdx, thrIdx, offset;
   uint32_t coreStateSize = (CPU_STATE_SIZE + p->thrQty * THR_STATE_SIZE);
   uint32_t returnedLen = ((EBM_SEMA_RW + PRIO_TX_MAX_WAIT_RW)>>2) + WR_STATE_SIZE + p->cpuQty * coreStateSize;
-  
+  eb_data_t time1, time0, time2;
+  eb_address_t eca_base;
+  int eca_num_devices;
+  struct sdb_device eca_devices[1];
+    
   if (len < returnedLen) return (len - returnedLen);
   
   eb_address_t tmpAdr;
@@ -811,6 +823,26 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   buff[offset + WR_UTC_HI] = (uint32_t)tmpRead[1] & 0xff;
   buff[offset + WR_UTC_LO] = (uint32_t)tmpRead[2];
   
+  // try to get the white rabbit time
+  if (show_time)
+  {
+    // search for ECA version 2+
+    if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_ECA, &eca_devices[0], &eca_num_devices)) == EB_OK)
+    {
+    eca_base = (eb_address_t)eca_devices[0].sdb_component.addr_first;
+    // get current time
+    do
+    {
+      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+      eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time1);
+      eb_cycle_read(cycle, eca_base + eva_time_low_get, EB_DATA32, &time0);
+      eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time2);
+      if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
+    } while (time1 != time2);
+    currentTimeHigh = time1;
+    currentTimeLow = time2;
+    }
+  }
 
   offset += WR_STATE_SIZE; 
 
@@ -957,6 +989,15 @@ void ftmShowStatus(uint32_t srcCpus, uint32_t* status, uint8_t verbose) {
   SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
   SNTPRINTF(pSB ,"\u2502 PPS: %s TS: %s \u2502 WR-UTC: %.24s                     \u2502\n", sLinkState, sSyncState, ctime((time_t*)&wrtime));
   SNTPRINTF(pSB ,"\u2514"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+
+  if (show_time)
+  {
+    SNTPRINTF(pSB ,"\u2552"); for(i=0;i<79;i++) SNTPRINTF(pSB ,"\u2550"); SNTPRINTF(pSB ,"\u2555\n");
+    SNTPRINTF(pSB ,"\u2502 %sRAW TIME %s                                                                     \u2502\n", KCYN, KNRM);
+    SNTPRINTF(pSB ,"\u251C"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u252C"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2524\n");
+    SNTPRINTF(pSB ,"\u2502 ECA TIME:              \u2502 0x%.8x%.8x                                   \u2502\n", currentTimeHigh, currentTimeLow);
+    SNTPRINTF(pSB ,"\u2514"); for(i=0;i<24;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2534"); for(i=0;i<54;i++) SNTPRINTF(pSB ,"\u2500"); SNTPRINTF(pSB ,"\u2518\n");
+  }
     
   //Generate CPUs Status
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {

@@ -15,7 +15,7 @@
 #define STATUS_BUF_SIZE 65536
 
 const char* program;
-uint8_t verbose, readonly, error;
+uint8_t verbose, readonly, error, show_time;
 
 
 static void help(void) {
@@ -26,6 +26,7 @@ static void help(void) {
   fprintf(stderr, "  -c <core-idx>             select a core by index, -1 selects all\n");
   fprintf(stderr, "  -v                        verbose operation, print more details\n");
   fprintf(stderr, "  -h                        display this help and exit\n");
+  fprintf(stderr, "  -t                        show the White Rabbit time\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "  status                    (default) report core status\n");
   fprintf(stderr, "  run                       start this core\n");
@@ -76,15 +77,19 @@ int main(int argc, char** argv) {
    sigOffset  = 0;
    sigValue   = 0;
    sigMask    = 0;
+   show_time  = 0;
   
    // start getopt 
-   while ((opt = getopt(argc, argv, "c:ovh")) != -1) {
+   while ((opt = getopt(argc, argv, "c:ovht")) != -1) {
       switch (opt) {
          case 'o':
             overrideFWcheck = 1;
             break;
          case 'v':
             verbose = 1;
+            break;
+         case 't':
+            show_time = 1;
             break;
          case 'c':
             cpuId = strtol(optarg, &value_end, 0);
