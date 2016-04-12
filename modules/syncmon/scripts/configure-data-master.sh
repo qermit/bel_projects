@@ -49,6 +49,8 @@ sed -i "s/$schedule_keyword/$start_time/g" "$schedule_next"
 # Finally set up the Data Master
 mv $schedule_next $data_master_bin
 cd $data_master_bin
+#ftm-ctl $data_master idle -c -1
+#ftm-ctl $data_master stop -c -1 
 #./ftm-ctl $data_master -c -1 loadfw ftm.bin
 #echo "DM Load firmware..."
 #sleep 1
