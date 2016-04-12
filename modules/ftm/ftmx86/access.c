@@ -840,7 +840,7 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
       if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
     } while (time1 != time2);
     currentTimeHigh = time1;
-    currentTimeLow = time2;
+    currentTimeLow = time0;
     }
   }
 
