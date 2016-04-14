@@ -827,20 +827,26 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
   if (show_time)
   {
     // search for ECA version 2+
+    eca_num_devices = sizeof(eca_devices)/sizeof(eca_devices[0]);
     if ((status = eb_sdb_find_by_identity(device, vendID_GSI, devID_ECA, &eca_devices[0], &eca_num_devices)) == EB_OK)
     {
-    eca_base = (eb_address_t)eca_devices[0].sdb_component.addr_first;
-    // get current time
-    do
+      // setup ECA base address
+      eca_base = (eb_address_t)eca_devices[0].sdb_component.addr_first;
+      // get current time
+      do
+      {
+        if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
+        eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time1);
+        eb_cycle_read(cycle, eca_base + eva_time_low_get, EB_DATA32, &time0);
+        eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time2);
+        if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
+      } while (time1 != time2);
+      currentTimeHigh = time1;
+      currentTimeLow = time0;
+    }
+    else
     {
-      if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-      eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time1);
-      eb_cycle_read(cycle, eca_base + eva_time_low_get, EB_DATA32, &time0);
-      eb_cycle_read(cycle, eca_base + eva_time_hi_get,  EB_DATA32, &time2);
-      if ((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle");
-    } while (time1 != time2);
-    currentTimeHigh = time1;
-    currentTimeLow = time0;
+      return die(status, "ECA not found");
     }
   }
 
