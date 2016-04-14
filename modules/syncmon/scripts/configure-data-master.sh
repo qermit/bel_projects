@@ -53,16 +53,19 @@ cd $data_master_bin
 #ftm-ctl $data_master stop -c -1 
 #./ftm-ctl $data_master -c -1 loadfw ftm.bin
 #echo "DM Load firmware..."
-#sleep 1
+#sleep 0.5
+ftm-ctl $data_master -c 0 preptime 500000
+echo "DM Preptime 500000"
+sleep 0.5
 ftm-ctl $data_master -c 0 put $schedule_next
 echo "DM Put..."
-sleep 1
+sleep 0.5
 ftm-ctl $data_master -c 0 swap
 echo "DM Swap..."
-sleep 1
+sleep 0.5
 ftm-ctl $data_master -c 0 run
 echo "DM Run..."
-sleep 1
+sleep 0.5
 cd ..
 
 # Wait until Data Master should start
