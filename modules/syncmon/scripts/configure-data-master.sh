@@ -8,7 +8,7 @@ eca_pattern=0xffff000000000000 # FID=MAX & GRPID=MAX
 schedule=pps.xml
 schedule_next=dm_pps.xml
 schedule_keyword="___STARTTIME___"
-start_offset=0x0000000300000000
+start_offset=0x0000000100000000
 start_time=0x0
 #period=125000000 # Legacy value for ECAv1
 period=1000000000
