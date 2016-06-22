@@ -261,6 +261,9 @@ static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32
     if((dstCpus >> cpuIdx) & 0x1) {
       baseAddr  = p->pCores[cpuIdx].ramAdr;
       offs      = p->pCores[cpuIdx].inaOffs;
+
+      printf("InaOffs: 0x%08x\n", offs);
+
       memset(bufWrite, 0, len);
       if(serPage (pPage, bufWrite, offs, cpuIdx) == NULL) return -1;
       ftmRamWrite(baseAddr + offs, bufWrite, len, BIG_ENDIAN);
@@ -295,6 +298,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   struct sdb_bridge CluCB;
   
   uint32_t validCpus = 0;
+  uint32_t masks[32];
   
   eb_data_t tmpRead[4];
   
@@ -358,7 +362,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
   //FIXME Adapt Cluster Info correctly and do a read here!!!
   p->thrQty = 8;
   p->pCores =  malloc(p->cpuQty * sizeof(t_core));
-
+/*
   // Get Shared RAM
   num_devices = MAX_DEVICES;
   if ((status = eb_sdb_find_by_identity_at(device, &CluCB, vendID_GSI, devID_SharedRAM, &devices[0], &num_devices)) != EB_OK)
@@ -371,7 +375,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
     {return die(status, "failed to when searching for Shared RAM ");}
   }
   p->sharedAdr = (eb_address_t)devices[0].sdb_component.addr_first;
-
+*/
   // Get prioq
   num_devices = 1;
   if ((status = eb_sdb_find_by_identity(device, PRIO_SDB_VENDOR_ID, PRIO_SDB_DEVICE_ID, &devices[0], &num_devices)) != EB_OK)
@@ -406,6 +410,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
     ftm_shared_offs = FTM_SHARED_OFFSET_NEW;
     for(cpuIdx = 0; cpuIdx < p->cpuQty; cpuIdx++) {
       p->pCores[cpuIdx].ramAdr = devices[cpuIdx].sdb_component.addr_first;
+      p->pCores[cpuIdx].ramEnd = devices[cpuIdx].sdb_component.addr_last;
       //check for valid firmware
       uint8_t isValid = 0;
       if(overrideFWcheck) isValid = 1;
@@ -451,9 +456,13 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
       eb_cycle_read(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_SHARED_PTR_OFFSET),   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]); 
       
       if ((status = eb_cycle_close(cycle)) != EB_OK) die(status, "failed to close read cycle");
-      p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[0];
-      p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[1];
-      p->pCores[cpuIdx].sharedOffs  = (uint32_t) tmpRead[2];
+      uint32_t mask = p->pCores[cpuIdx].ramEnd - p->pCores[cpuIdx].ramAdr;
+      //printf("Mask: 0x%08x\n", mask);
+      p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[0] & mask;
+      p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[1] & mask;
+      p->pCores[cpuIdx].sharedOffs  = (uint32_t) tmpRead[2] & mask;
+
+      //printf("Act: 0x%08x\n", p->pCores[cpuIdx].actOffs);
     
     } else printf("Core #%u: Can't read schedule data offsets - no valid firmware present.\n", cpuIdx);
   }
