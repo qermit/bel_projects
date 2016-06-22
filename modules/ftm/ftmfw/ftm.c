@@ -27,7 +27,7 @@ void prioQueueInit()
 void ftmInit()
 {
    pFtmIf = (t_ftmIf*)_startshared;
-   mprintf("Shared Area @ 0x%08x\n", (uint32_t)pFtmIf); 
+   //mprintf("Shared Area @ 0x%08x\n", (uint32_t)pFtmIf); 
    pFtmIf->cmd = 0;
    pFtmIf->status = 0x0;
    pFtmIf->pAct = (t_ftmPage*)&(pFtmIf->pPages[0]);
@@ -52,9 +52,9 @@ void ftmInit()
    pFtmIf->sema.sig     = 1;
    pFtmIf->sema.cond    = 1;
    pCurrentChain        = (t_ftmChain*)&pFtmIf->idle;
-   pFtmIf->tPrep        = 150000/8;
+   pFtmIf->tPrep        = 150000;
 //   pFtmIf->tTrn         = 15000/8;
-   pFtmIf->tDue         = 5000/8;
+   pFtmIf->tDue         = 5000;
    prioQueueInit();
 
    // MODELSIM FIRMWARE
