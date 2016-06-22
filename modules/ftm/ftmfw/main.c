@@ -128,7 +128,8 @@ void main(void) {
    #if DEBUGPRIOQ == 1
       mprintf("#%02u: Priority Queue Debugmode ON, timestamps will be written to 0x%08x on receivers", cpuId, DEBUGPRIOQDST);
    #endif
-    
+   mprintf("Found MsgBox at 0x%08x. MSI Path is 0x%08x\n", (uint32_t)pCpuMsiBox, (uint32_t)pMyMsi);
+
    atomic_off();
    //mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
    //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
