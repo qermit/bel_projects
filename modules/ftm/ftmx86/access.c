@@ -266,13 +266,13 @@ static int ftmPut(uint32_t dstCpus, t_ftmPage*  pPage, uint8_t* bufWrite, uint32
 
       memset(bufWrite, 0, len);
       if(serPage (pPage, bufWrite, offs, cpuIdx) == NULL) return -1;
-      ftmRamWrite(baseAddr + offs, bufWrite, len, BIG_ENDIAN);
-      printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + offs);
+      ftmRamWrite(baseAddr + (offs & p->pCores[cpuIdx].mask), bufWrite, len, BIG_ENDIAN);
+      printf("Wrote %u byte schedule to CPU %u at 0x%08x.", len, cpuIdx, baseAddr + (offs & p->pCores[cpuIdx].mask));
       printf("Verify..."); 
-      ftmRamRead(baseAddr + offs, bufRead, len, BIG_ENDIAN);
+      ftmRamRead(baseAddr + (offs & p->pCores[cpuIdx].mask), bufRead, len, BIG_ENDIAN);
       for(i = 0; i<len; i++) {
         if(!(bufRead[i] == bufWrite[i])) { 
-          fprintf(stderr, "!ERROR! \nVerify failed for CPU %u at offset 0x%08x\n", cpuIdx, baseAddr + offs +( i & ~0x3) );
+          fprintf(stderr, "!ERROR! \nVerify failed for CPU %u at offset 0x%08x\n", cpuIdx, baseAddr + (offs & p->pCores[cpuIdx].mask) +( i & ~0x3) );
           free(bufRead);
           return -2;
         }
@@ -385,6 +385,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
     goto error;
   }
   p->prioQAdr = (eb_address_t)devices[0].sdb_component.addr_first;
+
   
   // Get EBM
   num_devices = 1;
@@ -410,7 +411,7 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
     ftm_shared_offs = FTM_SHARED_OFFSET_NEW;
     for(cpuIdx = 0; cpuIdx < p->cpuQty; cpuIdx++) {
       p->pCores[cpuIdx].ramAdr = devices[cpuIdx].sdb_component.addr_first;
-      p->pCores[cpuIdx].ramEnd = devices[cpuIdx].sdb_component.addr_last;
+      p->pCores[cpuIdx].mask = devices[cpuIdx].sdb_component.addr_last - devices[cpuIdx].sdb_component.addr_first;
       //check for valid firmware
       uint8_t isValid = 0;
       if(overrideFWcheck) isValid = 1;
@@ -456,11 +457,11 @@ int ftmOpen(const char* netaddress, uint8_t overrideFWcheck)
       eb_cycle_read(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_SHARED_PTR_OFFSET),   EB_BIG_ENDIAN | EB_DATA32, &tmpRead[2]); 
       
       if ((status = eb_cycle_close(cycle)) != EB_OK) die(status, "failed to close read cycle");
-      uint32_t mask = p->pCores[cpuIdx].ramEnd - p->pCores[cpuIdx].ramAdr;
-      //printf("Mask: 0x%08x\n", mask);
-      p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[0] & mask;
-      p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[1] & mask;
-      p->pCores[cpuIdx].sharedOffs  = (uint32_t) tmpRead[2] & mask;
+
+
+      p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[0];
+      p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[1];
+      p->pCores[cpuIdx].sharedOffs  = (uint32_t) tmpRead[2];
 
       //printf("Act: 0x%08x\n", p->pCores[cpuIdx].actOffs);
     
@@ -579,6 +580,7 @@ int v02FtmCommand(uint32_t dstCpus, uint32_t command) {
   
   for(cpuIdx=0;cpuIdx < p->cpuQty;cpuIdx++) {
     if((dstCpus >> cpuIdx) & 0x1) {
+      printf("cmd adr: 0x%08x\n", (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET));  
       eb_cycle_write(cycle, (eb_address_t)(p->pCores[cpuIdx].ramAdr + ftm_shared_offs + FTM_CMD_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)command);
     }
   }
@@ -677,7 +679,7 @@ int v02FtmDump(uint32_t srcCpus, uint32_t len, uint8_t actIna, char* stringBuf, 
       if(actIna == ACTIVE)  offs = p->pCores[cpuIdx].actOffs; 
       else              offs = p->pCores[cpuIdx].inaOffs;
       
-      ftmRamRead( baseAddr + offs, bufRead, len, BIG_ENDIAN);
+      ftmRamRead( baseAddr + (offs & p->pCores[cpuIdx].mask), bufRead, len, BIG_ENDIAN);
       pPage = deserPage(calloc(1, sizeof(t_ftmPage)), bufRead, offs);
       if(pPage != NULL) {  
          printf("Deserialization successful.\n\n");
@@ -698,8 +700,8 @@ int v02FtmClear(uint32_t dstCpus) {
     if((dstCpus >> cpuIdx) & 0x1) {
       baseAddr  = p->pCores[cpuIdx].ramAdr;
       offs      = p->pCores[cpuIdx].inaOffs;
-      ftmRamClear(baseAddr + offs, BUF_SIZE);
-      printf("Cleared %u bytes in inactive page of CPU %u at 0x%08x.", BUF_SIZE, cpuIdx, baseAddr + offs);
+      ftmRamClear(baseAddr + (offs & p->pCores[cpuIdx].mask), BUF_SIZE);
+      printf("Cleared %u bytes in inactive page of CPU %u at 0x%08x.", BUF_SIZE, cpuIdx, baseAddr + (offs & p->pCores[cpuIdx].mask));
     }  
   }
   printf("done.\n");
@@ -763,12 +765,12 @@ int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
       
       //user gave us a planIdx. load corresponding ptr
       if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
-      eb_cycle_read(cycle, (eb_address_t)(baseAddr + offs + FTM_PAGE_PLANQTY_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
+      eb_cycle_read(cycle, (eb_address_t)(baseAddr + (offs & p->pCores[cpuIdx].mask) + FTM_PAGE_PLANQTY_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[0]);
       //if the user wanted to go to idle, read idle ptr from interface, else read plan ptr
       if(planIdx == -1)
       {eb_cycle_read(cycle, (eb_address_t)(baseAddr + ftm_shared_offs + FTM_IDLE_OFFSET), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
       else 
-      {eb_cycle_read(cycle, (eb_address_t)(baseAddr + offs + FTM_PAGE_PLANS_OFFSET + 4*planIdx), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
+      {eb_cycle_read(cycle, (eb_address_t)(baseAddr + (offs & p->pCores[cpuIdx].mask) + FTM_PAGE_PLANS_OFFSET + 4*planIdx), EB_BIG_ENDIAN | EB_DATA32, &tmpRead[1]);}
       if((status = eb_cycle_close(cycle)) != EB_OK) return die(status, "failed to close read cycle"); 
 
       planQty  = (uint32_t)tmpRead[0];
@@ -776,7 +778,7 @@ int v02FtmSetBp(uint32_t dstCpus, int32_t planIdx) {
       // Check and write to BP
       if(bp != FTM_NULL && planIdx < planQty) {
         printf("Writing plan %d @ 0x%08x to BP\n", planIdx, bp);
-        status = eb_device_write(device, (eb_address_t)(baseAddr + offs + FTM_PAGE_BP_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)bp, 0, eb_block);
+        status = eb_device_write(device, (eb_address_t)(baseAddr + (offs & p->pCores[cpuIdx].mask) + FTM_PAGE_BP_OFFSET), EB_BIG_ENDIAN | EB_DATA32, (eb_data_t)bp, 0, eb_block);
         if (status != EB_OK) return die(status, "failed to create cycle"); 
         
       } else { 
@@ -814,11 +816,12 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
 
   offset += (EBM_SEMA_RW)>>2; //advance offset
 
-  // read PrioQ status
+  // read PrioQ status 
+  printf("PQadr: 0x%08x\n", (uint32_t)p->prioQAdr);
   ftmRamRead(p->prioQAdr + PRIO_MODE_GET,     (const uint8_t*)&buff[(EBM_SEMA_RW + PRIO_MODE_GET)>>2],    4,                                            BIG_ENDIAN);
   ftmRamRead(p->prioQAdr + PRIO_ST_FULL_GET,  (const uint8_t*)&buff[(EBM_SEMA_RW + PRIO_ST_FULL_GET)>>2], PRIO_CNT_OUT_ALL_GET_1 - PRIO_ST_FULL_GET +4, BIG_ENDIAN);
   offset += (PRIO_CNT_OUT_ALL_GET_1 + 4)>>2; //advance offset
- 
+  printf("PQadr1: 0x%08x\n", (uint32_t)p->prioQAdr);
 
   //read WR State
   if ((status = eb_cycle_open(device, 0, eb_block, &cycle)) != EB_OK) return die(status, "failed to create cycle"); 
@@ -890,7 +893,7 @@ int v02FtmFetchStatus(uint32_t* buff, uint32_t len) {
       if(tmp & STAT_WAIT) buff[offset + cpuIdx*coreStateSize  + CPU_THR_WAITING] = 1;
       if(tmp & STAT_IDLE)    buff[offset + cpuIdx*coreStateSize  + CPU_THR_IDLE]    = 1;
       if(tmp & STAT_ERROR)   buff[offset + cpuIdx*coreStateSize  + CPU_THR_ERROR]   = 1;
-      
+
       p->pCores[cpuIdx].actOffs     = (uint32_t) tmpRead[4];
       p->pCores[cpuIdx].inaOffs     = (uint32_t) tmpRead[5];
       

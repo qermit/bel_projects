@@ -122,7 +122,7 @@ extern const char* program;
 
 typedef struct {
    uint32_t ramAdr;
-   uint32_t ramEnd;
+   uint32_t mask;
    uint32_t actOffs;
    uint32_t inaOffs;
    uint32_t sharedOffs;
