@@ -41,14 +41,22 @@ void ebmInit()
    int j;
    while (*(pEbCfg + (EBC_SRC_IP>>2)) == EBC_DEFAULT_IP) {
      for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
+     
    } 
 
    ebm_init();
+
    ebm_config_meta(1500, 42, 0x00000000 );
    ebm_config_if(DESTINATION, 0xffffffffffff, 0xffffffff,                0xebd0); //Dst: EB broadcast 
    ebm_config_if(SOURCE,      0xd15ea5edbeef, *(pEbCfg + (EBC_SRC_IP>>2)), 0xebd0); //Src: bogus mac (will be replaced by WR), WR IP
-   
-
+   atomic_on();
+   mprintf("#%02u: EBM 0x%08x 0x%08x\n", cpuId, pEbm, pEbmLast );
+   atomic_off();
+   ebm_hi(0x123);
+   ebm_op(0x123, 0x123, EBM_WRITE);
+   ebm_op(0x124, 0x124, EBM_WRITE);
+   ebm_op(0x125, 0x125, EBM_WRITE);
+   ebm_flush();
 }
 
 void init()
@@ -58,7 +66,7 @@ void init()
    cmdCnt = 0;
    cpuId = getCpuIdx();
    ftmInit();
-
+   //mprintf("#%02u: Configured EBM and PQ\n", cpuId); 
    if (cpuId == 0) {
 
      ebmInit();
@@ -128,9 +136,12 @@ void main(void) {
    #if DEBUGPRIOQ == 1
       mprintf("#%02u: Priority Queue Debugmode ON, timestamps will be written to 0x%08x on receivers", cpuId, DEBUGPRIOQDST);
    #endif
-   mprintf("Found MsgBox at 0x%08x. MSI Path is 0x%08x\n", (uint32_t)pCpuMsiBox, (uint32_t)pMyMsi);
+   //mprintf("Found MsgBox at 0x%08x. MSI Path is 0x%08x\n", (uint32_t)pCpuMsiBox, (uint32_t)pMyMsi);
+
 
    atomic_off();
+
+  
    //mprintf("#%02u: Tprep @ 0x%08x\n", cpuId, test);
    //hexDump ("Plan 0 Chain 0 : \n", (void*)pFtmIf->pAct->plans[0], 128);
    /*
