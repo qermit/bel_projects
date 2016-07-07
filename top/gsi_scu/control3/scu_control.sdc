@@ -44,3 +44,10 @@ set_false_path -from [get_clocks {main|\sys_a2:sys_inst|*|clk[1]}] -to [get_cloc
 # cut: wr-ref <=> butis
 set_false_path -from [get_clocks {main|\ref_a2:ref_inst|*|clk[0]}] -to [get_clocks {main|\ref_a2:ref_inst|*|clk[1]}]
 set_false_path -from [get_clocks {main|\ref_a2:ref_inst|*|clk[1]}] -to [get_clocks {main|\ref_a2:ref_inst|*|clk[0]}]
+
+set_false_path -from * -to [get_ports "DDR3_RES_n"]
+# like example design http://svn.ohwr.org/conv-ttl-blo/hdl/wr_core_demo/rtl/platform/altera/ddr3/ddr3_mem_example_top.sdc
+
+set_false_path -from [get_clocks {main|\DDR3_y:DDR3_inst|ddr_ctlr_generated|scu_ddr3_controller_phy_inst|scu_ddr3_phy_inst|scu_ddr3_phy_alt_mem_phy_inst|clk|half_rate.pll|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {main|\sys_a2:sys_inst|altpll_component|auto_generated|pll1|clk[0]}]
+# cut half_rate clock <=> sys_clk  (different frequencies and using xwb_clock_crossing)
+
