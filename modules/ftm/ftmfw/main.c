@@ -41,7 +41,6 @@ void ebmInit()
    int j;
    while (*(pEbCfg + (EBC_SRC_IP>>2)) == EBC_DEFAULT_IP) {
      for (j = 0; j < (125000000/4); ++j) { asm("nop"); }
-     
    } 
 
    ebm_init();
@@ -49,14 +48,7 @@ void ebmInit()
    ebm_config_meta(1500, 42, 0x00000000 );
    ebm_config_if(DESTINATION, 0xffffffffffff, 0xffffffff,                0xebd0); //Dst: EB broadcast 
    ebm_config_if(SOURCE,      0xd15ea5edbeef, *(pEbCfg + (EBC_SRC_IP>>2)), 0xebd0); //Src: bogus mac (will be replaced by WR), WR IP
-   atomic_on();
-   mprintf("#%02u: EBM 0x%08x 0x%08x\n", cpuId, pEbm, pEbmLast );
-   atomic_off();
-   ebm_hi(0x123);
-   ebm_op(0x123, 0x123, EBM_WRITE);
-   ebm_op(0x124, 0x124, EBM_WRITE);
-   ebm_op(0x125, 0x125, EBM_WRITE);
-   ebm_flush();
+
 }
 
 void init()
