@@ -1,1 +1,1 @@
-qmegawiz {scu_ddr3}
+qmegawiz { scu_ddr3 }
