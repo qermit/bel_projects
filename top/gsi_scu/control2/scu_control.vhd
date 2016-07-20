@@ -232,15 +232,15 @@ entity scu_control is
     DDR3_BA           : out   std_logic_vector( 2 downto 0);
     DDR3_ADDR         : out   std_logic_vector(12 downto 0);
     DDR3_CS_n         : out   std_logic_vector( 0 downto 0);
---    DDR3_DQS          : inout std_logic_vector(1 downto 0);
---    DDR3_DQSn         : inout std_logic_vector(1 downto 0);
+    DDR3_DQS          : inout std_logic_vector(1 downto 0);
+    DDR3_DQSn         : inout std_logic_vector(1 downto 0);
     DDR3_RES_n        : out   std_logic;
     DDR3_CKE          : out   std_logic_vector( 0 downto 0);
     DDR3_ODT          : out   std_logic_vector( 0 downto 0);
     DDR3_CAS_n        : out   std_logic;
     DDR3_RAS_n        : out   std_logic;
---    DDR3_CLK          : inout std_logic_vector(0 downto 0);
---    DDR3_CLK_n        : inout std_logic_vector(0 downto 0);
+    DDR3_CLK          : inout std_logic_vector(0 downto 0);
+    DDR3_CLK_n        : inout std_logic_vector(0 downto 0);
     DDR3_WE_n         : out   std_logic);
     
 end scu_control;
@@ -282,21 +282,22 @@ begin
 
   main : monster
     generic map(
-      g_family        => c_family,
-      g_project       => c_project,
-      g_gpio_inout    => 2,
-      g_flash_bits    => 24,
-      g_en_pcie    => true,
-      g_en_scubus  => true,
-      g_en_mil     => true,
-      g_en_oled    => true,
-      g_en_user_ow => true,
-      g_en_cfi     => true,
+      g_family          => c_family,
+      g_project         => c_project,
+      g_gpio_inout      => 2,
+      g_flash_bits      => 24,
+      g_en_pcie         => true,
+      g_en_scubus       => true,
+      g_en_mil          => true,
+      g_en_oled         => true,
+      g_en_user_ow      => true,
+      g_en_cfi          => true,
+      g_en_ddr3         => true,
       g_io_table        => io_mapping_table,
       g_lm32_cores      => c_cores,
       g_lm32_ramsizes   => c_lm32_ramsizes/4,
       g_lm32_init_files => c_initf,
-		g_lm32_profiles   => f_string_list_repeat(c_profile_name, c_cores)
+      g_lm32_profiles   => f_string_list_repeat(c_profile_name, c_cores)
     )  
     port map(
       core_clk_20m_vcxo_i    => clk_20m_vcxo_i,
@@ -399,6 +400,22 @@ begin
       cfi_noe_fsh            => nOE_FSH,
       cfi_nrst_fsh           => nRST_FSH,
       cfi_wait_fsh           => WAIT_FSH,
+         -- g_en_ddr3
+      mem_DDR3_DQ            => DDR3_DQ,
+      mem_DDR3_DM            => DDR3_DM,
+      mem_DDR3_BA            => DDR3_BA,
+      mem_DDR3_ADDR          => DDR3_ADDR,
+      mem_DDR3_CS_n          => DDR3_CS_n,
+      mem_DDR3_DQS           => DDR3_DQS,
+      mem_DDR3_DQSn          => DDR3_DQSn,
+      mem_DDR3_RES_n         => DDR3_RES_n,
+      mem_DDR3_CKE           => DDR3_CKE,
+      mem_DDR3_ODT           => DDR3_ODT,
+      mem_DDR3_CAS_n         => DDR3_CAS_n,
+      mem_DDR3_RAS_n         => DDR3_RAS_N,
+      mem_DDR3_CLK           => DDR3_CLK,
+      mem_DDR3_CLK_n         => DDR3_CLK_n,
+      mem_DDR3_WE_n          => DDR3_WE_n,
       hw_version             => x"0000000" & not scu_cb_version);
  
   -- LPC UART
@@ -509,17 +526,17 @@ begin
 
  
   -- DDR3 not connected
-  DDR3_RES_n <= '0';
-  DDR3_DQ    <= (others => 'Z');
-  DDR3_DM    <= (others => 'Z');
-  DDR3_BA    <= (others => 'Z');
-  DDR3_ADDR  <= (others => 'Z');
-  DDR3_CS_n  <= (others => 'Z');
-  DDR3_CKE   <= (others => 'Z');
-  DDR3_ODT   <= (others => 'Z');
-  DDR3_CAS_n <= 'Z';
-  DDR3_RAS_n <= 'Z';
-  DDR3_WE_n  <= 'Z';
+  --DDR3_RES_n <= '0';
+  --DDR3_DQ    <= (others => 'Z');
+  --DDR3_DM    <= (others => 'Z');
+  --DDR3_BA    <= (others => 'Z');
+  --DDR3_ADDR  <= (others => 'Z');
+  --DDR3_CS_n  <= (others => 'Z');
+  --DDR3_CKE   <= (others => 'Z');
+  --DDR3_ODT   <= (others => 'Z');
+  --DDR3_CAS_n <= 'Z';
+  --DDR3_RAS_n <= 'Z';
+  --DDR3_WE_n  <= 'Z';
   
   -- External reset values
   nFPGA_Res_Out <= rstn_ref;
