@@ -8,29 +8,43 @@
 #       will actually install them into /tmp/package/usr for zipping.
 STAGING     ?=
 PREFIX      ?= /usr/local
+SYSCONFDIR  ?= /etc
 EXTRA_FLAGS ?=
 PWD         := $(shell pwd)
 
 all::		etherbone tools eca tlu sdbfs toolchain firmware driver
 
-gateware:	all pexarria5 exploder exploder5 vetar scu2 scu3
+gateware:	all pexarria5 exploder5 vetar2a scu2 scu3
 
 install::	etherbone-install tools-install eca-install tlu-install driver-install
 
-clean::		etherbone-clean tools-clean eca-clean tlu-clean sdbfs-clean driver-clean toolchain-clean firmware-clean scu2-clean scu3-clean exploder-clean exploder5-clean pexarria5-clean
+clean::		etherbone-clean tools-clean eca-clean tlu-clean sdbfs-clean driver-clean toolchain-clean firmware-clean scu2-clean scu3-clean exploder-clean exploder5-clean pexarria5-clean sio3-clean
 
 distclean::	clean
 	git clean -xfd .
 	for i in etherbone-core fpga-config-space general-cores wr-cores wrpc-sw; do cd ip_cores/$$i; git clean -xfd .; cd ../..; done
 
 etherbone::
+	test -f ip_cores/etherbone-core/api/Makefile.in || ./ip_cores/etherbone-core/api/autogen.sh
+	cd ip_cores/etherbone-core/api; test -f Makefile || ./configure --enable-maintainer-mode --prefix=$(PREFIX)
 	$(MAKE) -C ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" all
 
 etherbone-clean::
-	$(MAKE) -C ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" clean
+	! test -f ip_cores/etherbone-core/Makefile || $(MAKE) -C ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" distclean
 
 etherbone-install::
-	$(MAKE) -C ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" install
+	$(MAKE) -C ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" DESTDIR=$(STAGING) install
+
+saftlib::
+	test -f ip_cores/saftlib/Makefile.in || ./ip_cores/saftlib/autogen.sh
+	cd ip_cores/saftlib; test -f Makefile || ./configure --enable-maintainer-mode --prefix=$(PREFIX) --sysconfdir=$(SYSCONFDIR)
+	$(MAKE) -C ip_cores/saftlib EXTRA_FLAGS="$(EXTRA_FLAGS)" all
+
+saftlib-clean::
+	! test -f ip_cores/saftlib/Makefile || $(MAKE) -C ip_cores/saftlib EXTRA_FLAGS="$(EXTRA_FLAGS)" distclean
+
+saftlib-install::
+	$(MAKE) -C ip_cores/saftlib EXTRA_FLAGS="$(EXTRA_FLAGS)" DESTDIR=$(STAGING) install
 
 tools::		etherbone eca tlu
 	$(MAKE) -C tools ECA=$(PWD)/ip_cores/wr-cores/modules/wr_eca TLU=$(PWD)/ip_cores/wr-cores/modules/wr_tlu EB=$(PWD)/ip_cores/etherbone-core/api EXTRA_FLAGS="$(EXTRA_FLAGS)" all
@@ -89,13 +103,19 @@ toolchain-clean::
 	rm -rf toolchain
 
 ip_cores/wrpc-sw/.config:
-	cp ip_cores/wrpc-sw/configs/gsi_defconfig $@
+	$(MAKE) -C ip_cores/wrpc-sw/ gsi_defconfig
 
 firmware::	sdbfs etherbone toolchain ip_cores/wrpc-sw/.config
 	$(MAKE) -C ip_cores/wrpc-sw EB=$(PWD)/ip_cores/etherbone-core/api SDBFS=$(PWD)/ip_cores/fpga-config-space/sdbfs/userspace PATH=$(PWD)/toolchain/bin:$(PATH) all
 
 firmware-clean::
 	$(MAKE) -C ip_cores/wrpc-sw EB=$(PWD)/ip_cores/etherbone-core/api SDBFS=$(PWD)/ip_cores/fpga-config-space/sdbfs/userspace PATH=$(PWD)/toolchain/bin:$(PATH) clean
+
+avsoc::		firmware
+	$(MAKE) -C syn/gsi_avsoc/av_rocket_board PATH=$(PWD)/toolchain/bin:$(PATH) all
+
+avsoc-clean::
+	$(MAKE) -C syn/gsi_avsoc/av_rocket_board PATH=$(PWD)/toolchain/bin:$(PATH) clean
 
 scu2::		firmware
 	$(MAKE) -C syn/gsi_scu/control2 PATH=$(PWD)/toolchain/bin:$(PATH) all
@@ -120,6 +140,12 @@ vetar2a::	firmware
 
 vetar2a-clean::
 	$(MAKE) -C syn/gsi_vetar2a/wr_core_demo PATH=$(PWD)/toolchain/bin:$(PATH) clean
+
+vetar2a-ee-butis::	firmware
+	$(MAKE) -C syn/gsi_vetar2a/ee_butis PATH=$(PWD)/toolchain/bin:$(PATH) all
+
+vetar2a-ee-butis-clean::
+	$(MAKE) -C syn/gsi_vetar2a/ee_butis PATH=$(PWD)/toolchain/bin:$(PATH) clean
 
 exploder::	firmware
 	$(MAKE) -C syn/gsi_exploder/wr_core_demo PATH=$(PWD)/toolchain/bin:$(PATH) all
@@ -162,3 +188,9 @@ diob::		firmware
 
 diob-clean::
 	$(MAKE) -C syn/scu_diob PATH=$(PWD)/toolchain/bin:$(PATH) clean
+
+sio3::		firmware		
+	$(MAKE) -C syn/scu_sio3 PATH=$(PWD)/toolchain/bin:$(PATH) all
+
+sio3-clean::
+	$(MAKE) -C syn/scu_sio3 PATH=$(PWD)/toolchain/bin:$(PATH) clean

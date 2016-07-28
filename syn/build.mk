@@ -1,8 +1,7 @@
 TOP		:= $(dir $(lastword $(MAKEFILE_LIST)))..
-
 QUARTUS		?= /opt/quartus
 QUARTUS_BIN	=  $(QUARTUS)/bin
-
+PATHPKG		= $(shell python2.7 ../../../ip_cores/hdl-make/hdlmake list-mods | grep -G '^[^\#]' | grep top | grep -o '^\S*')
 SPI_LANES	?= ASx1
 
 CROSS_COMPILE	?= lm32-elf-
@@ -21,14 +20,14 @@ STUBD	?= $(TOP)/modules/lm32_stub
 STUBS	?= $(STUBD)/stubs.c $(STUBD)/crt0.S
 INCLUDES  += 	$(INCPATH)/dbg.c $(INCPATH)/aux.c $(INCPATH)/irq.c $(INCPATH)/mini_sdb.c $(INCPATH)/mprintf.c \
 		$(W1)/dev/uart.c $(W1)/lib/usleep.c $(W1)/dev/devicelist.c $(W1)/dev/syscon.c $(W1)/pp_printf/printf.c \
-		$(W1)/sdb-lib/glue.c $(W1)/pp_printf/vsprintf-mini.c
-LDFLAGS		?= -nostdlib -T ram.ld -Wl,--defsym,_fstack=$(RAM_SIZE)-4 -lgcc -lc
+		$(W1)/sdb-lib/glue.c $(W1)/pp_printf/vsprintf-mini.c $(INCPATH)/sdb_add.S
+LDFLAGS		?= -nostdlib -T ram.ld -Wl,--defsym,_fstack=$$(($(RAM_SIZE)-4)) -lgcc -lc
 
 ifndef RAM_SIZE
 $(error Missing mandatory RAM_SIZE parameter! Quitting ...)
 endif
 
-.PHONY: ram.ld buildid.c
+.PHONY: ram.ld buildid.c $(PATHPKG)/ramsize_pkg.vhd
 
 include $(INCPATH)/build_lm32.mk
  
@@ -36,10 +35,13 @@ include $(INCPATH)/build_lm32.mk
 all:	$(TARGET).mif $(TARGET)_stub.mif $(TARGET).sof $(TARGET).jic $(TARGET).rpd
 
 buildid.c:
-	@(echo $(CBR) 2>&1) > $@
+	@(printf %b $(CBR)) > $@
 
 ram.ld:
-	@(echo $(LDS) 2>&1) > $@
+	@(printf %b $(LDS)) > $@
+
+$(PATHPKG)/ramsize_pkg.vhd:
+	@(printf %b $(PKG)) > $@
 
 clean::
 	rm -rf db incremental_db PLLJ_PLLSPE_INFO.txt
@@ -64,7 +66,7 @@ prog:
 %.mif:	%.bin
 	$(GENRAMMIF) $< $(RAM_SIZE) > $@
 
-%.sof:	%.qsf %.mif
+%.sof:	%.qsf %.mif $(PATHPKG)/ramsize_pkg.vhd 
 	python2.7 $(TOP)/ip_cores/hdl-make/hdlmake quartus-project
 	find $(TOP) -name Manifest.py > $*.dep
 	sed -n -e 's/"//g;s/quartus_sh://;s/set_global_assignment.*-name.*_FILE //p' < $< >> $*.dep

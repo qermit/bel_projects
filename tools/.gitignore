@@ -1,7 +1,10 @@
 eb-flash
+eb-sflash
 eb-info
 eb-console
 eb-config-nv
+eb-time
 eca-snoop
 io-test
 button-game
+eb-time

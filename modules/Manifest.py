@@ -33,5 +33,14 @@ modules = {
     "ssd1325",
     "nau8811",
     "psram",
+    "io_control",
+    "simple_tag_decoder",
+    "flash_loader",
+    "remote_update",
+    "pll",
+    "remote_update",
+    "watchdog",
+    "mbox",
+    "prioq2",
   ]
 }

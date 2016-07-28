@@ -28,6 +28,7 @@ use ieee.numeric_std.all;
 library work;
 use work.gencores_pkg.all;
 use work.wrcore_pkg.all;
+use work.pll_pkg.all;
 use work.monster_pkg.all;
 use work.wr_fabric_pkg.all;
 use work.wishbone_pkg.all;
@@ -41,6 +42,8 @@ use work.altera_flash_pkg.all;
 use work.altera_networks_pkg.all;
 use work.altera_lvds_pkg.all;
 use work.build_id_pkg.all;
+use work.watchdog_pkg.all;
+use work.mbox_pkg.all;
 use work.oled_display_pkg.all;
 use work.lpc_uart_pkg.all;
 use work.wb_irq_pkg.all;
@@ -56,8 +59,8 @@ use work.wb_nau8811_audio_driver_pkg.all;
 use work.fg_quad_pkg.all;
 use work.cfi_flash_pkg.all;
 use work.psram_pkg.all;
-use work.packet_pkg.all;
-use work.endpoint_pkg.all;
+use work.wb_serdes_clk_gen_pkg.all;
+use work.io_control_pkg.all;
 
 entity monster is
   generic(
@@ -73,6 +76,7 @@ entity monster is
     g_lvds_inout           : natural;
     g_lvds_in              : natural;
     g_lvds_out             : natural;
+    g_fixed                : natural;
     g_lvds_invert          : boolean;
     g_en_pcie              : boolean;
     g_en_vme               : boolean;
@@ -85,13 +89,13 @@ entity monster is
     g_en_ssd1325           : boolean;
     g_en_nau8811           : boolean;
     g_en_user_ow           : boolean;
-    g_en_fg                : boolean;
     g_en_psram             : boolean;
+    g_io_table             : t_io_mapping_table_arg_array(natural range <>);
     g_lm32_cores           : natural;
     g_lm32_MSIs            : natural;
     g_lm32_ramsizes        : natural;
-    g_lm32_shared_ramsize  : natural;
     g_lm32_init_files      : string;
+	 g_lm32_profiles        : string;
     g_lm32_are_ftm         : boolean);
   port(
     -- Required: core signals
@@ -125,7 +129,10 @@ entity monster is
     -- GPIO for the board
     gpio_i                 : in    std_logic_vector(f_sub1(g_gpio_inout+g_gpio_in)  downto 0);
     gpio_o                 : out   std_logic_vector(f_sub1(g_gpio_inout+g_gpio_out) downto 0) := (others => 'Z');
-    gpio_oen_o             : out   std_logic_vector(f_sub1(g_gpio_inout)            downto 0) := (others => '1');
+    gpio_oen_o             : out   std_logic_vector(f_sub1(g_gpio_inout+g_gpio_out) downto 0) := (others => '0');
+    gpio_term_o            : out   std_logic_vector(f_sub1(g_gpio_inout+g_gpio_in)  downto 0) := (others => '1');
+    gpio_spec_in_o         : out   std_logic_vector(f_sub1(g_gpio_inout+g_gpio_in)  downto 0) := (others => '0');
+    gpio_spec_out_o        : out   std_logic_vector(f_sub1(g_gpio_inout+g_gpio_out) downto 0) := (others => '0');
     -- LVDS for the board
     lvds_p_i               : in    std_logic_vector(f_sub1(g_lvds_inout+g_lvds_in)  downto 0);
     lvds_n_i               : in    std_logic_vector(f_sub1(g_lvds_inout+g_lvds_in)  downto 0);
@@ -133,7 +140,10 @@ entity monster is
     lvds_p_o               : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_out) downto 0) := (others => 'Z');
     lvds_n_o               : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_out) downto 0) := (others => 'Z');
     lvds_o_led_o           : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_out) downto 0) := (others => 'Z');
-    lvds_oen_o             : out   std_logic_vector(f_sub1(g_lvds_inout)            downto 0) := (others => '1');
+    lvds_oen_o             : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_out) downto 0) := (others => '0');
+    lvds_term_o            : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_in)  downto 0) := (others => '1');
+    lvds_spec_in_o         : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_in)  downto 0) := (others => '0');
+    lvds_spec_out_o        : out   std_logic_vector(f_sub1(g_lvds_inout+g_lvds_out) downto 0) := (others => '0');
     -- Optional status LEDs
     led_link_up_o          : out   std_logic;
     led_link_act_o         : out   std_logic;
@@ -282,157 +292,174 @@ entity monster is
     ps_advn                : out   std_logic := 'Z';
     ps_wait                : in    std_logic;
     -- g_en_user_ow
-    ow_io                  : inout std_logic_vector(1 downto 0));
+    ow_io                  : inout std_logic_vector(1 downto 0);
+    hw_version             : in    std_logic_vector(31 downto 0));
 end monster;
 
 architecture rtl of monster is
 
   constant c_is_arria5 : boolean := g_family = "Arria V";
   constant c_is_arria2 : boolean := g_family = "Arria II";
+  
+  constant c_zero_master : t_wishbone_master_out := (
+    cyc => '0',
+    stb => '0',
+    adr => (others => '0'),
+    sel => (others => '0'),
+    we  => '0',
+    dat => (others => '0'));
 
   ----------------------------------------------------------------------------------
-  -- MSI IRQ Crossbar --------------------------------------------------------------
-  ----------------------------------------------------------------------------------
-  constant c_irq_masters : natural := 7;
-  constant c_irqm_top    : natural := 0;
-  constant c_irqm_eca    : natural := 1;
-  constant c_irqm_aq     : natural := 2;
-  constant c_irqm_scubus : natural := 3;
-  constant c_irqm_tlu    : natural := 4;
-  constant c_irqm_mil    : natural := 5;
-  constant c_irqm_fg     : natural := 6;
-  
-  constant c_irq_slaves     : natural := 3;
-  constant c_irqs_lm32      : natural := 0;
-  constant c_irqs_pcie      : natural := 1;
-  constant c_irqs_vme       : natural := 2;
-  
-  constant c_lm32_irq_bridge_sdb : t_sdb_bridge := 
-    f_lm32_irq_bridge_sdb(g_lm32_cores, g_lm32_MSIs);
-  
-  constant c_irq_layout_req : t_sdb_record_array(c_irq_slaves-1 downto 0) :=
-   (c_irqs_lm32     => f_sdb_auto_bridge(c_lm32_irq_bridge_sdb,  true),
-    c_irqs_pcie     => f_sdb_auto_device(c_msi_pcie_sdb,      g_en_pcie),
-    c_irqs_vme      => f_sdb_auto_device(c_vme_msi_sdb,       g_en_vme));
-  
-  constant c_irq_layout      : t_sdb_record_array(c_irq_slaves-1 downto 0) 
-                                                  := f_sdb_auto_layout(c_irq_layout_req);
-  constant c_irq_sdb_address : t_wishbone_address := f_sdb_auto_sdb(c_irq_layout_req);
-  constant c_irq_bridge_sdb  : t_sdb_bridge       := f_xwb_bridge_layout_sdb(true, c_irq_layout, c_irq_sdb_address);
-
-  signal irq_cbar_slave_i  : t_wishbone_slave_in_array  (c_irq_masters-1 downto 0);
-  signal irq_cbar_slave_o  : t_wishbone_slave_out_array (c_irq_masters-1 downto 0);
-  signal irq_cbar_master_i : t_wishbone_master_in_array (c_irq_slaves -1 downto 0);
-  signal irq_cbar_master_o : t_wishbone_master_out_array(c_irq_slaves -1 downto 0);
-
-  -- END OF MSI IRQ Crossbar
+  -- GSI Top Crossbar Masters ------------------------------------------------------
   ----------------------------------------------------------------------------------
   
-  ----------------------------------------------------------------------------------
-  -- GSI Top Crossbar --------------------------------------------------------------
-  ----------------------------------------------------------------------------------
-  
-  constant c_top_masters    : natural := 8;
+  constant c_top_my_masters : natural := 6;
   constant c_topm_ebs       : natural := 0;
-  constant c_topm_lm32      : natural := 1;
+  constant c_topm_eca_wbm   : natural := 1;
   constant c_topm_pcie      : natural := 2;
   constant c_topm_vme       : natural := 3;
   constant c_topm_usb       : natural := 4;
-  constant c_topm_fpq       : natural := 5;
-  constant c_topm_fg        : natural := 6;
-  constant c_topm_eca_wbm   : natural := 7;
+  constant c_topm_prioq     : natural := 5;
+  
+  constant c_top_layout_my_masters : t_sdb_record_array(c_top_my_masters-1 downto 0) :=
+   (c_topm_ebs     => f_sdb_auto_msi(c_ebs_msi,     false),   -- Need to add MSI support !!!
+    c_topm_eca_wbm => f_sdb_auto_msi(c_null_msi,    false),   -- no MSIs for ECA=>WB macro player
+    c_topm_pcie    => f_sdb_auto_msi(c_pcie_msi,    g_en_pcie),
+    c_topm_vme     => f_sdb_auto_msi(c_vme_msi,     g_en_vme),
+    c_topm_usb     => f_sdb_auto_msi(c_usb_msi,     false), -- Need to add MSI support !!!
+    c_topm_prioq   => f_sdb_auto_msi(c_null_msi,    false));  
+  
+  -- The FTM adds a bunch of masters to this crossbar
+  constant c_ftm_masters : t_sdb_record_array := f_lm32_masters_bridge_msis(g_lm32_cores);
+  constant c_top_masters : natural := c_ftm_masters'length + c_top_my_masters;
+  constant c_top_layout_req_masters : t_sdb_record_array(c_top_masters-1 downto 0) :=
+    c_ftm_masters & c_top_layout_my_masters;
+    
+  constant c_top_layout_masters : t_sdb_record_array := f_sdb_auto_layout(c_top_layout_req_masters);
+  constant c_top_bridge_msi     : t_sdb_msi          := f_xwb_msi_layout_sdb(c_top_layout_masters);
+  
+  signal top_bus_slave_i  : t_wishbone_slave_in_array  (c_top_masters-1 downto 0);
+  signal top_bus_slave_o  : t_wishbone_slave_out_array (c_top_masters-1 downto 0);
+  signal top_msi_master_i : t_wishbone_master_in_array (c_top_masters-1 downto 0);
+  signal top_msi_master_o : t_wishbone_master_out_array(c_top_masters-1 downto 0);
+  
+  ----------------------------------------------------------------------------------
+  -- GSI Dev Crossbar Masters ------------------------------------------------------
+  ----------------------------------------------------------------------------------
+  constant c_dev_masters         : natural := 1;
+  constant c_devm_top            : natural := 0;
+  
+  constant c_dev_layout_req_masters : t_sdb_record_array(c_dev_masters-1 downto 0) :=
+    (c_devm_top => f_sdb_auto_msi(c_top_bridge_msi, true));
+  constant c_dev_layout_masters : t_sdb_record_array := f_sdb_auto_layout(c_dev_layout_req_masters);
+  constant c_dev_bridge_msi : t_sdb_msi := f_xwb_msi_layout_sdb(c_dev_layout_masters);
+  
+  signal dev_bus_slave_i  : t_wishbone_slave_in_array  (c_dev_masters-1 downto 0);
+  signal dev_bus_slave_o  : t_wishbone_slave_out_array (c_dev_masters-1 downto 0);
+  signal dev_msi_master_i : t_wishbone_master_in_array (c_dev_masters-1 downto 0);
+  signal dev_msi_master_o : t_wishbone_master_out_array(c_dev_masters-1 downto 0);
+  
+  ----------------------------------------------------------------------------------
+  -- GSI Dev Crossbar Slaves -------------------------------------------------------
+  ----------------------------------------------------------------------------------
   
   -- required slaves
-  constant c_top_slaves     : natural := 28;
-  constant c_tops_irq       : natural := 0;
-  constant c_tops_wrc       : natural := 1;
-  constant c_tops_lm32      : natural := 2;
-  constant c_tops_build_id  : natural := 3;
-  constant c_tops_flash     : natural := 4;
-  constant c_tops_reset     : natural := 5;
-  constant c_tops_ebm       : natural := 6;
-  constant c_tops_tlu       : natural := 7;
-  constant c_tops_eca_ctl   : natural := 8;
-  constant c_tops_eca_event : natural := 9;
-  constant c_tops_eca_aq    : natural := 10;
-  constant c_tops_iodir     : natural := 11;
-  constant c_tops_eca_wbm   : natural := 26;
-
+  constant c_dev_slaves          : natural := 28;
+  constant c_devs_build_id       : natural := 0;
+  constant c_devs_watchdog       : natural := 1;
+  constant c_devs_mbox           : natural := 2;
+  constant c_devs_flash          : natural := 3;
+  constant c_devs_reset          : natural := 4;
+  constant c_devs_wrc            : natural := 5;
+  constant c_devs_ebm            : natural := 6;
+  constant c_devs_tlu            : natural := 7;
+  constant c_devs_eca_ctl        : natural := 8;
+  constant c_devs_eca_aq         : natural := 9;
+  constant c_devs_eca_tlu        : natural := 10;
+  constant c_devs_eca_wbm        : natural := 11;
+  constant c_devs_emb_cpu        : natural := 12;
+  constant c_devs_serdes_clk_gen : natural := 13;
+  constant c_devs_control        : natural := 14;
+  constant c_devs_ftm_cluster    : natural := 15;
+  
   -- optional slaves:
-  constant c_tops_lcd       : natural := 12;
-  constant c_tops_oled      : natural := 13;
-  constant c_tops_scubus    : natural := 14;
-  constant c_tops_mil       : natural := 15;
-  constant c_tops_mil_ctrl  : natural := 16;
-  constant c_tops_ow        : natural := 17;
-  constant c_tops_scubirq   : natural := 18;
-  constant c_tops_ssd1325   : natural := 19;
-  constant c_tops_vme_info  : natural := 20;
-  constant c_tops_fg        : natural := 21;
-  constant c_tops_fgirq     : natural := 22;
-  constant c_tops_CfiPFlash : natural := 23;
-  constant c_tops_nau8811   : natural := 24;
-  constant c_tops_psram     : natural := 25;
-  -- packet generator
-  constant c_tops_packet    : natural := 27;
+  constant c_devs_lcd            : natural := 16;
+  constant c_devs_oled           : natural := 17;
+  constant c_devs_scubus         : natural := 18;
+  constant c_devs_scubirq        : natural := 19;
+  constant c_devs_mil            : natural := 20;
+  constant c_devs_mil_ctrl       : natural := 21;
+  constant c_devs_ow             : natural := 22;
+  constant c_devs_ssd1325        : natural := 23;
+  constant c_devs_vme_info       : natural := 24;
+  constant c_devs_CfiPFlash      : natural := 25;
+  constant c_devs_nau8811        : natural := 26;
+  constant c_devs_psram          : natural := 27;
 
-  -- We have to specify the values for WRC as there is no generic out in vhdl
+  -- We have to specify the values for WRC as they provide no function for this
   constant c_wrcore_bridge_sdb : t_sdb_bridge := f_xwb_bridge_manual_sdb(x"0003ffff", x"00030000");
+  constant c_ftm_slaves : t_sdb_bridge := f_cluster_bridge(c_dev_bridge_msi, g_lm32_cores, g_lm32_ramsizes, g_lm32_are_ftm);
   
-  -- LM32 cluster (IRQs, RAM, Periphery)
-  constant c_lm32_main_bridge_sdb : t_sdb_bridge := 
-    f_lm32_main_bridge_sdb(g_lm32_cores,
-                           g_lm32_MSIs,
-                           g_lm32_ramsizes,
-                           g_lm32_shared_ramsize,
-                           g_lm32_are_ftm);
-  
-  ----------------------------------------------------------------------------------------------------
-  
-  constant c_top_layout_req : t_sdb_record_array(c_top_slaves-1 downto 0) :=
-   (c_tops_irq       => f_sdb_auto_bridge(c_irq_bridge_sdb,                 true),
-    c_tops_wrc       => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
-    c_tops_lm32      => f_sdb_auto_bridge(c_lm32_main_bridge_sdb,           true),
-    c_tops_build_id  => f_sdb_auto_device(c_build_id_sdb,                   true),
-    c_tops_flash     => f_sdb_auto_device(f_wb_spi_flash_sdb(g_flash_bits), true),
-    c_tops_reset     => f_sdb_auto_device(c_arria_reset,                    true),
-    c_tops_ebm       => f_sdb_auto_device(c_ebm_sdb,                        true),
-    c_tops_tlu       => f_sdb_auto_device(c_tlu_sdb,                        true),
-    c_tops_eca_ctl   => f_sdb_auto_device(c_eca_sdb,                        true),
-    c_tops_eca_event => f_sdb_embed_device(c_eca_event_sdb, x"7FFFFFF0"), -- must be located at fixed address
-    c_tops_eca_aq    => f_sdb_auto_device(c_eca_queue_sdb,                  true),
-    c_tops_iodir     => f_sdb_auto_device(c_iodir_sdb,                      true),
-    c_tops_CfiPFlash => f_sdb_auto_device(c_wb_CfiPFlash_sdb,               g_en_cfi),
-    c_tops_lcd       => f_sdb_auto_device(c_wb_serial_lcd_sdb,              g_en_lcd),
-    c_tops_oled      => f_sdb_auto_device(c_oled_display,                   g_en_oled),
-    c_tops_ssd1325   => f_sdb_auto_device(c_ssd1325_sdb,                    g_en_ssd1325),
-    c_tops_nau8811   => f_sdb_auto_device(c_nau8811_sdb,                    g_en_nau8811),
-    c_tops_scubus    => f_sdb_auto_device(c_scu_bus_master,                 g_en_scubus),
-    c_tops_scubirq   => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               g_en_scubus),
-    c_tops_mil       => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
-    c_tops_mil_ctrl  => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
-    c_tops_vme_info  => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
-    c_tops_ow        => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
-    c_tops_fg        => f_sdb_auto_device(c_wb_fg_sdb,                      g_en_fg),
-    c_tops_fgirq     => f_sdb_auto_device(c_fg_irq_ctrl_sdb,                g_en_fg),
-    c_tops_psram     => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
-    c_tops_eca_wbm   => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,
-    true),
-    c_tops_packet    => f_sdb_auto_device(c_packet_gen_sdb,                 true)
-);
+  constant c_dev_layout_req_slaves : t_sdb_record_array(c_dev_slaves-1 downto 0) :=
+   (c_devs_build_id       => f_sdb_auto_device(c_build_id_sdb,                   true),
+    c_devs_watchdog       => f_sdb_auto_device(c_watchdog_sdb,                   true),
+    c_devs_mbox           => f_sdb_auto_device(c_mbox_sdb,                       true),
+    c_devs_flash          => f_sdb_auto_device(f_wb_spi_flash_sdb(g_flash_bits), true),
+    c_devs_reset          => f_sdb_auto_device(c_arria_reset,                    true),
+    c_devs_wrc            => f_sdb_auto_bridge(c_wrcore_bridge_sdb,              true),
+    c_devs_ebm            => f_sdb_auto_device(c_ebm_sdb,                        true),
+    c_devs_tlu            => f_sdb_auto_device(c_tlu_sdb,                        true),
+    c_devs_eca_ctl        => f_sdb_auto_device(c_eca_slave_sdb,                  true),
+    c_devs_eca_aq         => f_sdb_auto_device(c_eca_queue_slave_sdb,            true),
+    c_devs_eca_tlu        => f_sdb_auto_device(c_eca_tlu_slave_sdb,              true),
+    c_devs_eca_wbm        => f_sdb_auto_device(c_eca_ac_wbm_slave_sdb,           true),
+    c_devs_emb_cpu        => f_sdb_auto_device(c_eca_queue_slave_sdb,            true),
+    c_devs_serdes_clk_gen => f_sdb_auto_device(c_wb_serdes_clk_gen_sdb,          true),
+    c_devs_control        => f_sdb_auto_device(c_io_control_sdb,                 true),
+    c_devs_ftm_cluster    => f_sdb_auto_bridge(c_ftm_slaves,                     true),
+    c_devs_lcd            => f_sdb_auto_device(c_wb_serial_lcd_sdb,              g_en_lcd),
+    c_devs_oled           => f_sdb_auto_device(c_oled_display,                   g_en_oled),
+    c_devs_scubus         => f_sdb_auto_device(c_scu_bus_master,                 g_en_scubus),
+    c_devs_scubirq        => f_sdb_auto_device(c_scu_irq_ctrl_sdb,               g_en_scubus),
+    c_devs_mil            => f_sdb_auto_device(c_xwb_gsi_mil_scu,                g_en_mil),
+    c_devs_mil_ctrl       => f_sdb_auto_device(c_irq_master_ctrl_sdb,            g_en_mil),
+    c_devs_ow             => f_sdb_auto_device(c_wrc_periph2_sdb,                g_en_user_ow),
+    c_devs_nau8811        => f_sdb_auto_device(c_nau8811_sdb,                    g_en_nau8811),
+    c_devs_vme_info       => f_sdb_auto_device(c_vme_info_sdb,                   g_en_vme),
+    c_devs_psram          => f_sdb_auto_device(f_psram_sdb(g_psram_bits),        g_en_psram),
+    c_devs_CfiPFlash      => f_sdb_auto_device(c_wb_CfiPFlash_sdb,               g_en_cfi),
+    c_devs_ssd1325        => f_sdb_auto_device(c_ssd1325_sdb,                    g_en_ssd1325));
     
-  constant c_top_layout      : t_sdb_record_array(c_top_slaves-1 downto 0) 
-                                                  := f_sdb_auto_layout(c_top_layout_req);
-  constant c_top_sdb_address : t_wishbone_address := f_sdb_auto_sdb(c_top_layout_req);
+  constant c_dev_layout      : t_sdb_record_array := f_sdb_auto_layout(c_dev_layout_req_masters, c_dev_layout_req_slaves);
+  constant c_dev_sdb_address : t_wishbone_address := f_sdb_auto_sdb   (c_dev_layout_req_masters, c_dev_layout_req_slaves);
+  constant c_dev_bridge_sdb  : t_sdb_bridge       := f_xwb_bridge_layout_sdb(true, c_dev_layout, c_dev_sdb_address);
+  
+  signal dev_msi_slave_i  : t_wishbone_slave_in_array  (c_dev_slaves-1 downto 0) := (others => c_zero_master);
+  signal dev_msi_slave_o  : t_wishbone_slave_out_array (c_dev_slaves-1 downto 0);
+  signal dev_bus_master_i : t_wishbone_master_in_array (c_dev_slaves-1 downto 0);
+  signal dev_bus_master_o : t_wishbone_master_out_array(c_dev_slaves-1 downto 0);
+
+  ----------------------------------------------------------------------------------
+  -- GSI Top Crossbar Slaves -------------------------------------------------------
+  ----------------------------------------------------------------------------------
+  
+  -- Only put a slave here if it has critical performance requirements!
+  constant c_top_slaves     : natural := 2;
+  constant c_tops_eca_event : natural := 0;
+  constant c_tops_dev       : natural := 1;
+  
+  constant c_top_layout_req_slaves : t_sdb_record_array(c_top_slaves-1 downto 0) :=
+   (c_tops_eca_event  => f_sdb_embed_device(c_eca_event_sdb, x"7FFFFFF0"), -- must be located at fixed address
+    c_tops_dev        => f_sdb_auto_bridge (c_dev_bridge_sdb));
+  
+  constant c_top_layout      : t_sdb_record_array := f_sdb_auto_layout(c_top_layout_req_masters, c_top_layout_req_slaves);
+  constant c_top_sdb_address : t_wishbone_address := f_sdb_auto_sdb   (c_top_layout_req_masters, c_top_layout_req_slaves);
   constant c_top_bridge_sdb  : t_sdb_bridge       := f_xwb_bridge_layout_sdb(true, c_top_layout, c_top_sdb_address);
   
-  signal top_cbar_slave_i  : t_wishbone_slave_in_array (c_top_masters-1 downto 0);
-  signal top_cbar_slave_o  : t_wishbone_slave_out_array(c_top_masters-1 downto 0);
-  signal top_cbar_master_i : t_wishbone_master_in_array(c_top_slaves-1 downto 0);
-  signal top_cbar_master_o : t_wishbone_master_out_array(c_top_slaves-1 downto 0);  
-  
-  -- END OF GSI Top Crossbar
-  ----------------------------------------------------------------------------------     
+  signal top_msi_slave_i  : t_wishbone_slave_in_array  (c_top_slaves-1 downto 0) := (others => c_zero_master);
+  signal top_msi_slave_o  : t_wishbone_slave_out_array (c_top_slaves-1 downto 0);
+  signal top_bus_master_i : t_wishbone_master_in_array (c_top_slaves-1 downto 0);
+  signal top_bus_master_o : t_wishbone_master_out_array(c_top_slaves-1 downto 0);
 
   ----------------------------------------------------------------------------------
   -- Clock networks ----------------------------------------------------------------
@@ -450,10 +477,14 @@ architecture rtl of monster is
   signal clk_sys1         : std_logic;
   signal clk_sys2         : std_logic;
   signal clk_sys3         : std_logic;
+  signal clk_sys4         : std_logic;
+  signal clk_sys5         : std_logic;
   
   signal clk_sys          : std_logic;
   signal clk_reconf       : std_logic; -- 50MHz on arrai2, 100MHz on arria5
-  signal clk_flash        : std_logic; -- for now, the same as clk_reconf
+  signal clk_flash_ext    : std_logic;
+  signal clk_flash_out    : std_logic;
+  signal clk_flash_in     : std_logic;
   signal clk_20m          : std_logic;
   signal clk_update       : std_logic;
   signal rstn_sys         : std_logic;
@@ -506,12 +537,6 @@ architecture rtl of monster is
   signal eb_snk_out    : t_wrf_sink_out;
   signal eb_snk_in     : t_wrf_sink_in;
   
-  signal wr_src_out    : t_wrf_source_out;
-  signal wr_src_in     : t_wrf_source_in;
-  signal wr_snk_out    : t_wrf_sink_out;
-  signal wr_snk_in     : t_wrf_sink_in;
-
- 
   signal uart_usb : std_logic; -- from usb
   signal uart_mux : std_logic; -- either usb or external
   signal uart_wrc : std_logic; -- from wrc
@@ -554,8 +579,7 @@ architecture rtl of monster is
   signal tm_tai    : std_logic_vector(39 downto 0);
   signal tm_cycles : std_logic_vector(27 downto 0);
   
-  signal sys_tai8ns : t_time;
-  signal ref_tai8ns : t_time;
+  signal ref_tai8ns : std_logic_vector(63 downto 0);
 
   signal owr_pwren : std_logic_vector(1 downto 0);
   signal owr_en    : std_logic_vector(1 downto 0);
@@ -563,7 +587,35 @@ architecture rtl of monster is
   signal sfp_scl_o : std_logic;
   signal sfp_sda_o : std_logic;
   
-  signal channels : t_channel_array(4 downto 0);
+  constant c_loc_linux        : natural := 0;
+  constant c_loc_wb_master    : natural := 1;
+  constant c_loc_embedded_cpu : natural := 2;
+  constant c_loc_scubus_tag   : natural := 3;
+  
+  function f_channel_types return t_nat_array is
+    constant c_scu_channel_types : t_nat_array(3 downto 0) := (
+      0 => c_loc_linux, 
+      1 => c_loc_wb_master, 
+      2 => c_loc_embedded_cpu,
+      3 => c_loc_scubus_tag);
+    constant c_channel_types : t_nat_array(2 downto 0) := c_scu_channel_types(2 downto 0);
+  begin
+    if g_en_scubus then
+      return c_scu_channel_types;
+    else
+      return c_channel_types;
+    end if;
+  end f_channel_types;
+  
+  constant c_channel_types : t_nat_array := f_channel_types;
+  
+  signal s_stall_i   : std_logic_vector(c_channel_types'range) := (others => '0');
+  signal s_channel_o : t_channel_array(c_channel_types'range);
+  signal s_time      : t_time;
+  
+  constant c_num_streams : natural := 2;
+  signal s_stream_i : t_stream_array(c_num_streams-1 downto 0);
+  signal s_stall_o  : std_logic_vector(c_num_streams-1 downto 0);
   
   -- END OF White Rabbit
   ----------------------------------------------------------------------------------
@@ -591,7 +643,7 @@ architecture rtl of monster is
   
   -- SCU bus signals
   ----------------------------------------------------------------------------------
-    signal s_timestamps: t_txtsu_timestamp;
+  
   
   ----------------------------------------------------------------------------------
   -- VME signals -------------------------------------------------------------------
@@ -610,15 +662,38 @@ architecture rtl of monster is
   -- END OF VME signals
   ----------------------------------------------------------------------------------
   
-  signal lcd_scp : std_logic;
-  signal lcd_lp  : std_logic;
-  signal lcd_flm : std_logic;
-  signal lcd_in  : std_logic;
-  signal gpio    : std_logic_vector(15 downto 0);
-  signal user_ow_pwren  : std_logic_vector(1 downto 0);
-  signal user_ow_en     : std_logic_vector(1 downto 0);
-  signal lvds_o  : t_lvds_byte_array(11 downto 0);
-  signal lvds_i  : t_lvds_byte_array(15 downto 0);
+  signal lcd_scp       : std_logic;
+  signal lcd_lp        : std_logic;
+  signal lcd_flm       : std_logic;
+  signal lcd_in        : std_logic;
+  signal user_ow_pwren : std_logic_vector(1 downto 0);
+  signal user_ow_en    : std_logic_vector(1 downto 0);
+  
+  constant c_eca_lvds : natural := g_lvds_inout + g_lvds_out;
+  constant c_eca_gpio : natural := g_gpio_inout + g_gpio_out;
+  constant c_eca_io   : natural := c_eca_lvds + c_eca_gpio;
+  
+  constant c_tlu_lvds : natural := g_lvds_inout + g_lvds_in;
+  constant c_tlu_gpio : natural := g_gpio_inout + g_gpio_in;
+  constant c_tlu_io   : natural := c_tlu_lvds + c_tlu_gpio;
+
+  signal s_eca_io   : t_gpio_array(c_eca_io-1 downto 0);
+  signal s_tlu_io   : t_gpio_array(c_tlu_io-1 downto 0);
+
+  signal s_gpio_out     : std_logic_vector(f_sub1(c_eca_gpio) downto 0);
+  signal s_gpio_src_eca : std_logic_vector(f_sub1(c_eca_gpio) downto 0);
+  signal s_gpio_src_ioc : std_logic_vector(f_sub1(c_eca_gpio) downto 0);
+  
+  signal s_gpio_mux      : std_logic_vector(f_sub1(c_eca_gpio) downto 0);
+  signal s_lvds_mux      : std_logic_vector(f_sub1(c_eca_lvds) downto 0);
+  signal s_lvds_vec_i    : t_lvds_byte_array(f_sub1(g_lvds_inout+g_lvds_in) downto 0);
+  
+  signal lvds_dat_fr_butis_t0 : t_lvds_byte_array(f_sub1(c_eca_lvds) downto 0);
+  signal lvds_dat_fr_ioc      : t_lvds_byte_array(f_sub1(c_eca_lvds) downto 0);
+  signal lvds_dat_fr_eca_chan : t_lvds_byte_array(f_sub1(c_eca_lvds) downto 0);
+  signal lvds_dat_fr_clk_gen  : t_lvds_byte_array(f_sub1(c_eca_lvds) downto 0);
+  signal lvds_dat             : t_lvds_byte_array(f_sub1(c_eca_lvds) downto 0);
+  signal lvds_i               : t_lvds_byte_array(15 downto 0);
   
   signal s_triggers : t_trigger_array(g_gpio_in + g_gpio_inout + g_lvds_inout + g_lvds_in -1 downto 0);
   
@@ -697,15 +772,17 @@ begin
       c2     => clk_sys2,         --  20  MHz
       c3     => clk_sys3,         --  10  MHz
       locked => sys_locked);
+    clk_sys4 <= clk_sys1;
   end generate;
   sys_a5 : if c_is_arria5 generate
     sys_inst : sys_pll5 port map(
       rst      => pll_rst,
       refclk   => core_clk_125m_local_i, -- 125  Mhz 
       outclk_0 => clk_sys0,           --  62.5MHz
-      outclk_1 => clk_sys1,           -- 100  MHz
+      outclk_1 => clk_sys1,           -- 100  MHz +0   ns
       outclk_2 => clk_sys2,           --  20  MHz
       outclk_3 => clk_sys3,           --  10  MHz
+      outclk_4 => clk_sys4,           --  20  MHz
       locked   => sys_locked);
   end generate;
   
@@ -717,8 +794,6 @@ begin
     inclk  => clk_sys1,
     outclk => clk_reconf);
   
-  clk_flash <= clk_reconf;
-  
   c20m_clk : single_region port map(
     inclk  => clk_sys2,
     outclk => clk_20m);
@@ -726,6 +801,13 @@ begin
   update_clk : single_region port map(
     inclk  => clk_sys3,
     outclk => clk_update);
+  
+  flash_out : global_region port map(
+    inclk  => clk_sys4,
+    outclk => clk_flash_ext);
+  
+  clk_flash_in  <= clk_flash_ext;
+  clk_flash_out <= clk_reconf;
   
   ref_a2 : if c_is_arria2 generate
     ref_inst : ref_pll port map( -- see "Phase Counter Select Mapping" table for arria2gx
@@ -819,8 +901,7 @@ begin
       wr_rst_n_i               => rstn_ref,
       wr_PPSpulse_i            => pps,
       BuTis_rst_n_i            => rstn_butis,
-      timestamp_i(63 downto 3) => ref_tai8ns(60 downto 0),
-      timestamp_i( 2 downto 0) => "000",
+      timestamp_i              => s_time,
       BuTis_C2_i               => clk_butis,
       BuTis_T0_o               => clk_butis_t0,
       BuTis_T0_timestamp_o     => clk_butis_t0_ts,
@@ -850,42 +931,59 @@ begin
     port map(
       clk_sys_i     => clk_sys,
       rst_n_i       => rstn_sys,
-      slave_i       => top_cbar_slave_i,
-      slave_o       => top_cbar_slave_o,
-      master_i      => top_cbar_master_i,
-      master_o      => top_cbar_master_o);
+      slave_i       => top_bus_slave_i,
+      slave_o       => top_bus_slave_o,
+      msi_master_i  => top_msi_master_i,
+      msi_master_o  => top_msi_master_o,
+      master_i      => top_bus_master_i,
+      master_o      => top_bus_master_o,
+      msi_slave_i   => top_msi_slave_i,
+      msi_slave_o   => top_msi_slave_o);
   
-  irq_bar : xwb_sdb_crossbar
+  dev_bar : xwb_sdb_crossbar
     generic map(
-      g_num_masters => c_irq_masters,
-      g_num_slaves  => c_irq_slaves,
+      g_num_masters => c_dev_masters,
+      g_num_slaves  => c_dev_slaves,
       g_registered  => true,
       g_wraparound  => true,
-      g_layout      => c_irq_layout,
-      g_sdb_addr    => c_irq_sdb_address)
+      g_layout      => c_dev_layout,
+      g_sdb_addr    => c_dev_sdb_address)
     port map(
       clk_sys_i     => clk_sys,
       rst_n_i       => rstn_sys,
-      slave_i       => irq_cbar_slave_i,
-      slave_o       => irq_cbar_slave_o,
-      master_i      => irq_cbar_master_i,
-      master_o      => irq_cbar_master_o);
+      slave_i       => dev_bus_slave_i,
+      slave_o       => dev_bus_slave_o,
+      msi_master_i  => dev_msi_master_i,
+      msi_master_o  => dev_msi_master_o,
+      master_i      => dev_bus_master_i,
+      master_o      => dev_bus_master_o,
+      msi_slave_i   => dev_msi_slave_i,
+      msi_slave_o   => dev_msi_slave_o);
   
-  top2irq : xwb_register_link
+  top2dev_bus : xwb_register_link
     port map(
       clk_sys_i     => clk_sys,
       rst_n_i       => rstn_sys,
-      slave_i       => top_cbar_master_o(c_tops_irq),
-      slave_o       => top_cbar_master_i(c_tops_irq),
-      master_i      => irq_cbar_slave_o (c_irqm_top),
-      master_o      => irq_cbar_slave_i (c_irqm_top));
+      slave_i       => top_bus_master_o(c_tops_dev),
+      slave_o       => top_bus_master_i(c_tops_dev),
+      master_i      => dev_bus_slave_o (c_devm_top),
+      master_o      => dev_bus_slave_i (c_devm_top));
   
-  top2wrc : xwb_register_link
+  dev2top_msi : xwb_register_link
     port map(
       clk_sys_i     => clk_sys,
       rst_n_i       => rstn_sys,
-      slave_i       => top_cbar_master_o(c_tops_wrc),
-      slave_o       => top_cbar_master_i(c_tops_wrc),
+      slave_i       => dev_msi_master_o(c_devm_top),
+      slave_o       => dev_msi_master_i(c_devm_top),
+      master_i      => top_msi_slave_o (c_tops_dev),
+      master_o      => top_msi_slave_i (c_tops_dev));
+  
+  top2wrc_bus : xwb_register_link
+    port map(
+      clk_sys_i     => clk_sys,
+      rst_n_i       => rstn_sys,
+      slave_i       => dev_bus_master_o(c_devs_wrc),
+      slave_o       => dev_bus_master_i(c_devs_wrc),
       master_i      => wrc_slave_o,
       master_o      => wrc_slave_i);
   
@@ -893,13 +991,13 @@ begin
   ----------------------------------------------------------------------------------
 
   ----------------------------------------------------------------------------------
-  -- Wishbone masters --------------------------------------------------------------
+  -- Top Wishbone masters ----------------------------------------------------------
   
+  top_msi_master_i(c_topm_ebs) <= cc_dummy_slave_out; -- Etherbone does not accept MSI !!!
   eb : eb_master_slave_wrapper
     generic map(
       g_with_master     => true,
-      g_ebs_sdb_address => (x"00000000" & c_top_sdb_address)
-    )
+      g_ebs_sdb_address => (x"00000000" & c_top_sdb_address))
     port map(
       clk_i           => clk_sys,
       nRst_i          => rstn_sys,
@@ -909,41 +1007,42 @@ begin
       src_i           => eb_src_in,
       ebs_cfg_slave_o => wrc_master_i,
       ebs_cfg_slave_i => wrc_master_o,
-      ebs_wb_master_o => top_cbar_slave_i (c_topm_ebs),
-      ebs_wb_master_i => top_cbar_slave_o (c_topm_ebs),
-      ebm_wb_slave_i  => top_cbar_master_o(c_tops_ebm),
-      ebm_wb_slave_o  => top_cbar_master_i(c_tops_ebm));
- 
- 
+      ebs_wb_master_o => top_bus_slave_i (c_topm_ebs),
+      ebs_wb_master_i => top_bus_slave_o (c_topm_ebs),
+      ebm_wb_slave_i  => dev_bus_master_o(c_devs_ebm),
+      ebm_wb_slave_o  => dev_bus_master_i(c_devs_ebm));
    
+
   lm32 : ftm_lm32_cluster 
     generic map(
-      g_is_ftm           => g_lm32_are_ftm,	
+      g_is_dm            => g_lm32_are_ftm,	
       g_cores            => g_lm32_cores,
       g_ram_per_core     => g_lm32_ramsizes,
-      g_shared_mem       => g_lm32_shared_ramsize,
       g_world_bridge_sdb => c_top_bridge_sdb,
+      g_clu_msi_sdb      => c_dev_bridge_msi,
       g_init_files       => g_lm32_init_files,
-      g_msi_per_core     => g_lm32_MSIs)
+		g_profiles         => g_lm32_profiles)
     port map(
-      clk_ref_i            => clk_ref,
-      rst_ref_n_i          => rstn_ref,
-      clk_sys_i            => clk_sys,
-      rst_sys_n_i          => rstn_sys,
-      rst_lm32_n_i         => s_lm32_rstn,
-      tm_tai8ns_i     	   => ref_tai8ns,
-      irq_slave_o     	   => irq_cbar_master_i(c_irqs_lm32),
-      irq_slave_i     	   => irq_cbar_master_o(c_irqs_lm32),
-      cluster_slave_o      => top_cbar_master_i(c_tops_lm32),
-      cluster_slave_i      => top_cbar_master_o(c_tops_lm32),
-      ftm_queue_master_o   => top_cbar_slave_i (c_topm_fpq),
-      ftm_queue_master_i   => top_cbar_slave_o (c_topm_fpq),
-      master_o             => top_cbar_slave_i (c_topm_lm32),
-      master_i             => top_cbar_slave_o (c_topm_lm32));
+      clk_ref_i          => clk_ref,
+      rst_ref_n_i        => rstn_ref,
+      clk_sys_i          => clk_sys,
+      rst_sys_n_i        => rstn_sys,
+      rst_lm32_n_i       => s_lm32_rstn,
+      tm_tai8ns_i        => s_time,
+      lm32_masters_o     => top_bus_slave_i(top_bus_slave_i'high downto c_top_my_masters),
+      lm32_masters_i     => top_bus_slave_o(top_bus_slave_o'high downto c_top_my_masters),
+      lm32_msi_slaves_o  => top_msi_master_i(top_msi_master_i'high downto c_top_my_masters), 
+      lm32_msi_slaves_i  => top_msi_master_o(top_msi_master_o'high downto c_top_my_masters), 
+      clu_slave_o        => dev_bus_master_i(c_devs_ftm_cluster),
+      clu_slave_i        => dev_bus_master_o(c_devs_ftm_cluster),
+      clu_msi_master_o   => dev_msi_slave_i(c_devs_ftm_cluster),
+      clu_msi_master_i   => dev_msi_slave_o(c_devs_ftm_cluster),
+      dm_prioq_master_o  => top_bus_slave_i(c_topm_prioq),
+      dm_prioq_master_i  => top_bus_slave_o(c_topm_prioq));
   
   pcie_n : if not g_en_pcie generate
-    top_cbar_slave_i (c_topm_pcie) <= cc_dummy_master_out;
-    irq_cbar_master_i(c_irqs_pcie) <= cc_dummy_slave_out;
+    top_bus_slave_i (c_topm_pcie) <= cc_dummy_master_out;
+    top_msi_master_i(c_topm_pcie) <= cc_dummy_slave_out;
   end generate;
   pcie_y : if g_en_pcie generate
     pcie : pcie_wb
@@ -959,19 +1058,18 @@ begin
         pcie_tx_o     => pcie_tx_o,
         master_clk_i  => clk_sys,
         master_rstn_i => rstn_sys,
-        master_o      => top_cbar_slave_i (c_topm_pcie),
-        master_i      => top_cbar_slave_o (c_topm_pcie),
+        master_o      => top_bus_slave_i (c_topm_pcie),
+        master_i      => top_bus_slave_o (c_topm_pcie),
         slave_clk_i   => clk_sys,
         slave_rstn_i  => rstn_sys,
-        slave_i       => irq_cbar_master_o(c_irqs_pcie),
-        slave_o       => irq_cbar_master_i(c_irqs_pcie));
+        slave_i       => top_msi_master_o(c_topm_pcie),
+        slave_o       => top_msi_master_i(c_topm_pcie));
   end generate;
   
   vme_n : if not g_en_vme generate
-    top_cbar_slave_i (c_topm_vme) <= cc_dummy_master_out;
-    top_cbar_master_i(c_tops_vme_info) <= cc_dummy_slave_out;
-    irq_cbar_master_i(c_irqs_vme) <= cc_dummy_slave_out;
-
+    top_bus_slave_i (c_topm_vme) <= cc_dummy_master_out;
+    top_msi_master_i(c_topm_vme) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_vme_info) <= cc_dummy_slave_out;
     vme_addr_data_b <= (others => 'Z');
   end generate;
   vme_y : if g_en_vme generate
@@ -987,7 +1085,7 @@ begin
         g_RevisionID     => c_RevisionID, -- 0x1
         g_ProgramID      => 96,           -- 0x60
         g_base_addr      => MECHANICALLY,
-        g_sdb_addr 		 => c_top_sdb_address,
+        g_sdb_addr       => c_top_sdb_address,
         g_irq_src        => MSI)
        port map(
         clk_i           => clk_sys,
@@ -1016,12 +1114,12 @@ begin
         irq_i           => '0',  -- => wbirq_i,  
         int_ack_o       => open, -- => s_int_ack,
         --reset_o         => open, -- => s_rst,
-        master_o        => top_cbar_slave_i(c_topm_vme),
-        master_i        => top_cbar_slave_o(c_topm_vme),
-        slave_o         => irq_cbar_master_i(c_irqs_vme),
-        slave_i         => irq_cbar_master_o(c_irqs_vme), 
-        info_slave_i    => top_cbar_master_o(c_tops_vme_info),
-        info_slave_o    => top_cbar_master_i(c_tops_vme_info),
+        master_o        => top_bus_slave_i (c_topm_vme),
+        master_i        => top_bus_slave_o (c_topm_vme),
+        slave_o         => top_msi_master_i(c_topm_vme),
+        slave_i         => top_msi_master_o(c_topm_vme), 
+        info_slave_i    => dev_bus_master_o(c_devs_vme_info),
+        info_slave_o    => dev_bus_master_i(c_devs_vme_info),
         debug           => open);
     
     U_BUFFER_CTRL : VME_Buffer_ctrl
@@ -1051,8 +1149,9 @@ begin
     
   end generate;
   
+  top_msi_master_i(c_topm_usb) <= cc_dummy_slave_out; -- USB does not accept MSI !!!
   usb_n : if not g_en_usb generate
-    top_cbar_slave_i (c_topm_usb) <= cc_dummy_master_out;
+    top_bus_slave_i(c_topm_usb) <= cc_dummy_master_out;
     uart_usb <= '1';
     usb_readyn_io <= 'Z';
     usb_fd_io <= (others => 'Z');
@@ -1066,8 +1165,8 @@ begin
       port map(
         clk_sys_i => clk_sys,
         rstn_i    => rstn_sys,
-        master_i  => top_cbar_slave_o(c_topm_usb),
-        master_o  => top_cbar_slave_i(c_topm_usb),
+        master_i  => top_bus_slave_o(c_topm_usb),
+        master_o  => top_bus_slave_i(c_topm_usb),
         uart_o    => uart_usb,
         uart_i    => uart_wrc,
         rstn_o    => usb_rstn_o,
@@ -1090,22 +1189,6 @@ begin
   wr_uart_o <= uart_wrc;
   uart_mux <= uart_usb and wr_uart_i;
   
- Packet_generator : xwb_packet
-    port map(
-      clk_i               => clk_sys,
-      rst_n_i             => rstn_sys,
-
-      wr_src_o            => wr_src_out,
-      wr_src_i            => wr_src_in,
-
-      timestamps_i        => s_timestamps,
-      tm_tai_i            => tm_tai,
-      tm_cycle_i          => tm_cycles,
-
-
-      wb_ctrl_stat_slave_o  => top_cbar_master_i(c_tops_packet),
-      wb_ctrl_stat_slave_i  => top_cbar_master_o(c_tops_packet));
-
   -- END OF Wishbone masters
   ----------------------------------------------------------------------------------
   
@@ -1140,12 +1223,12 @@ begin
       dac_dpll_data_o      => dac_dpll_data,
       phy_ref_clk_i        => clk_ref,
       phy_tx_data_o        => phy_tx_data,
-      phy_tx_k_o           => phy_tx_k,
+      phy_tx_k_o(0)        => phy_tx_k,
       phy_tx_disparity_i   => phy_tx_disparity,
       phy_tx_enc_err_i     => phy_tx_enc_err,
       phy_rx_data_i        => phy_rx_data,
       phy_rx_rbclk_i       => phy_rx_rbclk,
-      phy_rx_k_i           => phy_rx_k,
+      phy_rx_k_i(0)        => phy_rx_k,
       phy_rx_enc_err_i     => phy_rx_enc_err,
       phy_rx_bitslide_i    => phy_rx_bitslide,
       phy_rst_o            => phy_rst,
@@ -1173,19 +1256,10 @@ begin
       slave_o              => wrc_slave_o,
       aux_master_o         => wrc_master_o,
       aux_master_i         => wrc_master_i,
---      wrf_src_o            => eb_snk_in,
---      wrf_src_i            => eb_snk_out,
---      wrf_snk_o            => eb_src_in,
---      wrf_snk_i            => eb_src_out,
-		
-		wrf_src_o            => wr_snk_in,
-      wrf_src_i            => wr_snk_out,
-      wrf_snk_o            => wr_src_in,
-      wrf_snk_i            => wr_src_out,
-
-      timestamps_o         => s_timestamps,
-      timestamps_ack_i     => '1',
-
+      wrf_src_o            => eb_snk_in,
+      wrf_src_i            => eb_snk_out,
+      wrf_snk_o            => eb_src_in,
+      wrf_snk_i            => eb_src_out,
       tm_link_up_o         => open,
       tm_dac_value_o       => open,
       tm_dac_wr_o          => open,
@@ -1263,18 +1337,6 @@ begin
         pad_rxp_i      => wr_sfp_rx_i);    
   end generate;
   
-  sys_time : time_clk_cross
-    port map(
-      clk_ref_i           => clk_ref,
-      rst_ref_n_i         => rstn_ref,
-      clk_sys_i           => clk_sys,
-      rst_sys_n_i         => rstn_sys,
-      tm_time_valid_i     => tm_valid,
-      tm_tai_i            => tm_tai,
-      tm_cycles_i         => tm_cycles,
-      tm_ref_tai_cycles_o => ref_tai8ns,
-      tm_sys_tai_cycles_o => sys_tai8ns);
-
   pps_ext : gc_extend_pulse
     generic map(
       g_width => 10000000)
@@ -1304,8 +1366,24 @@ begin
     port map(
       clk_i   => clk_sys,
       rst_n_i => rstn_sys,
-      slave_i => top_cbar_master_o(c_tops_build_id),
-      slave_o => top_cbar_master_i(c_tops_build_id));
+      slave_i => dev_bus_master_o(c_devs_build_id),
+      slave_o => dev_bus_master_i(c_devs_build_id));
+  
+  dog : watchdog
+    port map(
+      clk_i   => clk_sys,
+      rst_n_i => rstn_sys,
+      slave_i => dev_bus_master_o(c_devs_watchdog),
+      slave_o => dev_bus_master_i(c_devs_watchdog));
+  
+  mailbox : mbox
+    port map(
+      clk_i        => clk_sys,
+      rst_n_i      => rstn_sys,
+      bus_slave_i  => dev_bus_master_o(c_devs_mbox),
+      bus_slave_o  => dev_bus_master_i(c_devs_mbox),
+      msi_master_o => dev_msi_slave_i (c_devs_mbox),
+      msi_master_i => dev_msi_slave_o (c_devs_mbox));
   
   flash_a2 : if c_is_arria2 generate
     flash : flash_top
@@ -1316,16 +1394,17 @@ begin
         g_dummy_time             => 8,   -- 8 cycles between address and data
         g_input_latch_edge       => '0', -- 30ns at 50MHz (10+20) after falling edge sets up SPI output
         g_output_latch_edge      => '1', -- falling edge to meet SPI setup times
-        g_input_to_output_cycles => 2)   -- delayed to work-around unconstrained design
+        g_input_to_output_cycles => 4)   -- delayed to work-around unconstrained design
       port map(
         clk_i     => clk_sys,
         rstn_i    => rstn_sys,
-        slave_i   => top_cbar_master_o(c_tops_flash),
-        slave_o   => top_cbar_master_i(c_tops_flash),
-        clk_ext_i => clk_flash,
-        clk_out_i => clk_flash,
-        clk_in_i  => clk_flash);
+        slave_i   => dev_bus_master_o(c_devs_flash),
+        slave_o   => dev_bus_master_i(c_devs_flash),
+        clk_ext_i => clk_flash_ext,
+        clk_out_i => clk_flash_out,
+        clk_in_i  => clk_flash_in);
   end generate;
+  
   flash_a5 : if c_is_arria5 generate
     flash : flash_top
       generic map(
@@ -1333,17 +1412,17 @@ begin
         g_port_width             => 4,  -- quad-lane SPI bus
         g_addr_width             => g_flash_bits,
         g_dummy_time             => 10,
-        g_input_latch_edge       => '1',
+        g_input_latch_edge       => '0',
         g_output_latch_edge      => '1',
-        g_input_to_output_cycles => 3)
+        g_input_to_output_cycles => 4)
       port map(
         clk_i     => clk_sys,
         rstn_i    => rstn_sys,
-        slave_i   => top_cbar_master_o(c_tops_flash),
-        slave_o   => top_cbar_master_i(c_tops_flash),
-        clk_ext_i => clk_flash,
-        clk_out_i => clk_flash,
-        clk_in_i  => clk_flash);
+        slave_i   => dev_bus_master_o(c_devs_flash),
+        slave_o   => dev_bus_master_i(c_devs_flash),
+        clk_ext_i => clk_flash_ext,
+        clk_out_i => clk_flash_ext,
+        clk_in_i  => clk_flash_ext);
   end generate;
   
   wb_reset : wb_arria_reset
@@ -1355,21 +1434,83 @@ begin
       rstn_sys_i => rstn_sys,
       clk_upd_i  => clk_update,
       rstn_upd_i => rstn_update,
-      slave_o    => top_cbar_master_i(c_tops_reset),
-      slave_i    => top_cbar_master_o(c_tops_reset),
+      hw_version => hw_version,
+      slave_o    => dev_bus_master_i(c_devs_reset),
+      slave_i    => dev_bus_master_o(c_devs_reset),
       rstn_o     => s_lm32_rstn);
   
-  iodir : monster_iodir
+  iocontrol : io_control
     generic map(
+      g_project    => g_project,
+      g_syn_target => g_family,
+      g_gpio_in    => g_gpio_in,
+      g_gpio_out   => g_gpio_out,
       g_gpio_inout => g_gpio_inout,
-      g_lvds_inout => g_lvds_inout)
+      g_lvds_in    => g_lvds_in,
+      g_lvds_out   => g_lvds_out,
+      g_lvds_inout => g_lvds_inout,
+      g_fixed      => g_fixed,
+      g_io_table   => g_io_table)
     port map(
-      clk_i      => clk_sys,
-      rst_n_i    => rstn_sys,
-      slave_i    => top_cbar_master_o(c_tops_iodir),
-      slave_o    => top_cbar_master_i(c_tops_iodir),
-      gpio_oen_o => gpio_oen_o,
-      lvds_oen_o => lvds_oen_o);
+      clk_i           => clk_sys,
+      rst_n_i         => rstn_sys,
+      gpio_input_i    => gpio_i(f_sub1(g_gpio_in+g_gpio_inout) downto 0),
+      gpio_output_i   => s_gpio_out,
+      gpio_output_o   => s_gpio_src_ioc,
+      lvds_input_i    => s_lvds_vec_i(f_sub1(g_lvds_in+g_lvds_inout) downto 0),
+      lvds_output_i   => lvds_dat,
+      lvds_output_o   => lvds_dat_fr_ioc,
+      slave_i         => dev_bus_master_o(c_devs_control),
+      slave_o         => dev_bus_master_i(c_devs_control),
+      gpio_oe_o       => gpio_oen_o,
+      gpio_term_o     => gpio_term_o,
+      gpio_spec_out_o => gpio_spec_out_o,
+      gpio_spec_in_o  => gpio_spec_in_o,
+      gpio_mux_o      => s_gpio_mux,
+      lvds_oe_o       => lvds_oen_o,
+      lvds_term_o     => lvds_term_o,
+      lvds_spec_out_o => lvds_spec_out_o,
+      lvds_spec_in_o  => lvds_spec_in_o,
+      lvds_mux_o      => s_lvds_mux);
+  
+  lvds_vec_in_zero : if (g_lvds_inout + g_lvds_in = 0) generate
+    s_lvds_vec_i <= (others => (others => '0'));
+  end generate;
+  
+  lvds_vec_in : if (g_lvds_inout + g_lvds_in > 0) generate
+    s_lvds_vec_i <= lvds_i(f_sub1(g_lvds_in+g_lvds_inout) downto 0);
+  end generate;
+  
+  gpio_out_selector : for i in 0 to f_sub1(c_eca_gpio) generate
+    gpio_o(i) <= s_gpio_out(i) when s_gpio_mux(i)='0' else clk_butis_t0_ts;
+  end generate;
+  s_gpio_out <= s_gpio_src_eca or s_gpio_src_ioc;
+  
+  lvds_out_selector : for i in 0 to f_sub1(c_eca_lvds) generate
+    lvds_dat_fr_butis_t0(i) <= (others => clk_butis_t0_ts and s_lvds_mux(i));
+  end generate;
+  
+  -- Instantiate SERDES clock generator
+  cmp_serdes_clk_gen : xwb_serdes_clk_gen
+    generic map(
+      g_num_serdes_bits       => 8,
+      g_selectable_duty_cycle => true,
+      g_with_frac_counter     => true,
+      g_num_outputs           => f_sub1(c_eca_lvds)+1)
+    port map(
+      clk_sys_i    => clk_sys,
+      rst_sys_n_i  => rstn_sys,
+      wbs_i        => dev_bus_master_o(c_devs_serdes_clk_gen),
+      wbs_o        => dev_bus_master_i(c_devs_serdes_clk_gen),
+      clk_ref_i    => clk_ref,
+      rst_ref_n_i  => rstn_ref,
+      eca_time_i   => ref_tai8ns,
+      serdes_dat_o => lvds_dat_fr_clk_gen);
+
+  -- LVDS component data input is OR between ECA chan output and SERDES clk. gen.
+  gen_lvds_dat : for i in lvds_dat'range generate
+    lvds_dat(i) <= lvds_dat_fr_eca_chan(i) or lvds_dat_fr_clk_gen(i) or lvds_dat_fr_ioc(i) or lvds_dat_fr_butis_t0(i);
+  end generate gen_lvds_dat;
   
   tlu_gpio : if (g_gpio_in + g_gpio_inout > 0) generate
    s_triggers(g_gpio_in + g_gpio_inout -1 downto 0) <= f_gpio_to_trigger_array(gpio_i);
@@ -1390,98 +1531,151 @@ begin
       rst_sys_n_i    => rstn_sys,
       triggers_i     => s_triggers,
       tm_tai_cyc_i   => ref_tai8ns,
-      ctrl_slave_i   => top_cbar_master_o(c_tops_tlu),
-      ctrl_slave_o   => top_cbar_master_i(c_tops_tlu),
-      irq_master_o   => irq_cbar_slave_i(c_irqm_tlu),
-      irq_master_i   => irq_cbar_slave_o(c_irqm_tlu)
-      );
+      ctrl_slave_i   => dev_bus_master_o(c_devs_tlu),
+      ctrl_slave_o   => dev_bus_master_i(c_devs_tlu),
+      irq_master_o   => dev_msi_slave_i (c_devs_tlu),
+      irq_master_i   => dev_msi_slave_o (c_devs_tlu));
   
+  ecawb : eca_wb_event
+    port map(
+      w_clk_i    => clk_sys,
+      w_rst_n_i  => rstn_sys,
+      w_slave_i  => top_bus_master_o(c_tops_eca_event),
+      w_slave_o  => top_bus_master_i(c_tops_eca_event),
+      e_clk_i    => clk_ref,
+      e_rst_n_i  => rstn_ref,
+      e_stream_o => s_stream_i(0),
+      e_stall_i  => s_stall_o(0));
+  
+  ecatlu : eca_tlu
+    generic map(
+      g_inputs => c_tlu_io)
+    port map(
+      c_clk_i    => clk_sys,
+      c_rst_n_i  => rstn_sys,
+      c_slave_i  => dev_bus_master_o(c_devs_eca_tlu),
+      c_slave_o  => dev_bus_master_i(c_devs_eca_tlu),
+      a_clk_i    => clk_ref,
+      a_rst_n_i  => rstn_ref,
+      a_time_i   => s_time,
+      a_gpio_i   => s_tlu_io,
+      a_stream_o => s_stream_i(1),
+      a_stall_i  => s_stall_o(1));
+
   eca : wr_eca
     generic map(
-      g_eca_name      => f_name(g_project & " top"),
-      g_channel_names => (f_name("GPIO: gpio triggers"),
-                          f_name("RTOS: Action Queue"),
-                          f_name("GPIO: lvds triggers"),
-                          f_name("SCUBUS: tag to scubus"),
-                          f_name("WB:   WB Master")),
-      g_log_table_size => 7,
-      g_log_queue_len  => 8,
-      g_num_channels   => 5,
-      g_num_streams    => 1)
+      g_channel_types  => c_channel_types,
+      g_num_streams    => c_num_streams,
+      g_num_ios        => c_eca_io,
+      g_log_table_size => 8,
+      g_log_queue_size => 8) -- any smaller and g_log_latency must be decreased
     port map(
-      e_clk_i  (0)=> clk_sys,
-      e_rst_n_i(0)=> rstn_sys,
-      e_slave_i(0)=> top_cbar_master_o(c_tops_eca_event),
-      e_slave_o(0)=> top_cbar_master_i(c_tops_eca_event),
       c_clk_i     => clk_sys,
       c_rst_n_i   => rstn_sys,
-      c_slave_i   => top_cbar_master_o(c_tops_eca_ctl),
-      c_slave_o   => top_cbar_master_i(c_tops_eca_ctl),
+      c_slave_i   => dev_bus_master_o(c_devs_eca_ctl),
+      c_slave_o   => dev_bus_master_i(c_devs_eca_ctl),
       a_clk_i     => clk_ref,
       a_rst_n_i   => rstn_ref,
       a_tai_i     => tm_tai,  
       a_cycles_i  => tm_cycles,
-      a_channel_o => channels, 
+      a_time_o    => s_time,
+      a_stream_i  => s_stream_i,
+      a_stall_o   => s_stall_o,
+      a_stall_i   => s_stall_i,
+      a_channel_o => s_channel_o,
+      a_io_o      => s_eca_io,
       i_clk_i     => clk_sys,  
       i_rst_n_i   => rstn_sys, 
-      i_master_i  => irq_cbar_slave_o(c_irqm_eca),
-      i_master_o  => irq_cbar_slave_i(c_irqm_eca));
-    
-  c0 : eca_gpio_channel
-    port map(
-      clk_i     => clk_ref,
-      rst_n_i   => rstn_ref,
-      channel_i => channels(0),
-      gpio_o    => gpio);
-  gpio_o <= gpio(gpio_o'range);
+      i_master_i  => dev_msi_slave_o(c_devs_eca_ctl),
+      i_master_o  => dev_msi_slave_i(c_devs_eca_ctl));
+
+  -- Legacy 8ns time
+  ref_tai8ns <= "000" & s_time(63 downto 3);
   
-  c1 : eca_queue_channel
+  -- GPIO output from the ECA
+  gpio1 : if c_eca_gpio > 0 generate
+    gpio : for i in 0 to c_eca_gpio-1 generate
+      s_gpio_src_eca(i) <= s_eca_io(i)(0);
+    end generate;
+  end generate;
+  
+  -- LVDS output from the ECA
+  lvds1 : if c_eca_lvds > 0 generate
+    lvds : for i in 0 to c_eca_lvds-1 generate
+      bits : for b in 0 to 7 generate -- 0 goes first for ECA, 7 goes first for serdes
+        lvds_dat_fr_eca_chan(i)(b) <= s_eca_io(i+c_eca_gpio)(7-b);
+      end generate;
+    end generate;
+  end generate;
+  
+  -- GPIO input to the TLU
+  gpi1 : if c_tlu_gpio > 0 generate
+    gpio : for i in 0 to c_tlu_gpio-1 generate
+      s_tlu_io(i) <= (others => gpio_i(i));
+    end generate;
+  end generate;
+  
+  -- LVDS input to the TLU
+  lvd1 : if c_tlu_lvds > 0 generate
+    lvds : for i in 0 to c_tlu_lvds-1 generate
+      bits : for b in 0 to 7 generate -- 0 goes first for ECA
+        s_tlu_io(i+c_tlu_gpio)(b) <= lvds_i(i)(7-b);
+      end generate;
+    end generate;
+  end generate;
+  
+  c0 : eca_queue
+    generic map(
+      g_queue_id  => 0)
     port map(   
       a_clk_i     => clk_ref,
       a_rst_n_i   => rstn_ref,
-      a_channel_i => channels(1),
-      i_clk_i     => clk_sys,
-      i_rst_n_i   => rstn_sys,
-      i_master_o  => irq_cbar_slave_i(c_irqm_aq),
-      i_master_i  => irq_cbar_slave_o(c_irqm_aq),
+      a_stall_o   => s_stall_i(0),
+      a_channel_i => s_channel_o(0),
       q_clk_i     => clk_sys,
       q_rst_n_i   => rstn_sys,  
-      q_slave_i   => top_cbar_master_o(c_tops_eca_aq),
-      q_slave_o   => top_cbar_master_i(c_tops_eca_aq)); 
+      q_slave_i   => dev_bus_master_o(c_devs_eca_aq),
+      q_slave_o   => dev_bus_master_i(c_devs_eca_aq)); 
   
-  c2 : eca_lvds_channel
+  top_msi_master_i(c_topm_eca_wbm) <= cc_dummy_slave_out; -- does not accept MSIs
+  c1: eca_ac_wbm
+    generic map(
+      g_entries  => 16,
+      g_ram_size => 128)
     port map(
-      clk_i     => clk_ref,
-      rst_n_i   => rstn_ref,
-      channel_i => channels(2),
-      lvds_o    => lvds_o);
-  
-  c3 : eca_scubus_channel
-    port map(
-      clk_i     => clk_ref,
-      rst_n_i   => rstn_ref,
-      channel_i => channels(3),
-      tag_valid => tag_valid,
-      tag       => tag);
-  
-c4: eca_ac_wbm
-  generic map(
-     g_entries  => 16,
-     g_ram_size => 128   
-  )
-  Port map(
-   clk_ref_i   => clk_ref,                                           
-   rst_ref_n_i => rstn_ref,
-   channel_i   => channels(4),
-   
-   clk_sys_i   => clk_sys,
-   rst_sys_n_i => rstn_sys,
-   slave_i     => top_cbar_master_o(c_tops_eca_wbm),
-   slave_o     => top_cbar_master_i(c_tops_eca_wbm),
-   master_o    => top_cbar_slave_i(c_topm_eca_wbm),
-   master_i    => top_cbar_slave_o(c_topm_eca_wbm)                                         
-  );
+      clk_ref_i   => clk_ref,
+      rst_ref_n_i => rstn_ref,
+      channel_i   => s_channel_o(1),
+      clk_sys_i   => clk_sys,
+      rst_sys_n_i => rstn_sys,
+      slave_i     => dev_bus_master_o(c_devs_eca_wbm),
+      slave_o     => dev_bus_master_i(c_devs_eca_wbm),
+      master_o    => top_bus_slave_i(c_topm_eca_wbm),
+      master_i    => top_bus_slave_o(c_topm_eca_wbm));
 
+  c2 : eca_queue
+    generic map(
+      g_queue_id  => 2)
+    port map(   
+      a_clk_i     => clk_ref,
+      a_rst_n_i   => rstn_ref,
+      a_stall_o   => s_stall_i(2),
+      a_channel_i => s_channel_o(2),
+      q_clk_i     => clk_sys,
+      q_rst_n_i   => rstn_sys,  
+      q_slave_i   => dev_bus_master_o(c_devs_emb_cpu),
+      q_slave_o   => dev_bus_master_i(c_devs_emb_cpu)); 
+  
+  eca_scu : if g_en_scubus generate
+    c3 : eca_scubus_channel
+      port map(
+        clk_i     => clk_ref,
+        rst_n_i   => rstn_ref,
+        channel_i => s_channel_o(3),
+        tag_valid => tag_valid,
+        tag       => tag);
+  end generate;
+        
   lvds_pins : altera_lvds
     generic map(
       g_family  => g_family,
@@ -1497,42 +1691,34 @@ c4: eca_ac_wbm
       lvds_p_i     => lvds_p_i,
       lvds_n_i     => lvds_n_i,
       lvds_i_led_o => lvds_i_led_o,
-      dat_i        => lvds_o(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
+      dat_i        => lvds_dat(f_sub1(g_lvds_inout+g_lvds_out) downto 0),
       lvds_p_o     => lvds_p_o,
       lvds_n_o     => lvds_n_o,
       lvds_o_led_o => lvds_o_led_o);
-  
 
   CfiPFlash_n : if not g_en_cfi generate
-    top_cbar_master_i(c_tops_CfiPFlash) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_CfiPFlash) <= cc_dummy_slave_out;
   end generate;
-
   CfiPFlash_y : if g_en_cfi generate
-  CfiPFlash: XWB_CFI_WRAPPER 
-    port map(
-      clk_i          => clk_sys,
-      rst_n_i        => rstn_sys,
-      
-      -- Wishbone
-      slave_i        => top_cbar_master_o(c_tops_CfiPFlash),    -- to Slave
-      slave_o        => top_cbar_master_i(c_tops_CfiPFlash),    -- to WB
-      
-      -- External Parallel Flash Pins
-      AD             => cfi_ad,
-      DF             => cfi_df,
-      ADV_FSH        => cfi_adv_fsh,
-      nCE_FSH        => cfi_nce_fsh,
-      CLK_FSH        => cfi_clk_fsh,
-      nWE_FSH        => cfi_nwe_fsh,
-      nOE_FSH        => cfi_noe_fsh,
-      nRST_FSH       => cfi_nrst_fsh,
-      WAIT_FSH       => cfi_wait_fsh
-     );
+    CfiPFlash: XWB_CFI_WRAPPER 
+      port map(
+        clk_i          => clk_sys,
+        rst_n_i        => rstn_sys,
+        slave_i        => dev_bus_master_o(c_devs_CfiPFlash),    -- to Slave
+        slave_o        => dev_bus_master_i(c_devs_CfiPFlash),    -- to WB
+        AD             => cfi_ad,
+        DF             => cfi_df,
+        ADV_FSH        => cfi_adv_fsh,
+        nCE_FSH        => cfi_nce_fsh,
+        CLK_FSH        => cfi_clk_fsh,
+        nWE_FSH        => cfi_nwe_fsh,
+        nOE_FSH        => cfi_noe_fsh,
+        nRST_FSH       => cfi_nrst_fsh,
+        WAIT_FSH       => cfi_wait_fsh);
   end generate;
-
 
   lcd_n : if not g_en_lcd generate
-    top_cbar_master_i(c_tops_lcd) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_lcd) <= cc_dummy_slave_out;
   end generate;
   lcd_y : if g_en_lcd generate
     lcd : wb_serial_lcd
@@ -1542,8 +1728,8 @@ c4: eca_ac_wbm
       port map(
         slave_clk_i  => clk_sys,
         slave_rstn_i => rstn_sys,
-        slave_i      => top_cbar_master_o(c_tops_lcd),
-        slave_o      => top_cbar_master_i(c_tops_lcd),
+        slave_i      => dev_bus_master_o(c_devs_lcd),
+        slave_o      => dev_bus_master_i(c_devs_lcd),
         di_clk_i     => clk_20m,
         di_scp_o     => lcd_scp,
         di_lp_o      => lcd_lp,
@@ -1557,15 +1743,15 @@ c4: eca_ac_wbm
   end generate;
   
   oled_n : if not g_en_oled generate
-    top_cbar_master_i(c_tops_oled) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_oled) <= cc_dummy_slave_out;
   end generate;
   oled_y : if g_en_oled generate
     oled : display_console
       port map(
         clk_i      => clk_sys,
         nRst_i     => rstn_sys,
-        slave_i    => top_cbar_master_o(c_tops_oled),
-        slave_o    => top_cbar_master_i(c_tops_oled),
+        slave_i    => dev_bus_master_o(c_devs_oled),
+        slave_o    => dev_bus_master_i(c_devs_oled),
         RST_DISP_o => oled_rstn_o,
         DC_SPI_o   => oled_dc_o,
         SS_SPI_o   => oled_ss_o,
@@ -1575,52 +1761,49 @@ c4: eca_ac_wbm
   end generate;
   
   ssd1325_n : if not g_en_ssd1325 generate
-    top_cbar_master_i(c_tops_ssd1325) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_ssd1325) <= cc_dummy_slave_out;
   end generate;
   ssd1325_y : if g_en_ssd1325 generate
     ssd1325_display : wb_ssd1325_serial_driver
       port map (
         clk_sys_i  => clk_sys,
         rst_n_i    => rstn_sys,
-        slave_i    => top_cbar_master_o(c_tops_ssd1325),
-        slave_o    => top_cbar_master_i(c_tops_ssd1325),
+        slave_i    => dev_bus_master_o(c_devs_ssd1325),
+        slave_o    => dev_bus_master_i(c_devs_ssd1325),
         ssd_rst_o  => ssd1325_rst_o,
         ssd_dc_o   => ssd1325_dc_o,    
         ssd_ss_o   => ssd1325_ss_o,    
         ssd_sclk_o => ssd1325_sclk_o,   
-        ssd_data_o => ssd1325_data_o    
-      );
+        ssd_data_o => ssd1325_data_o);
   end generate;
 
   nau8811_n : if not g_en_nau8811 generate
-    top_cbar_master_i(c_tops_nau8811) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_nau8811) <= cc_dummy_slave_out;
   end generate;
   nau8811_y : if g_en_nau8811 generate
     nau8811_audio : wb_nau8811_audio_driver
       generic map (
-        g_use_external_pll => true
-      )
+        g_use_external_pll => true)
       port map (
         clk_sys_i    => clk_sys,
         rst_n_i      => rstn_sys,
         pll_ref_i    => core_clk_125m_local_i,
         trigger_i    => ext_pps,
-        slave_i      => top_cbar_master_o(c_tops_nau8811),
-        slave_o      => top_cbar_master_i(c_tops_nau8811),
+        slave_i      => dev_bus_master_o(c_devs_nau8811),
+        slave_o      => dev_bus_master_i(c_devs_nau8811),
         spi_csb_o    => nau8811_spi_csb_o,
         spi_sclk_o   => nau8811_spi_sclk_o,
         spi_sdio_o   => nau8811_spi_sdio_o, 
         iis_fs_o     => nau8811_iis_fs_o,
         iis_bclk_o   => nau8811_iis_bclk_o,
         iis_adcout_o => nau8811_iis_adcout_o,
-        iis_dacin_i  => nau8811_iis_dacin_i
-      );
+        iis_dacin_i  => nau8811_iis_dacin_i);
   end generate;
   
   scub_n : if not g_en_scubus generate
-    top_cbar_master_i(c_tops_scubus) <= cc_dummy_slave_out;
-    top_cbar_master_i(c_tops_scubirq) <= cc_dummy_slave_out;
-    irq_cbar_slave_i (c_irqm_scubus) <= cc_dummy_master_out;
+    dev_bus_master_i(c_devs_scubus)  <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_scubirq) <= cc_dummy_slave_out;
+    dev_msi_slave_i (c_devs_scubirq) <= cc_dummy_master_out;
     scubus_a_d <= (others => 'Z');
   end generate;
   scub_y : if g_en_scubus generate
@@ -1633,16 +1816,16 @@ c4: eca_ac_wbm
         Test                  => 0,  
         Time_Out_in_ns        => 350)
       port map(
-        clk_i    => clk_sys,
-        rst_n_i  => rstn_sys,
+        clk_i              => clk_sys,
+        rst_n_i            => rstn_sys,
         tag                => tag,
         tag_valid          => tag_valid,
-        irq_master_o       => irq_cbar_slave_i (c_irqm_scubus),
-        irq_master_i       => irq_cbar_slave_o (c_irqm_scubus),
-        ctrl_irq_o         => top_cbar_master_i(c_tops_scubirq),
-        ctrl_irq_i         => top_cbar_master_o(c_tops_scubirq),
-        scu_slave_o        => top_cbar_master_i(c_tops_scubus),
-        scu_slave_i        => top_cbar_master_o(c_tops_scubus),
+        irq_master_o       => dev_msi_slave_i (c_devs_scubirq),
+        irq_master_i       => dev_msi_slave_o (c_devs_scubirq),
+        ctrl_irq_o         => dev_bus_master_i(c_devs_scubirq),
+        ctrl_irq_i         => dev_bus_master_o(c_devs_scubirq),
+        scu_slave_o        => dev_bus_master_i(c_devs_scubus),
+        scu_slave_i        => dev_bus_master_o(c_devs_scubus),
         scub_data          => scubus_a_d,
         nscub_ds           => scubus_a_nds,
         nscub_dtack        => scubus_a_ndtack,
@@ -1655,9 +1838,9 @@ c4: eca_ac_wbm
   end generate;
   
   mil_n : if not g_en_mil generate
-    top_cbar_master_i(c_tops_mil) <= cc_dummy_slave_out;
-    top_cbar_master_i(c_tops_mil_ctrl) <= cc_dummy_slave_out;
-    irq_cbar_slave_i(c_irqm_mil) <= cc_dummy_master_out;
+    dev_bus_master_i(c_devs_mil)      <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_mil_ctrl) <= cc_dummy_slave_out;
+    dev_msi_slave_i (c_devs_mil_ctrl) <= cc_dummy_master_out;
   end generate;
   
   mil_y : if g_en_mil generate
@@ -1681,11 +1864,11 @@ c4: eca_ac_wbm
       clk_i           => clk_sys,
       rst_n_i         => rstn_sys,
       --msi if
-      irq_master_o    => irq_cbar_slave_i(c_irqm_mil),
-      irq_master_i    => irq_cbar_slave_o(c_irqm_mil),
+      irq_master_o    => dev_msi_slave_i (c_devs_mil_ctrl),
+      irq_master_i    => dev_msi_slave_o (c_devs_mil_ctrl),
       -- ctrl interface  
-      ctrl_slave_o    => top_cbar_master_i(c_tops_mil_ctrl),       
-      ctrl_slave_i    => top_cbar_master_o(c_tops_mil_ctrl),
+      ctrl_slave_o    => dev_bus_master_i(c_devs_mil_ctrl),       
+      ctrl_slave_i    => dev_bus_master_o(c_devs_mil_ctrl),
       --irq lines
       irq_i           => (mil_every_ms_intr_o,
                           mil_ev_fifo_ne_intr_o,
@@ -1701,8 +1884,8 @@ c4: eca_ac_wbm
       port map(
         clk_i         => clk_sys,
         nRst_i        => rstn_sys,
-        slave_i       => top_cbar_master_o(c_tops_mil),
-        slave_o       => top_cbar_master_i(c_tops_mil),
+        slave_i       => dev_bus_master_o(c_devs_mil),
+        slave_o       => dev_bus_master_i(c_devs_mil),
         nME_BOO       => mil_nme_boo_i,
         nME_BZO       => mil_nme_bzo_i,
         ME_SD         => mil_me_sd_i,
@@ -1760,70 +1943,31 @@ c4: eca_ac_wbm
   
   
   ow_n : if not g_en_user_ow generate
-    top_cbar_master_i(c_tops_ow) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_ow) <= cc_dummy_slave_out;
   end generate;
   ow_y : if g_en_user_ow generate
-    
     ow_io(0) <= user_ow_pwren(0) when (user_ow_pwren(0) = '1' or user_ow_en(0) = '1') else 'Z';
     ow_io(1) <= user_ow_pwren(1) when (user_ow_pwren(1) = '1' or user_ow_en(1) = '1') else 'Z';
-    
     ONEWIRE : xwb_onewire_master
       generic map(
         g_interface_mode      => PIPELINED,
         g_address_granularity => BYTE,
         g_num_ports           => 2,
         g_ow_btp_normal       => "5.0",
-        g_ow_btp_overdrive    => "1.0"
-        )
+        g_ow_btp_overdrive    => "1.0")
       port map(
-        clk_sys_i => clk_sys,
-        rst_n_i   => rstn_sys,
-
-        -- Wishbone
-        slave_i => top_cbar_master_o(c_tops_ow),
-        slave_o => top_cbar_master_i(c_tops_ow),
-        desc_o  => open,
-
+        clk_sys_i   => clk_sys,
+        rst_n_i     => rstn_sys,
+        slave_i     => dev_bus_master_o(c_devs_ow),
+        slave_o     => dev_bus_master_i(c_devs_ow),
+        desc_o      => open,
         owr_pwren_o => user_ow_pwren,
         owr_en_o    => user_ow_en,
-        owr_i       => ow_io
-        );
-  end generate;
-  
-  -- fg quad with wb interface, special solution for ring RF
-  fg_n  : if not g_en_fg generate
-    top_cbar_master_i(c_tops_fg)    <= cc_dummy_slave_out;
-    top_cbar_master_i(c_tops_fgirq) <= cc_dummy_slave_out;
-    top_cbar_slave_i(c_topm_fg)     <= cc_dummy_master_out;
-    irq_cbar_slave_i(c_irqm_fg)     <= cc_dummy_master_out;
-  end generate;
-  fg_y  : if g_en_fg generate
-    fg_quad: wb_fg_quad
-      generic map (
-        Clk_in_Hz => 62_500_000)
-      port map (
-        clk_i   => clk_sys,
-        rst_n_i => rstn_sys,
-        
-        -- slave wb port to fg
-        fg_slave_i => top_cbar_master_o(c_tops_fg),
-        fg_slave_o => top_cbar_master_i(c_tops_fg),
-        
-        -- master interface for output from fg to the top crossbar
-        fg_mst_i => top_cbar_slave_o(c_topm_fg),
-        fg_mst_o => top_cbar_slave_i(c_topm_fg),
-        
-        -- control interface for msi to top crossbar
-        ctrl_irq_i => top_cbar_master_o(c_tops_fgirq),
-        ctrl_irq_o => top_cbar_master_i(c_tops_fgirq),
-        
-        -- master interface to irq crossbar
-        irq_mst_i => irq_cbar_slave_o(c_irqm_fg),
-        irq_mst_o => irq_cbar_slave_i(c_irqm_fg));
+        owr_i       => ow_io);
   end generate;
   
   psram_n : if not g_en_psram generate
-    top_cbar_master_i(c_tops_psram) <= cc_dummy_slave_out;
+    dev_bus_master_i(c_devs_psram) <= cc_dummy_slave_out;
   end generate;
   psram_y : if g_en_psram generate
     ram : psram
@@ -1832,8 +1976,8 @@ c4: eca_ac_wbm
       port map(
       clk_i     => clk_sys,
       rstn_i    => rstn_sys,
-      slave_i   => top_cbar_master_o(c_tops_psram),
-      slave_o   => top_cbar_master_i(c_tops_psram),
+      slave_i   => dev_bus_master_o(c_devs_psram),
+      slave_o   => dev_bus_master_i(c_devs_psram),
       ps_clk    => ps_clk,
       ps_addr   => ps_addr,
       ps_data   => ps_data,
