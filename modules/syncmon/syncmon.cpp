@@ -50,8 +50,6 @@ using namespace GSI_TLU;
 /* ==================================================================================================== */
 #define LEMO_TOTAL_IOS            16
 #define LEMO_OE_SETUP             0
-#define TLU_ID                    0x4d78adfdU
-#define TLU_VENDOR                0x651
 #define DEBUG_MODE                0
 #define TARGET_PLATFORM_UNKNOWN   0
 #define TARGET_PLATFORM_32        1
@@ -199,15 +197,6 @@ int main (int argc, const char** argv)
   tlu.set_enable(false); /* No interrupts */
   tlu.clear(-1);
   tlu.listen(-1, true, true, 8); /* Listen on all inputs */
-  
-  /* Find the IO reconfig to enable/disable outputs to specific IOs */
-  std::vector<sdb_device> devs;
-  device.sdb_find_by_identity(TLU_VENDOR, TLU_ID, devs);
-  assert (devs.size() == 1);
-  address_t ioconf = devs[0].sdb_component.addr_first;
-  device.write(ioconf, EB_DATA32, LEMO_OE_SETUP);
-  ioconf = devs[0].sdb_component.addr_first + 4;
-  device.write(ioconf, EB_DATA32, LEMO_OE_SETUP);
   
   /* Reset variable */
   iSysCallRes = 0;
