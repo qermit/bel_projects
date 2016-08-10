@@ -111,7 +111,7 @@ void main(void) {
    int j;
 
    init();
-   uint32_t test = &pFtmIf->tPrep;
+   //uint32_t test = &pFtmIf->tPrep;
    
    
    // wait 1s + cpuIdx * 1/10s
